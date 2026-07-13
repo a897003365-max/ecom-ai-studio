@@ -194,10 +194,67 @@ export interface DingTalkStoreMetric extends DingTalkMetricTotals {
   offsiteSpend?: number;
 }
 
+export interface DingTalkMonthlyOverview {
+  month: string;
+  label: string;
+  period: DingTalkReportingPeriod;
+  metrics: {
+    netRevenue: number;
+    priorYearNetRevenue: number;
+    yoy: number | null;
+    onsiteSpend: number;
+    offsiteSpend: number;
+    onsiteFeeRate: number;
+    offsiteFeeRate: number;
+    totalFeeRate: number;
+    target: number;
+    completionRate: number;
+  };
+  daily: Array<{
+    date: string;
+    totalNetRevenue: number;
+    channels: Array<{ platform: string; netRevenue: number }>;
+  }>;
+  source: string;
+}
+
+export interface DingTalkComparisonItem {
+  level: "channel" | "store";
+  platform: string;
+  name: string;
+  netRevenue: number;
+  netRevenueChange: number | null;
+  spend: number;
+  spendChange: number | null;
+  feeRate: number;
+  feeRateChange: number | null;
+  refundRate: number;
+  refundRateChange: number | null;
+}
+
+export interface DingTalkLatestComparison {
+  asOf: string;
+  previousDate: string;
+  channels: DingTalkComparisonItem[];
+  stores: DingTalkComparisonItem[];
+}
+
 export interface DingTalkSnapshot {
   source: "dingtalk_export" | "dingtalk_api";
   refreshedAt: string;
   sourceFile: string;
+  schedule?: string[];
+  monthly?: {
+    month: string;
+    netRevenue: number;
+    yoy: number;
+    onsiteSpend: number;
+    offsiteSpend: number;
+    onsiteFeeRate?: number;
+    offsiteFeeRate?: number;
+    totalSpendRate: number;
+    completionRate: number;
+  };
   period: { start: string | null; end: string | null };
   totals: DingTalkMetricTotals;
   platforms: Array<{ platform: string } & DingTalkMetricTotals>;
@@ -210,6 +267,9 @@ export interface DingTalkSnapshot {
     dailyPlatforms?: Array<{ date: string; platform: string } & DingTalkMetricTotals>;
     dailyStores?: Array<{ date: string; platform: string; store: string } & DingTalkMetricTotals>;
     dailyOffsiteSpend?: Array<{ date: string; spend: number }>;
+    monthlyOverview?: DingTalkMonthlyOverview;
+    latestComparison?: DingTalkLatestComparison;
+    formulaLineage?: { summary: string; monthlyRollup: string; target: string };
   };
   inventory: Array<{
     name: string;

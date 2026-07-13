@@ -172,7 +172,7 @@ export default function App() {
     <div className="app-shell">
       <Sidebar activePage={activePage} items={navItems} onNavigate={handleNavigate} />
       <div className="flex min-w-0 flex-1 flex-col">
-        <Topbar onAction={showToast} />
+        <Topbar onAction={showToast} showStoreSelector={activePage !== "analytics"} />
         <div className="border-b border-[var(--border)] bg-[var(--bg-2)] px-4 py-3 lg:hidden">
           <div className="flex gap-2 overflow-x-auto">
             {navItems.map((item) => (

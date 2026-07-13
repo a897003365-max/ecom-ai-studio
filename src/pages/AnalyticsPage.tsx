@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { AnalyticsDateFilter } from "../components/AnalyticsDateFilter";
 import { Card } from "../components/Card";
+import { ComparisonTicker } from "../components/ComparisonTicker";
 import { MetricCard } from "../components/MetricCard";
+import { MonthlyOverview } from "../components/MonthlyOverview";
 import { PageHeader } from "../components/PageHeader";
 import { PlatformBadge } from "../components/PlatformBadge";
 import { StatusTag } from "../components/StatusTag";
@@ -53,16 +55,11 @@ function liveKpis(snapshot: DingTalkSnapshot): KpiMetric[] {
   ];
 }
 
-function linePoints(values: number[]) {
-  if (!values.length) return "";
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const span = max - min || 1;
-  return values.map((value, index) => {
-    const x = 20 + (values.length === 1 ? 0 : index * 660 / (values.length - 1));
-    const y = 24 + (1 - (value - min) / span) * 132;
-    return `${x.toFixed(1)},${y.toFixed(1)}`;
-  }).join(" ");
+function dateTime(value?: string | null) {
+  if (!value) return "尚未同步";
+  return new Intl.DateTimeFormat("zh-CN", {
+    month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false,
+  }).format(new Date(value)).replaceAll("/", "-");
 }
 
 export function AnalyticsPage({ onAction }: AnalyticsPageProps) {
@@ -87,19 +84,13 @@ export function AnalyticsPage({ onAction }: AnalyticsPageProps) {
     void loadAnalytics();
   }, []);
 
-  const warehouse = integration?.warehouse ?? null;
-  const feishu = integration?.feishu ?? null;
   const dingtalk = integration?.dingtalk ?? null;
   const reporting = dingtalk?.reporting;
   const metrics = dingtalk ? liveKpis(dingtalk) : [];
   const platforms = useMemo(() => (dingtalk?.platforms ?? []).map(withBusinessRates), [dingtalk]);
   const stores = useMemo(() => (dingtalk?.stores ?? []).map(withBusinessRates), [dingtalk]);
-  const trend = useMemo(() => (dingtalk?.daily ?? []).map((row) => ({
-    date: row.date,
-    feeRate: row.feeRate ?? (row.netRevenue ? row.spend / row.netRevenue : 0),
-    recoveryRate: row.recoveryRate ?? (row.gmv ? row.netRevenue / row.gmv : 0),
-    refundRate: row.refundRate ?? (row.gmv ? row.refund / row.gmv : 0),
-  })), [dingtalk]);
+  const latestSync = integration?.history.find((item) => item.sourceId === "dingtalk" && item.status === "success")?.finishedAt
+    ?? dingtalk?.refreshedAt;
 
   const highestRefund = [...platforms].sort((left, right) => right.refundRate - left.refundRate)[0];
   const highestFeeStore = [...stores].sort((left, right) => right.feeRate - left.feeRate)[0];
@@ -124,7 +115,7 @@ export function AnalyticsPage({ onAction }: AnalyticsPageProps) {
     <div>
       <PageHeader
         title="运营数据看板"
-        subtitle="按钉钉“全渠道数据表”第 10–39 行经营口径，联动日期重算全渠道、渠道和店铺结果。"
+        subtitle={`每日同步计划 ${dingtalk?.schedule?.join(" / ") || "10:00 / 12:30 / 17:30"} · 最近同步 ${dateTime(latestSync)} · 月度指标沿用“全渠道数据表”第 2–3 行完整跨表依赖`}
         actions={
           <>
             <button className="btn" disabled={syncing !== null} onClick={() => void sync("dingtalk")} type="button">
@@ -145,18 +136,24 @@ export function AnalyticsPage({ onAction }: AnalyticsPageProps) {
 
       {error && <div className="mb-4 rounded-md border border-[var(--red)]/40 bg-[var(--red-bg)] px-3 py-2 text-xs text-[var(--red)]">{error}</div>}
 
-      <div className="mb-5 flex flex-wrap items-center gap-2 border-y border-[var(--border)] bg-white/[0.015] px-3 py-2.5 text-xs text-[var(--muted)]">
-        <StatusTag label={dingtalk ? "钉钉经营实数" : "钉钉未同步"} tone={dingtalk ? "green" : "orange"} dot />
-        <StatusTag label={warehouse ? "本地数仓可用" : "数仓未同步"} tone={warehouse ? "green" : "muted"} dot />
-        <StatusTag label={feishu ? "飞书聚合可用" : "飞书未同步"} tone={feishu ? "green" : "muted"} dot />
-        {dingtalk && <span>当前经营周期 {dingtalk.period.start} 至 {dingtalk.period.end}</span>}
-        {reporting && <span>· 完整数据截止 {reporting.completedThrough}</span>}
-      </div>
-
       {loading && !dingtalk ? (
         <Card><div className="py-16 text-center text-sm text-[var(--muted)]">正在读取钉钉经营数据...</div></Card>
       ) : dingtalk ? (
         <>
+          {reporting?.latestComparison && (
+            <div className="mb-5" data-testid="comparison-ticker"><ComparisonTicker comparison={reporting.latestComparison} /></div>
+          )}
+
+          {reporting?.monthlyOverview && (
+            <section className="monthly-overview mb-5" data-testid="monthly-overview">
+              <div className="monthly-overview-heading">
+                <div><span>月度经营概览</span><small>{reporting.monthlyOverview.period.start} 至 {reporting.monthlyOverview.period.end}</small></div>
+                <StatusTag label="钉钉公式链已对账" tone="green" dot />
+              </div>
+              <div data-testid="channel-revenue-chart"><MonthlyOverview overview={reporting.monthlyOverview} /></div>
+            </section>
+          )}
+
           <div className="metric-grid mb-5" data-testid="analytics-kpis">
             {metrics.map((metric) => <MetricCard key={metric.label} metric={metric} />)}
           </div>
@@ -192,27 +189,14 @@ export function AnalyticsPage({ onAction }: AnalyticsPageProps) {
             </TableShell>
           </Card>
 
-          <div className="split-grid items-stretch">
-            <Card title="经营比率趋势">
-              <div className="chart-grid h-[230px] rounded-lg border border-[var(--border)] p-3">
-                <svg aria-label="费比、回款率、退款率趋势" height="180" role="img" viewBox="0 0 700 180" width="100%">
-                  <polyline fill="none" points={linePoints(trend.map((item) => item.recoveryRate))} stroke="var(--green)" strokeWidth="2.5" />
-                  <polyline fill="none" points={linePoints(trend.map((item) => item.refundRate))} stroke="var(--red)" strokeWidth="2.5" />
-                  <polyline fill="none" points={linePoints(trend.map((item) => item.feeRate))} stroke="var(--orange)" strokeWidth="2.5" />
-                </svg>
-                <div className="flex flex-wrap gap-4 text-[11.5px] text-[var(--muted)]"><span><b className="text-[var(--green)]">●</b> 回款率</span><span><b className="text-[var(--red)]">●</b> 退款率</span><span><b className="text-[var(--orange)]">●</b> 费比</span><span className="ml-auto">{trend[0]?.date} ~ {trend.at(-1)?.date}</span></div>
-              </div>
-            </Card>
-
-            <Card title="当前经营提示">
-              <div className="grid gap-3">
+          <Card title="当前经营提示">
+              <div className="insight-grid">
                 <div className="insight-row"><span>回款贡献最高</span><b>{leadingChannel?.platform ?? "—"} · {percent(leadingChannel?.channelShare)}</b></div>
                 <div className="insight-row"><span>退款率最高渠道</span><b className="text-[var(--red)]">{highestRefund?.platform ?? "—"} · {percent(highestRefund?.refundRate)}</b></div>
                 <div className="insight-row"><span>费比最高店铺</span><b className="text-[var(--orange)]">{highestFeeStore?.store ?? "—"} · {percent(highestFeeStore?.feeRate)}</b></div>
-                <div className="rounded-md border border-[var(--border)] bg-white/[0.02] px-3 py-2 text-xs leading-5 text-[var(--muted)]">所有提示均使用当前日期筛选范围；零分母只显示 0，不与其他数据源进行静默回退。</div>
+                <div className="insight-note">提示跟随日期筛选；月度概览按筛选结束日所在月计算 MTD，滚动播报固定使用最新完整日期。</div>
               </div>
-            </Card>
-          </div>
+          </Card>
         </>
       ) : (
         <Card><div className="py-16 text-center text-sm text-[var(--muted)]">钉钉经营数据尚未同步，请先点击“同步钉钉”。</div></Card>
