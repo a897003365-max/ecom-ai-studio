@@ -259,6 +259,8 @@ function parseSummarySheet(rows) {
     yoy: numberValue(monthlyRow[findColumn(monthlyHeaders, [/^同比$/])]),
     onsiteSpend: numberValue(monthlyRow[findColumn(monthlyHeaders, [/站内费用/])]),
     offsiteSpend: numberValue(monthlyRow[findColumn(monthlyHeaders, [/站外费用/])]),
+    onsiteFeeRate: numberValue(monthlyRow[findColumn(monthlyHeaders, [/站内月费率|站内费率/])]),
+    offsiteFeeRate: numberValue(monthlyRow[findColumn(monthlyHeaders, [/站外月费率|站外费率/])]),
     totalSpendRate: numberValue(monthlyRow[findColumn(monthlyHeaders, [/总费率/])]),
     completionRate: numberValue(monthlyRow[findColumn(monthlyHeaders, [/总完成率/])]),
   };
@@ -337,11 +339,12 @@ function parseSummarySheet(rows) {
 
 function parseTargets(rows, monthNumber) {
   const headerIndex = rows.findIndex((row) => row.map(normalizedHeader).includes("渠道") && row.map(normalizedHeader).includes("店铺"));
-  if (headerIndex < 0) return { byPlatform: new Map(), total: 0 };
+  if (headerIndex < 0) return { byPlatform: new Map(), total: 0, monthlyTotals: {} };
   const headers = rows[headerIndex].map(textValue);
   const monthIndex = headers.findIndex((value) => value === `${monthNumber}月`);
-  if (monthIndex < 0) return { byPlatform: new Map(), total: 0 };
+  if (monthIndex < 0) return { byPlatform: new Map(), total: 0, monthlyTotals: {} };
   const byPlatform = new Map();
+  const monthlyTotals = {};
   let total = 0;
   for (const row of rows.slice(headerIndex + 1)) {
     const label = textValue(row[0]);
@@ -349,12 +352,16 @@ function parseTargets(rows, monthNumber) {
     const value = numberValue(row[monthIndex]);
     if (/总计|合计/.test(label)) {
       total = value;
+      for (let month = 1; month <= 12; month += 1) {
+        const index = headers.findIndex((header) => header === `${month}月`);
+        monthlyTotals[String(month).padStart(2, "0")] = index >= 0 ? numberValue(row[index]) : 0;
+      }
       break;
     }
     const platform = platformName(label);
     byPlatform.set(platform, (byPlatform.get(platform) || 0) + value);
   }
-  return { byPlatform, total };
+  return { byPlatform, total, monthlyTotals };
 }
 
 function detailMetricIndexes(headers) {
@@ -453,6 +460,136 @@ function dateInRange(date, start, end) {
   return date >= start && date <= end;
 }
 
+function shiftYear(date, offset) {
+  const value = new Date(`${date}T00:00:00Z`);
+  value.setUTCFullYear(value.getUTCFullYear() + offset);
+  return value.toISOString().slice(0, 10);
+}
+
+function shiftDay(date, offset) {
+  const value = new Date(`${date}T00:00:00Z`);
+  value.setUTCDate(value.getUTCDate() + offset);
+  return value.toISOString().slice(0, 10);
+}
+
+function dateSequence(start, end) {
+  const result = [];
+  for (let date = start; date <= end; date = shiftDay(date, 1)) result.push(date);
+  return result;
+}
+
+function comparisonChange(current, previous) {
+  if (!previous) return current ? null : 0;
+  return current / previous - 1;
+}
+
+function comparisonItem(level, row, previous) {
+  const currentMetric = reportingMetricShape(row);
+  const previousMetric = reportingMetricShape(previous ?? {});
+  return {
+    level,
+    platform: platformName(row.platform),
+    name: level === "channel" ? platformName(row.platform) : row.store,
+    netRevenue: currentMetric.netRevenue,
+    netRevenueChange: comparisonChange(currentMetric.netRevenue, previousMetric.netRevenue),
+    spend: currentMetric.spend,
+    spendChange: comparisonChange(currentMetric.spend, previousMetric.spend),
+    feeRate: currentMetric.feeRate,
+    feeRateChange: comparisonChange(currentMetric.feeRate, previousMetric.feeRate),
+    refundRate: currentMetric.refundRate,
+    refundRateChange: comparisonChange(currentMetric.refundRate, previousMetric.refundRate),
+  };
+}
+
+function buildLatestComparison(snapshot) {
+  const asOf = snapshot.reporting.completedThrough;
+  const previousDate = shiftDay(asOf, -1);
+  const platformRows = snapshot.reporting.dailyPlatforms.map((row) => ({ ...row, platform: platformName(row.platform) }));
+  const currentChannels = aggregateMetricRows(platformRows.filter((row) => row.date === asOf), ["platform"]);
+  const previousChannels = new Map(aggregateMetricRows(platformRows.filter((row) => row.date === previousDate), ["platform"])
+    .map((row) => [row.platform, row]));
+  const channels = currentChannels
+    .map((row) => comparisonItem("channel", row, previousChannels.get(row.platform)))
+    .sort((left, right) => right.netRevenue - left.netRevenue);
+
+  const storeRows = snapshot.reporting.dailyStores.map((row) => ({ ...row, platform: platformName(row.platform) }));
+  const currentStores = aggregateMetricRows(storeRows.filter((row) => row.date === asOf), ["platform", "store"]);
+  const previousStores = new Map(aggregateMetricRows(storeRows.filter((row) => row.date === previousDate), ["platform", "store"])
+    .map((row) => [`${row.platform}\u0000${row.store}`, row]));
+  const stores = currentStores
+    .map((row) => comparisonItem("store", row, previousStores.get(`${row.platform}\u0000${row.store}`)))
+    .sort((left, right) => right.netRevenue - left.netRevenue);
+  return { asOf, previousDate, channels, stores };
+}
+
+function buildMonthlyOverview(snapshot, end) {
+  const month = end.slice(0, 7);
+  const monthNumber = end.slice(5, 7);
+  const start = `${month}-01`;
+  const platformRows = snapshot.reporting.dailyPlatforms
+    .filter((row) => dateInRange(row.date, start, end))
+    .map((row) => ({ ...row, platform: platformName(row.platform) }));
+  const current = platformRows.reduce((total, row) => addMetrics(total, row), metricShape());
+  const offsiteSpend = snapshot.reporting.dailyOffsiteSpend
+    .filter((row) => dateInRange(row.date, start, end))
+    .reduce((sum, row) => sum + Number(row.spend || 0), 0);
+  const priorStart = shiftYear(start, -1);
+  const priorEnd = shiftYear(end, -1);
+  const priorYearNetRevenue = snapshot.reporting.dailyPlatforms
+    .filter((row) => dateInRange(row.date, priorStart, priorEnd))
+    .reduce((sum, row) => sum + Number(row.netRevenue || 0), 0);
+  const target = Number(snapshot.reporting.monthlyTargets?.[monthNumber]
+    || (month === snapshot.reporting.completedThrough.slice(0, 7) ? snapshot.totals.target : 0)
+    || 0);
+  const sourceSummary = end === snapshot.reporting.completedThrough
+    && snapshot.monthly?.month === `${Number(monthNumber)}月`;
+  const sourceNetRevenue = Number(snapshot.monthly?.netRevenue || 0);
+  const sourceYoy = Number(snapshot.monthly?.yoy || 0);
+  const metrics = sourceSummary ? {
+    netRevenue: sourceNetRevenue,
+    priorYearNetRevenue: sourceYoy === -1 ? 0 : sourceNetRevenue / (1 + sourceYoy),
+    yoy: sourceYoy,
+    onsiteSpend: Number(snapshot.monthly?.onsiteSpend || 0),
+    offsiteSpend: Number(snapshot.monthly?.offsiteSpend || 0),
+    onsiteFeeRate: Number(snapshot.monthly?.onsiteFeeRate || (sourceNetRevenue ? snapshot.monthly?.onsiteSpend / sourceNetRevenue : 0)),
+    offsiteFeeRate: Number(snapshot.monthly?.offsiteFeeRate || (sourceNetRevenue ? snapshot.monthly?.offsiteSpend / sourceNetRevenue : 0)),
+    totalFeeRate: Number(snapshot.monthly?.totalSpendRate || (sourceNetRevenue ? (snapshot.monthly?.onsiteSpend + snapshot.monthly?.offsiteSpend) / sourceNetRevenue : 0)),
+    target,
+    completionRate: Number(snapshot.monthly?.completionRate || (target ? sourceNetRevenue / target : 0)),
+  } : {
+    netRevenue: current.netRevenue,
+    priorYearNetRevenue,
+    yoy: priorYearNetRevenue ? current.netRevenue / priorYearNetRevenue - 1 : null,
+    onsiteSpend: current.spend,
+    offsiteSpend,
+    onsiteFeeRate: current.netRevenue ? current.spend / current.netRevenue : 0,
+    offsiteFeeRate: current.netRevenue ? offsiteSpend / current.netRevenue : 0,
+    totalFeeRate: current.netRevenue ? (current.spend + offsiteSpend) / current.netRevenue : 0,
+    target,
+    completionRate: target ? current.netRevenue / target : 0,
+  };
+  const channelOrder = aggregateMetricRows(platformRows, ["platform"])
+    .sort((left, right) => right.netRevenue - left.netRevenue)
+    .map((row) => row.platform);
+  const dayMap = new Map(aggregateMetricRows(platformRows, ["date", "platform"])
+    .map((row) => [`${row.date}\u0000${row.platform}`, row]));
+  const daily = dateSequence(start, end).map((date) => {
+    const channels = channelOrder.map((platform) => ({
+      platform,
+      netRevenue: Number(dayMap.get(`${date}\u0000${platform}`)?.netRevenue || 0),
+    }));
+    return { date, totalNetRevenue: channels.reduce((sum, row) => sum + row.netRevenue, 0), channels };
+  });
+  return {
+    month,
+    label: `${Number(month.slice(5, 7))}月 MTD`,
+    period: { start, end },
+    metrics,
+    daily,
+    source: sourceSummary ? "全渠道数据表第2-3行及其跨表依赖" : "按筛选结束日期重算的跨渠道日明细",
+  };
+}
+
 function normalizedReportingPeriod(snapshot, range = {}) {
   const reporting = snapshot.reporting;
   const available = reporting.availablePeriod;
@@ -512,6 +649,9 @@ export function filterDingTalkSnapshot(snapshot, range = {}) {
       availablePeriod: snapshot.reporting.availablePeriod,
       completedThrough: snapshot.reporting.completedThrough,
       selectedPeriod: period,
+      monthlyOverview: buildMonthlyOverview(snapshot, period.end),
+      latestComparison: buildLatestComparison(snapshot),
+      formulaLineage: snapshot.reporting.formulaLineage,
     },
   };
 }
@@ -575,6 +715,12 @@ export function buildDingTalkSnapshot(sheets) {
       dailyPlatforms,
       dailyStores,
       dailyOffsiteSpend,
+      monthlyTargets: targets.monthlyTotals,
+      formulaLineage: {
+        summary: "全渠道数据表!A2:I3 → C53/E53/F53/G53/H53/L57",
+        monthlyRollup: "全渠道数据表!A45:L74 → 各渠道及店铺日明细",
+        target: "销售目标!A2:O10 → 对应月份总计",
+      },
     },
     inventory: sheets.map((sheet) => {
       const detail = details.find((item) => item.sheet === sheet.sheet);
