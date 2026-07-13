@@ -150,7 +150,7 @@ export function AnalyticsPage({ onAction }: AnalyticsPageProps) {
                 <div><span>月度经营概览</span><small>{reporting.monthlyOverview.period.start} 至 {reporting.monthlyOverview.period.end}</small></div>
                 <StatusTag label="钉钉公式链已对账" tone="green" dot />
               </div>
-              <div data-testid="channel-revenue-chart"><MonthlyOverview overview={reporting.monthlyOverview} /></div>
+              <div><MonthlyOverview overview={reporting.monthlyOverview} /></div>
             </section>
           )}
 
