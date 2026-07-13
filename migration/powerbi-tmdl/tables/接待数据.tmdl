@@ -1,0 +1,406 @@
+table 接待数据
+	isHidden
+	lineageTag: 343f3322-e56e-476b-8f36-a087e3661cdc
+
+	column 'Source.Name'
+		dataType: string
+		isHidden
+		lineageTag: fc7abfbc-9a80-4eaf-9d50-f97b64a28696
+		summarizeBy: none
+		sourceColumn: Source.Name
+
+		changedProperty = IsHidden
+
+		annotation SummarizationSetBy = Automatic
+
+	column 客服
+		dataType: string
+		isHidden
+		lineageTag: af915a20-7b68-4364-ac01-8c81738e8214
+		summarizeBy: none
+		sourceColumn: 客服
+
+		changedProperty = IsHidden
+
+		annotation SummarizationSetBy = Automatic
+
+	column 服务时长
+		dataType: double
+		isHidden
+		lineageTag: 3ac2bd62-6a4c-4a5c-b2d7-d8df5ee26b8f
+		summarizeBy: sum
+		sourceColumn: 服务时长
+
+		changedProperty = IsHidden
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 咨询量
+		dataType: double
+		isHidden
+		lineageTag: 656b7a86-2f94-4c7e-9133-73575ff7140d
+		summarizeBy: sum
+		sourceColumn: 咨询量
+
+		changedProperty = IsHidden
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 接待量
+		dataType: double
+		isHidden
+		lineageTag: 3965eafc-0233-4c2e-9100-01cbe1b9b3bb
+		summarizeBy: sum
+		sourceColumn: 接待量
+
+		changedProperty = IsHidden
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 回复率
+		dataType: double
+		isHidden
+		lineageTag: 6d566052-0213-4eea-9526-9102499c791a
+		summarizeBy: sum
+		sourceColumn: 回复率
+
+		changedProperty = IsHidden
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 30s应答率
+		dataType: double
+		isHidden
+		lineageTag: 22acd06c-6733-42b9-8c14-4e361f3527af
+		summarizeBy: sum
+		sourceColumn: 30s应答率
+
+		changedProperty = IsHidden
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 首次平均响应时间
+		dataType: double
+		isHidden
+		lineageTag: 0e02e263-1768-4ab1-8191-8f1253154a46
+		summarizeBy: sum
+		sourceColumn: 首次平均响应时间
+
+		changedProperty = IsHidden
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 平均响应时间
+		dataType: double
+		isHidden
+		lineageTag: 9b84b691-0f61-4dcc-8dee-4140d7aa6857
+		summarizeBy: sum
+		sourceColumn: 平均响应时间
+
+		changedProperty = IsHidden
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 新平均响应时间
+		dataType: double
+		isHidden
+		lineageTag: f6e3767c-7e07-41d7-af3e-e186149df683
+		summarizeBy: sum
+		sourceColumn: 新平均响应时间
+
+		changedProperty = IsHidden
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 平均会话时长
+		dataType: double
+		isHidden
+		lineageTag: 2d1b6795-3793-458f-a4c6-cc6e0dbefd98
+		summarizeBy: sum
+		sourceColumn: 平均会话时长
+
+		changedProperty = IsHidden
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 平均回复消息数
+		dataType: double
+		isHidden
+		lineageTag: 85d11413-6102-480f-8af6-5723cca519e8
+		summarizeBy: sum
+		sourceColumn: 平均回复消息数
+
+		changedProperty = IsHidden
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 无响应量
+		dataType: int64
+		isHidden
+		formatString: 0
+		lineageTag: 33e529cc-fe61-46d5-8f9c-b60fa9b9f5a7
+		summarizeBy: sum
+		sourceColumn: 无响应量
+
+		changedProperty = IsHidden
+
+		annotation SummarizationSetBy = Automatic
+
+	column 3分钟回复率（客服维度-不含留言）
+		dataType: double
+		isHidden
+		lineageTag: 9345c9f9-3a24-4902-9fe6-caa3eb7f20df
+		summarizeBy: sum
+		sourceColumn: 3分钟回复率（客服维度-不含留言）
+
+		changedProperty = IsHidden
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 邀评数
+		dataType: double
+		isHidden
+		lineageTag: 34c6b632-27e4-4f31-a1a9-9e8f1cfb8afc
+		summarizeBy: sum
+		sourceColumn: 邀评数
+
+		changedProperty = IsHidden
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 邀评率
+		dataType: double
+		isHidden
+		lineageTag: 916b78f9-2cfc-48cb-bc19-5177c335d87d
+		summarizeBy: sum
+		sourceColumn: 邀评率
+
+		changedProperty = IsHidden
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 评价量
+		dataType: int64
+		isHidden
+		formatString: 0
+		lineageTag: 47176a42-1ea9-4f54-9b68-8be959ecb512
+		summarizeBy: sum
+		sourceColumn: 评价量
+
+		changedProperty = IsHidden
+
+		annotation SummarizationSetBy = Automatic
+
+	column 评价率
+		dataType: string
+		isHidden
+		lineageTag: 411b9803-8de9-4c8d-9786-97ee7b5e71d1
+		summarizeBy: none
+		sourceColumn: 评价率
+
+		changedProperty = IsHidden
+
+		annotation SummarizationSetBy = Automatic
+
+	column 好评量
+		dataType: double
+		isHidden
+		lineageTag: 9cc0480a-18f2-4430-8f14-ad60bb5e38aa
+		summarizeBy: sum
+		sourceColumn: 好评量
+
+		changedProperty = IsHidden
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 满意率
+		dataType: string
+		isHidden
+		lineageTag: 7a437e0c-906a-44ac-acec-b9d822e07ca8
+		summarizeBy: none
+		sourceColumn: 满意率
+
+		changedProperty = IsHidden
+
+		annotation SummarizationSetBy = Automatic
+
+	column 差评量
+		dataType: double
+		isHidden
+		lineageTag: 73e3f278-59d9-4930-9220-d2676626ea30
+		summarizeBy: sum
+		sourceColumn: 差评量
+
+		changedProperty = IsHidden
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 不满意率
+		dataType: string
+		isHidden
+		lineageTag: 137879fd-4ea8-4e0c-a8d6-36caef132ee8
+		summarizeBy: none
+		sourceColumn: 不满意率
+
+		changedProperty = IsHidden
+
+		annotation SummarizationSetBy = Automatic
+
+	column 一般评价量
+		dataType: int64
+		isHidden
+		formatString: 0
+		lineageTag: a81bc2df-e6d7-4c1a-b109-2f3d6d757dcc
+		summarizeBy: sum
+		sourceColumn: 一般评价量
+
+		changedProperty = IsHidden
+
+		annotation SummarizationSetBy = Automatic
+
+	column 咨询差评率
+		dataType: double
+		isHidden
+		lineageTag: 9ae093a1-a9cb-4595-b3e8-8e343c91e29a
+		summarizeBy: sum
+		sourceColumn: 咨询差评率
+
+		changedProperty = IsHidden
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 解决量
+		dataType: double
+		isHidden
+		lineageTag: eff9878d-1500-4b7f-bb9c-267eab124325
+		summarizeBy: sum
+		sourceColumn: 解决量
+
+		changedProperty = IsHidden
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 未解决量
+		dataType: double
+		isHidden
+		lineageTag: d45f9588-6844-4f39-bc56-e6cc5ad68534
+		summarizeBy: sum
+		sourceColumn: 未解决量
+
+		changedProperty = IsHidden
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 解决率
+		dataType: string
+		isHidden
+		lineageTag: 5f2b4c38-3ed1-45c2-90e5-6b3a18acef6c
+		summarizeBy: none
+		sourceColumn: 解决率
+
+		changedProperty = IsHidden
+
+		annotation SummarizationSetBy = Automatic
+
+	column 留言回复量
+		dataType: string
+		isHidden
+		lineageTag: 022fcd1b-fa75-4333-b205-006d8e5d30b1
+		summarizeBy: none
+		sourceColumn: 留言回复量
+
+		changedProperty = IsHidden
+
+		annotation SummarizationSetBy = Automatic
+
+	column 留言分配量
+		dataType: string
+		isHidden
+		lineageTag: 54297d21-af34-4ec0-b0c9-451a7153ae49
+		summarizeBy: none
+		sourceColumn: 留言分配量
+
+		changedProperty = IsHidden
+
+		annotation SummarizationSetBy = Automatic
+
+	column 留言接待量
+		dataType: string
+		isHidden
+		lineageTag: 270b1885-bda0-4732-894f-741120bc1cd6
+		summarizeBy: none
+		sourceColumn: 留言接待量
+
+		changedProperty = IsHidden
+
+		annotation SummarizationSetBy = Automatic
+
+	column 留言响应率
+		dataType: string
+		isHidden
+		lineageTag: f5065b88-77ad-43cb-8872-919bc894934c
+		summarizeBy: none
+		sourceColumn: 留言响应率
+
+		changedProperty = IsHidden
+
+		annotation SummarizationSetBy = Automatic
+
+	partition 接待数据 = m
+		mode: import
+		source =
+				let
+				    源 = Folder.Files("D:\麻大师\日更数据\天猫旗舰店\10-2京东客服绩效明细\接待数据"),
+				    筛选的隐藏文件1 = Table.SelectRows(源, each [Attributes]?[Hidden]? <> true),
+				    调用自定义函数1 = Table.AddColumn(筛选的隐藏文件1, "转换文件 (45)", each #"转换文件 (45)"([Content])),
+				    重命名的列1 = Table.RenameColumns(调用自定义函数1, {"Name", "Source.Name"}),
+				    删除的其他列1 = Table.SelectColumns(重命名的列1, {"Source.Name", "转换文件 (45)"}),
+				    扩展的表格列1 = Table.ExpandTableColumn(删除的其他列1, "转换文件 (45)", Table.ColumnNames(#"转换文件 (45)"(#"示例文件 (45)"))),
+				    更改的类型 = Table.TransformColumnTypes(扩展的表格列1,{{"Source.Name", type text}, {"客服", type text}, {"服务时长", type number}, {"咨询量", type number}, {"接待量", type number}, {"应答率", Percentage.Type}, {"30s应答率", Percentage.Type}, {"首次平均响应时间", type number}, {"平均响应时长", type number}, {"平均响应时长(新标)", type number}, {"平均会话时长", type number}, {"平均回复消息数", type number}, {"无响应量", Int64.Type}, {"3分钟回复率（客服维度-不含留言）", Percentage.Type}, {"邀评数", type number}, {"邀评率", Percentage.Type}, {"评价量", Int64.Type}, {"评价率", type text}, {"好评量", type number}, {"满意率", type text}, {"差评量", type number}, {"不满意率", type text}, {"一般评价量", Int64.Type}, {"咨询差评率", type number}, {"解决量", type number}, {"未解决量", type number}, {"解决率", type text}, {"留言回复量", type any}, {"留言分配量", type any}, {"留言接待量", type any}, {"留言响应率", type text}}),
+				    筛选的行 = Table.SelectRows(更改的类型, each ([客服] <> null and [客服] <> "均值" and [客服] <> "总值")),
+				    重命名的列 = Table.RenameColumns(筛选的行,{{"平均响应时长(新标)", "新平均响应时间"}, {"平均响应时长", "平均响应时间"}, {"应答率", "回复率"}})
+				in
+				    重命名的列
+
+	changedProperty = IsHidden
+
+	annotation PBI_NavigationStepName = 导航
+
+	annotation PBI_ResultType = Table
+

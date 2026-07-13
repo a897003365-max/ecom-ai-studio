@@ -4,11 +4,32 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite --host 127.0.0.1",
+    "dev": "node server/index.mjs",
+    "dev:ui": "vite --host 127.0.0.1",
     "build": "tsc --noEmit && vite build",
-    "preview": "vite preview --host 127.0.0.1"
+    "preview": "node server/index.mjs --production",
+    "start": "node server/index.mjs --production",
+    "sync:dingtalk": "node scripts/sync-dingtalk.mjs",
+    "sync:dingtalk:dry": "node scripts/sync-dingtalk.mjs --dry-run",
+    "schedule:dingtalk": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/register-dingtalk-schedule.ps1",
+    "extract:power-query": "node scripts/extract-power-query.mjs",
+    "test:dingtalk": "node scripts/test-dingtalk-import.mjs",
+    "test:dingtalk-api": "node scripts/test-dingtalk-api.mjs",
+    "test:smoke": "node scripts/smoke-local.mjs"
+  },
+  "dependencies": {
+    "lucide-react": "^1.24.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "read-excel-file": "^9.3.1"
   },
   "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "autoprefixer": "^10.4.0",
+    "postcss": "^8.5.0",
+    "tailwindcss": "^3.4.0",
     "typescript": "^5.9.3",
     "vite": "^7.3.0"
   }

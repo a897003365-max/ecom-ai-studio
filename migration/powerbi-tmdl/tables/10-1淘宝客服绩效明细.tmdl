@@ -1,0 +1,384 @@
+table 10-1淘宝客服绩效明细
+	lineageTag: d388f43a-8621-480a-ae64-68d452a600dc
+
+	measure 净销售额（万） = divide(SUM('10-1淘宝客服绩效明细'[净销售额]),10000)
+		lineageTag: 535d6846-144d-4ad9-88dc-d7e95b92289f
+
+		formatStringDefinition = "0.00万"
+
+	measure 有效接待人数环比* =
+			
+			VAR CurrentValue = sum('10-1淘宝客服绩效明细'[有效接待人数])
+			VAR PreviousValue = CALCULATE(sum('10-1淘宝客服绩效明细'[有效接待人数]), DATEADD('01-店铺数据辅助表'[日期].[Date], -1 , DAY ))
+			RETURN
+			DIVIDE(CurrentValue - PreviousValue, PreviousValue, 0)
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: a78a12cc-c616-4cb3-8bbe-cbcae9030263
+
+	measure 销售人数环比 =
+			
+			VAR CurrentValue = sum('10-1淘宝客服绩效明细'[销售人数])
+			VAR PreviousValue = CALCULATE(sum('10-1淘宝客服绩效明细'[销售人数]), DATEADD('01-店铺数据辅助表'[日期].[Date], -1 , DAY ))
+			RETURN
+			DIVIDE(CurrentValue - PreviousValue, PreviousValue, 0)
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: 5ce52e8f-0a6e-48b8-86aa-9ec927b09592
+
+	measure 净销售额环比 =
+			
+			VAR CurrentValue = [净销售额（万）]
+			VAR PreviousValue = CALCULATE([净销售额（万）], DATEADD('01-店铺数据辅助表'[日期].[Date], -1 , DAY ))
+			RETURN
+			DIVIDE(CurrentValue - PreviousValue, PreviousValue, 0)
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: 6288d716-4c0e-4e53-8cc3-5d7c2f8ed0eb
+
+	measure 询单转化率环比 =
+			
+			VAR CurrentValue = [询单转化率]
+			VAR PreviousValue = CALCULATE([询单转化率], DATEADD('01-店铺数据辅助表'[日期].[Date], -1 , DAY ))
+			RETURN
+			DIVIDE(CurrentValue - PreviousValue, PreviousValue, 0)
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: dda910c4-8fca-4e2d-9610-c7e3bcabe9e0
+
+	measure 客单价环比 =
+			
+			VAR CurrentValue = AVERAGE('10-1淘宝客服绩效明细'[客单价])
+			VAR PreviousValue = CALCULATE(AVERAGE('10-1淘宝客服绩效明细'[客单价]), DATEADD('01-店铺数据辅助表'[日期].[Date], -1 , DAY ))
+			RETURN
+			DIVIDE(CurrentValue - PreviousValue, PreviousValue, 0)
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: fa9fdb4f-caa6-4d7a-98fb-f73b5c641204
+
+	measure 平均响应时长环比 =
+			
+			VAR CurrentValue = AVERAGE('10-1淘宝客服绩效明细'[平均响应时长（秒)])
+			VAR PreviousValue = CALCULATE(AVERAGE('10-1淘宝客服绩效明细'[平均响应时长（秒)]), DATEADD('01-店铺数据辅助表'[日期].[Date], -1 , DAY ))
+			RETURN
+			DIVIDE(CurrentValue - PreviousValue, PreviousValue, 0)
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: bc9288fa-ad30-4df6-b0ff-07233c115aa4
+
+	measure 答问比环比 =
+			
+			VAR CurrentValue = AVERAGE('10-1淘宝客服绩效明细'[淘宝答问比])
+			VAR PreviousValue = CALCULATE(AVERAGE('10-1淘宝客服绩效明细'[淘宝答问比]), DATEADD('01-店铺数据辅助表'[日期].[Date], -1 , DAY ))
+			RETURN
+			DIVIDE(CurrentValue - PreviousValue, PreviousValue, 0)
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: e5f213e2-891c-457d-9638-712fafd724d5
+
+	measure 首响环比 =
+			
+			VAR CurrentValue = AVERAGE('10-1淘宝客服绩效明细'[首次响应时长（秒)])
+			VAR PreviousValue = CALCULATE( AVERAGE('10-1淘宝客服绩效明细'[首次响应时长（秒)]), DATEADD('01-店铺数据辅助表'[日期].[Date], -1 , DAY ))
+			RETURN
+			DIVIDE(CurrentValue - PreviousValue, PreviousValue, 0)
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: 5f641068-fe2c-47bc-9ed7-35897cd89a85
+
+	measure 询单人数环比 =
+			
+			VAR CurrentValue = sum('10-1淘宝客服绩效明细'[当日询单人数])
+			VAR PreviousValue = CALCULATE(sum('10-1淘宝客服绩效明细'[当日询单人数]), DATEADD('01-店铺数据辅助表'[日期].[Date], -1 , DAY ))
+			RETURN
+			DIVIDE(CurrentValue - PreviousValue, PreviousValue, 0)
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: 2c80c09d-9879-40c6-a5f4-5b51f4a2779d
+
+	measure 询单流失率 =
+			
+			DIVIDE(SUM('10-1淘宝客服绩效明细'[询单流失人数]), SUM('10-1淘宝客服绩效明细'[当日询单人数]))
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: 7ab80426-dad1-4e01-9031-fd474fab4eb7
+
+	measure 询单转化率 = 1-[询单流失率]
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: db4c0b50-1df7-41a3-9f01-3ec633635610
+
+	measure 班次 =
+			
+			VAR CurrentDate =MIN('10-1淘宝客服绩效明细'[日期])
+			VAR CurrentNickname = MIN('10-1淘宝客服绩效明细'[旺旺昵称])
+			RETURN
+			MAXX(
+			    FILTER(
+			        '淘宝客服排班表',
+			        '淘宝客服排班表'[旺旺昵称] = CurrentNickname &&
+			        CurrentDate >= '淘宝客服排班表'[开始时间] &&
+			        CurrentDate <= '淘宝客服排班表'[结束时间]
+			    ),
+			    '淘宝客服排班表'[班次]
+			)
+		lineageTag: c0ce4883-4d53-48da-b8f1-66d8114773df
+
+	column 'Source.Name.1'
+		dataType: string
+		lineageTag: 7d951df0-3bf2-4243-b07a-4a0dd70845e0
+		summarizeBy: none
+		sourceColumn: Source.Name.1
+
+		annotation SummarizationSetBy = Automatic
+
+	column 日期
+		dataType: dateTime
+		formatString: Long Date
+		lineageTag: 249c8fc0-4757-469e-8ae6-421b2163ca5e
+		summarizeBy: none
+		sourceColumn: 日期
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation UnderlyingDateTimeDataType = Date
+
+	column 'Source.Name.3'
+		dataType: double
+		formatString: 0
+		lineageTag: 9c747a72-6bd7-4d4f-859f-889b982ee060
+		summarizeBy: sum
+		sourceColumn: Source.Name.3
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Source.Name.4'
+		dataType: string
+		lineageTag: 19275a79-fa84-4675-be53-7aad9d49e557
+		summarizeBy: none
+		sourceColumn: Source.Name.4
+
+		annotation SummarizationSetBy = Automatic
+
+	column 旺旺昵称
+		dataType: string
+		lineageTag: 18b4492a-26a2-41e2-9ff1-5ff89b0e130f
+		summarizeBy: none
+		sourceColumn: 旺旺昵称
+
+		annotation SummarizationSetBy = Automatic
+
+	column 有效接待人数
+		dataType: double
+		formatString: 0
+		lineageTag: f5780425-1959-48ba-99e7-084890632dd9
+		summarizeBy: sum
+		sourceColumn: 有效接待人数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 销售人数
+		dataType: double
+		formatString: 0
+		lineageTag: a7e19452-acef-43db-9b4c-22b17fe5ae52
+		summarizeBy: sum
+		sourceColumn: 销售人数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 销售额
+		dataType: double
+		lineageTag: f4dfa3f7-e5ef-4df3-a94b-ff7d972a96c5
+		summarizeBy: sum
+		sourceColumn: 销售额
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 客单价
+		dataType: double
+		formatString: 0
+		lineageTag: ce958ac9-d8c0-4096-8489-66a1bd234bdc
+		summarizeBy: sum
+		sourceColumn: 客单价
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isDecimal":true}
+
+	column 平均响应时长（秒)
+		dataType: double
+		lineageTag: e3b6b1d3-a13a-458c-ade4-7e8022764975
+		summarizeBy: sum
+		sourceColumn: 平均响应时长（秒)
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 客户满意率
+		dataType: double
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: 3674b62a-5995-4172-a54c-e37616ff8891
+		summarizeBy: sum
+		sourceColumn: 客户满意率
+
+		annotation SummarizationSetBy = Automatic
+
+	column 客服主动跟进人数
+		dataType: double
+		formatString: 0
+		lineageTag: 1162a510-691a-47f3-886f-0cd5e9989519
+		summarizeBy: sum
+		sourceColumn: 客服主动跟进人数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 询单最终付款转化率
+		dataType: double
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: 6fa4a7fc-01da-4776-b444-2b58e75b55d0
+		summarizeBy: sum
+		sourceColumn: 询单最终付款转化率
+
+		annotation SummarizationSetBy = Automatic
+
+	column 净销售额
+		dataType: double
+		lineageTag: c6401195-bc94-4f41-b7a1-8b096ade4467
+		summarizeBy: sum
+		sourceColumn: 净销售额
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 旺旺回复率
+		dataType: double
+		formatString: 0
+		lineageTag: 712ece69-d580-45b2-a3b3-449be09ec5c4
+		summarizeBy: sum
+		sourceColumn: 旺旺回复率
+
+		annotation SummarizationSetBy = Automatic
+
+	column 淘宝答问比
+		dataType: double
+		lineageTag: 97f8e02f-eb12-41f7-9cbb-6c825e712de2
+		summarizeBy: sum
+		sourceColumn: 淘宝答问比
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 平均接待时长
+		dataType: dateTime
+		formatString: Long Time
+		lineageTag: 6c6f01bd-8320-473e-aac7-2113ec67cd87
+		summarizeBy: none
+		sourceColumn: 平均接待时长
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation UnderlyingDateTimeDataType = Time
+
+	column 成功退款率
+		dataType: double
+		lineageTag: b4a7786b-faaf-4512-89b1-99240384bce7
+		summarizeBy: sum
+		sourceColumn: 成功退款率
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 当日询单人数
+		dataType: double
+		formatString: 0
+		lineageTag: 5fdb3a5c-ae50-4180-817e-3d23a8211132
+		summarizeBy: sum
+		sourceColumn: 当日询单人数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 下单最终付款人数
+		dataType: double
+		formatString: 0
+		lineageTag: 865d4de1-0746-45f3-8be6-a8e663d91a77
+		summarizeBy: sum
+		sourceColumn: 下单最终付款人数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 询单当日付款人数
+		dataType: double
+		formatString: 0
+		lineageTag: 4a7a264e-04ad-402f-a51d-573e233186f0
+		summarizeBy: sum
+		sourceColumn: 询单当日付款人数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 平均上线时间
+		dataType: string
+		lineageTag: 99cd36d0-241e-44a8-83e0-e08857344cf0
+		summarizeBy: none
+		sourceColumn: 平均上线时间
+
+		annotation SummarizationSetBy = Automatic
+
+	column 询单流失人数
+		dataType: double
+		formatString: 0
+		lineageTag: f005f695-d429-43c4-b766-ff5f86dadfd2
+		summarizeBy: sum
+		sourceColumn: 询单流失人数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 下单当日付款转化率
+		dataType: double
+		lineageTag: 203796e4-f6d3-4811-a306-75e4ad93b492
+		summarizeBy: sum
+		sourceColumn: 下单当日付款转化率
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 首次响应时长（秒)
+		dataType: double
+		lineageTag: 5f1d28b1-9247-4737-8ce0-4a6b6e9d9e24
+		summarizeBy: sum
+		sourceColumn: 首次响应时长（秒)
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 旺旺分组
+		dataType: string
+		lineageTag: 9a82382e-7b34-444c-877b-3bd35e143fff
+		summarizeBy: none
+		sourceColumn: 旺旺分组
+
+		annotation SummarizationSetBy = Automatic
+
+	partition 10-1淘宝客服绩效明细 = m
+		mode: import
+		source =
+				let
+				    源 = Folder.Files("D:\麻大师\日更数据\天猫旗舰店\10-1淘宝客服绩效明细\自制报表"),
+				    筛选的隐藏文件1 = Table.SelectRows(源, each [Attributes]?[Hidden]? <> true),
+				    调用自定义函数1 = Table.AddColumn(筛选的隐藏文件1, "转换文件 (37)", each #"转换文件 (37)"([Content])),
+				    重命名的列1 = Table.RenameColumns(调用自定义函数1, {"Name", "Source.Name"}),
+				    删除的其他列1 = Table.SelectColumns(重命名的列1, {"Source.Name", "转换文件 (37)"}),
+				    扩展的表格列1 = Table.ExpandTableColumn(删除的其他列1, "转换文件 (37)", Table.ColumnNames(#"转换文件 (37)"(#"示例文件 (37)"))),
+				    更改的类型 = Table.TransformColumnTypes(扩展的表格列1,{{"Source.Name", type text}, {"旺旺昵称", type text}, {"客服主动跟进人数", Int64.Type}, {"有效接待人数", Int64.Type}, {"销售人数", Int64.Type}, {"询单最终付款转化率", type number}, {"客单价", type number}, {"净销售额", type number}, {"旺旺回复率", Int64.Type}, {"平均响应时长（秒)", type number}, {"答问比", type number}, {"平均接待时长", type text}, {"成功退款率", type number}, {"当日询单人数", Int64.Type}, {"下单最终付款人数", Int64.Type}, {"询单当日付款人数", Int64.Type}, {"客户满意率", type number}, {"平均上线时间", type time}, {"销售额", type number}, {"询单流失人数", Int64.Type}, {"下单当日付款转化率", type number}, {"首次响应时长（秒)", type number}, {"旺旺分组", type any}}),
+				    按分隔符拆分列 = Table.SplitColumn(更改的类型, "Source.Name", Splitter.SplitTextByDelimiter("_", QuoteStyle.Csv), {"Source.Name.1", "Source.Name.2", "Source.Name.3", "Source.Name.4"}),
+				    更改的类型1 = Table.TransformColumnTypes(按分隔符拆分列,{{"Source.Name.1", type text}, {"Source.Name.2", type date}, {"Source.Name.3", Int64.Type}, {"Source.Name.4", type text}}),
+				    筛选的行 = Table.SelectRows(更改的类型1, each ([旺旺昵称] <> "全店平均值" and [旺旺昵称] <> "全店汇总值" and [旺旺昵称] <> "同行同层优秀" and [旺旺昵称] <> "同行同层均值" and [旺旺昵称] <> "平均值" and [旺旺昵称] <> "汇总值")),
+				    删除的副本 = Table.Distinct(筛选的行, {"Source.Name.2", "旺旺昵称"}),
+				    替换的值 = Table.ReplaceValue(删除的副本,null,0,Replacer.ReplaceValue,{"Source.Name.1", "Source.Name.2", "Source.Name.3", "Source.Name.4", "旺旺昵称", "客服主动跟进人数", "有效接待人数", "销售人数", "询单最终付款转化率", "客单价", "净销售额", "旺旺回复率", "平均响应时长（秒)", "答问比", "平均接待时长", "成功退款率", "当日询单人数", "下单最终付款人数", "询单当日付款人数", "客户满意率", "平均上线时间", "销售额", "询单流失人数", "下单当日付款转化率", "首次响应时长（秒)", "旺旺分组"}),
+				    更改的类型2 = Table.TransformColumnTypes(替换的值,{{"平均接待时长", type time}, {"Source.Name.2", type date}, {"询单最终付款转化率", Percentage.Type}}),
+				    删除的副本1 = Table.Distinct(更改的类型2, {"Source.Name.2", "旺旺昵称", "净销售额", "客单价"}),
+				    筛选的行1 = Table.SelectRows(删除的副本1, each true),
+				    重命名的列 = Table.RenameColumns(筛选的行1,{{"答问比", "淘宝答问比"}, {"Source.Name.2", "日期"}})
+				in
+				    重命名的列
+
+	annotation PBI_NavigationStepName = 导航
+
+	annotation PBI_ResultType = Table
+

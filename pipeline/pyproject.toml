@@ -1,0 +1,16 @@
+[project]
+name = "ecom-local-warehouse"
+version = "0.1.0"
+description = "Local Power Query replacement for Ecom AI Studio"
+requires-python = ">=3.11"
+dependencies = [
+  "duckdb>=1.3,<2",
+  "openpyxl>=3.1,<4",
+  "pandas>=2.2,<3",
+  "polars>=1.30,<2",
+  "pyarrow>=18,<23",
+  "xlrd>=2.0,<3",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

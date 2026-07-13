@@ -1,0 +1,486 @@
+model Model
+	culture: zh-CN
+	defaultPowerBIDataSourceVersion: powerBI_V3
+	sourceQueryCulture: zh-CN
+	dataAccessOptions
+		legacyRedirects
+		returnErrorValuesAsNull
+
+queryGroup '从 07-旗舰店销售数据 转换文件'
+
+	annotation PBI_QueryGroupOrder = 14
+
+queryGroup '从 07-旗舰店销售数据 转换文件\帮助程序查询'
+
+	annotation PBI_QueryGroupOrder = 0
+
+queryGroup '从 02-商品明细库存表 转换文件'
+
+	annotation PBI_QueryGroupOrder = 2
+
+queryGroup '从 02-商品明细库存表 转换文件\帮助程序查询'
+
+	annotation PBI_QueryGroupOrder = 0
+
+queryGroup '从 01-店铺数据辅助表 转换文件'
+
+	annotation PBI_QueryGroupOrder = 1
+
+queryGroup '从 01-店铺数据辅助表 转换文件\帮助程序查询'
+
+	annotation PBI_QueryGroupOrder = 0
+
+queryGroup '从 05-旗舰店ID对照表 转换文件'
+
+	annotation PBI_QueryGroupOrder = 5
+
+queryGroup '从 05-旗舰店ID对照表 转换文件\帮助程序查询'
+
+	annotation PBI_QueryGroupOrder = 0
+
+queryGroup '从 03-各店铺销售目标 转换文件'
+
+	annotation PBI_QueryGroupOrder = 3
+
+queryGroup '从 03-各店铺销售目标 转换文件\帮助程序查询'
+
+	annotation PBI_QueryGroupOrder = 0
+
+queryGroup '从 07-旗舰店销售数据 转换文件 (2)'
+
+	annotation PBI_QueryGroupOrder = 7
+
+queryGroup '从 07-旗舰店销售数据 转换文件 (2)\帮助程序查询'
+
+	annotation PBI_QueryGroupOrder = 0
+
+queryGroup '从 04-旗舰店基础数据 转换文件'
+
+	annotation PBI_QueryGroupOrder = 4
+
+queryGroup '从 04-旗舰店基础数据 转换文件\帮助程序查询'
+
+	annotation PBI_QueryGroupOrder = 0
+
+queryGroup '从 08-旗舰店推广花费 转换文件'
+
+	annotation PBI_QueryGroupOrder = 16
+
+queryGroup '从 08-旗舰店推广花费 转换文件\帮助程序查询'
+
+	annotation PBI_QueryGroupOrder = 0
+
+queryGroup '从 08-旗舰店推广花费 转换文件 (2)'
+
+	annotation PBI_QueryGroupOrder = 21
+
+queryGroup '从 08-旗舰店推广花费 转换文件 (2)\帮助程序查询'
+
+	annotation PBI_QueryGroupOrder = 0
+
+queryGroup '从 02-商品明细库存表 (2) 转换文件'
+
+	annotation PBI_QueryGroupOrder = 23
+
+queryGroup '从 02-商品明细库存表 (2) 转换文件\帮助程序查询'
+
+	annotation PBI_QueryGroupOrder = 0
+
+queryGroup '从 08-旗舰店推广花费 (2) 转换文件'
+
+	annotation PBI_QueryGroupOrder = 25
+
+queryGroup '从 08-旗舰店推广花费 (2) 转换文件\帮助程序查询'
+
+	annotation PBI_QueryGroupOrder = 0
+
+queryGroup '从 08-旗舰店推广花费 转换文件 (3)'
+
+	annotation PBI_QueryGroupOrder = 27
+
+queryGroup '从 08-旗舰店推广花费 转换文件 (3)\帮助程序查询'
+
+	annotation PBI_QueryGroupOrder = 0
+
+queryGroup '从 04-旗舰店基础数据 (2) 转换文件'
+
+	annotation PBI_QueryGroupOrder = 29
+
+queryGroup '从 04-旗舰店基础数据 (2) 转换文件\帮助程序查询'
+
+	annotation PBI_QueryGroupOrder = 0
+
+queryGroup '从 03-各店铺销售目标 转换文件 (2)'
+
+	annotation PBI_QueryGroupOrder = 31
+
+queryGroup '从 03-各店铺销售目标 转换文件 (2)\帮助程序查询'
+
+	annotation PBI_QueryGroupOrder = 0
+
+queryGroup '从 10-旗舰店客服数据 转换文件'
+
+	annotation PBI_QueryGroupOrder = 34
+
+queryGroup '从 10-旗舰店客服数据 转换文件\帮助程序查询'
+
+	annotation PBI_QueryGroupOrder = 0
+
+queryGroup '从 12-旗舰店流量数据 转换文件 (2)'
+
+	annotation PBI_QueryGroupOrder = 36
+
+queryGroup '从 12-旗舰店流量数据 转换文件 (2)\帮助程序查询'
+
+	annotation PBI_QueryGroupOrder = 0
+
+queryGroup '从 06-旗舰店流量数据 转换文件 (4)'
+
+	annotation PBI_QueryGroupOrder = 42
+
+queryGroup '从 06-旗舰店流量数据 转换文件 (4)\帮助程序查询'
+
+	annotation PBI_QueryGroupOrder = 0
+
+queryGroup '从 02-商品明细库存表 转换文件 (2)'
+
+	annotation PBI_QueryGroupOrder = 44
+
+queryGroup '从 02-商品明细库存表 转换文件 (2)\帮助程序查询'
+
+	annotation PBI_QueryGroupOrder = 0
+
+queryGroup '从 00-各渠道销售数据 转换文件'
+
+	annotation PBI_QueryGroupOrder = 54
+
+queryGroup '从 00-各渠道销售数据 转换文件\帮助程序查询'
+
+	annotation PBI_QueryGroupOrder = 0
+
+/// 已加载到 2025/9/20 17:49:24 上的查询中的错误。
+queryGroup '查询错误 - 2025/9/20 17:49:24'
+
+	annotation PBI_QueryGroupOrder = 56
+
+queryGroup '从 13-ERP各渠道商品信息 转换文件'
+
+	annotation PBI_QueryGroupOrder = 57
+
+queryGroup '从 13-ERP各渠道商品信息 转换文件\帮助程序查询'
+
+	annotation PBI_QueryGroupOrder = 0
+
+queryGroup '从 14-推广竞品数据 转换文件'
+
+	annotation PBI_QueryGroupOrder = 59
+
+queryGroup '从 14-推广竞品数据 转换文件\帮助程序查询'
+
+	annotation PBI_QueryGroupOrder = 0
+
+queryGroup '从 10-1客服绩效明细 转换文件'
+
+	annotation PBI_QueryGroupOrder = 61
+
+queryGroup '从 10-1客服绩效明细 转换文件\帮助程序查询'
+
+	annotation PBI_QueryGroupOrder = 0
+
+queryGroup '从 10-2客服排班表 转换文件'
+
+	annotation PBI_QueryGroupOrder = 63
+
+queryGroup '从 10-2客服排班表 转换文件\帮助程序查询'
+
+	annotation PBI_QueryGroupOrder = 0
+
+queryGroup '从 10-1客服绩效明细 转换文件 (2)'
+
+	annotation PBI_QueryGroupOrder = 69
+
+queryGroup '从 10-1客服绩效明细 转换文件 (2)\帮助程序查询'
+
+	annotation PBI_QueryGroupOrder = 0
+
+queryGroup '从 13-1-ERP打印订单信息 转换文件'
+
+	annotation PBI_QueryGroupOrder = 70
+
+queryGroup '从 13-1-ERP打印订单信息 转换文件\帮助程序查询'
+
+	annotation PBI_QueryGroupOrder = 0
+
+queryGroup '从 25年双十一付定 转换文件'
+
+	annotation PBI_QueryGroupOrder = 72
+
+queryGroup '从 25年双十一付定 转换文件\帮助程序查询'
+
+	annotation PBI_QueryGroupOrder = 0
+
+queryGroup '从 10-1客服绩效明细 转换文件 (3)'
+
+	annotation PBI_QueryGroupOrder = 74
+
+queryGroup '从 10-1客服绩效明细 转换文件 (3)\帮助程序查询'
+
+	annotation PBI_QueryGroupOrder = 0
+
+queryGroup '从 10-2京东客服绩效明细 转换文件'
+
+	annotation PBI_QueryGroupOrder = 74
+
+queryGroup '从 10-2京东客服绩效明细 转换文件\帮助程序查询'
+
+	annotation PBI_QueryGroupOrder = 0
+
+queryGroup '从 京东客服排班表 转换文件'
+
+	annotation PBI_QueryGroupOrder = 76
+
+queryGroup '从 京东客服排班表 转换文件\帮助程序查询'
+
+	annotation PBI_QueryGroupOrder = 0
+
+queryGroup '从 绩效数据 转换文件'
+
+	annotation PBI_QueryGroupOrder = 78
+
+queryGroup '从 绩效数据 转换文件\帮助程序查询'
+
+	annotation PBI_QueryGroupOrder = 0
+
+queryGroup '从 客服员工日报统计 转换文件'
+
+	annotation PBI_QueryGroupOrder = 80
+
+queryGroup '从 客服员工日报统计 转换文件\帮助程序查询'
+
+	annotation PBI_QueryGroupOrder = 0
+
+queryGroup '从 10-2京东客服营销明细 转换文件'
+
+	annotation PBI_QueryGroupOrder = 82
+
+queryGroup '从 10-2京东客服营销明细 转换文件\帮助程序查询'
+
+	annotation PBI_QueryGroupOrder = 0
+
+queryGroup '从 10-3京东客服绩效数据 转换文件'
+
+	annotation PBI_QueryGroupOrder = 84
+
+queryGroup '从 10-3京东客服绩效数据 转换文件\帮助程序查询'
+
+	annotation PBI_QueryGroupOrder = 0
+
+queryGroup '从 10-2京东客服营销明细 转换文件 (2)'
+
+	annotation PBI_QueryGroupOrder = 86
+
+queryGroup '从 10-2京东客服营销明细 转换文件 (2)\帮助程序查询'
+
+	annotation PBI_QueryGroupOrder = 0
+
+queryGroup '从 接待数据 转换文件'
+
+	annotation PBI_QueryGroupOrder = 90
+
+queryGroup '从 接待数据 转换文件\帮助程序查询'
+
+	annotation PBI_QueryGroupOrder = 0
+
+queryGroup '从 营销数据 转换文件'
+
+	annotation PBI_QueryGroupOrder = 92
+
+queryGroup '从 营销数据 转换文件\帮助程序查询'
+
+	annotation PBI_QueryGroupOrder = 0
+
+queryGroup '从 考勤数据 转换文件'
+
+	annotation PBI_QueryGroupOrder = 94
+
+queryGroup '从 考勤数据 转换文件\帮助程序查询'
+
+	annotation PBI_QueryGroupOrder = 0
+
+queryGroup '从 接待评价分析 转换文件'
+
+	annotation PBI_QueryGroupOrder = 96
+
+queryGroup '从 接待评价分析 转换文件\帮助程序查询'
+
+	annotation PBI_QueryGroupOrder = 0
+
+queryGroup '从 接待评价分析 转换文件 (2)'
+
+	annotation PBI_QueryGroupOrder = 98
+
+queryGroup '从 接待评价分析 转换文件 (2)\帮助程序查询'
+
+	annotation PBI_QueryGroupOrder = 0
+
+queryGroup '从 接待评价分析 转换文件 (3)'
+
+	annotation PBI_QueryGroupOrder = 100
+
+queryGroup '从 接待评价分析 转换文件 (3)\帮助程序查询'
+
+	annotation PBI_QueryGroupOrder = 0
+
+queryGroup '从 旗帜 转换文件'
+
+	annotation PBI_QueryGroupOrder = 102
+
+queryGroup '从 旗帜 转换文件\帮助程序查询'
+
+	annotation PBI_QueryGroupOrder = 0
+
+queryGroup '从 订单 转换文件'
+
+	annotation PBI_QueryGroupOrder = 104
+
+queryGroup '从 订单 转换文件\帮助程序查询'
+
+	annotation PBI_QueryGroupOrder = 0
+
+queryGroup '从 京东pop 转换文件'
+
+	annotation PBI_QueryGroupOrder = 106
+
+queryGroup '从 京东pop 转换文件\帮助程序查询'
+
+	annotation PBI_QueryGroupOrder = 0
+
+queryGroup '从 月恩工厂发货表 转换文件'
+
+	annotation PBI_QueryGroupOrder = 112
+
+queryGroup '从 月恩工厂发货表 转换文件\帮助程序查询'
+
+	annotation PBI_QueryGroupOrder = 0
+
+queryGroup '从 京东自营 转换文件 (2)'
+
+	annotation PBI_QueryGroupOrder = 114
+
+queryGroup '从 京东自营 转换文件 (2)\帮助程序查询'
+
+	annotation PBI_QueryGroupOrder = 0
+
+queryGroup '从 抖音订单 转换文件'
+
+	annotation PBI_QueryGroupOrder = 95
+
+queryGroup '从 抖音订单 转换文件\帮助程序查询'
+
+	annotation PBI_QueryGroupOrder = 0
+
+queryGroup '从 营销数据改版 转换文件'
+
+	annotation PBI_QueryGroupOrder = 95
+
+queryGroup '从 营销数据改版 转换文件\帮助程序查询'
+
+	annotation PBI_QueryGroupOrder = 0
+
+queryGroup '从 11-旗舰店UD推广计划 转换文件'
+
+	annotation PBI_QueryGroupOrder = 95
+
+queryGroup '从 11-旗舰店UD推广计划 转换文件\帮助程序查询'
+
+	annotation PBI_QueryGroupOrder = 0
+
+queryGroup '从 商品带图 转换文件'
+
+	annotation PBI_QueryGroupOrder = 97
+
+queryGroup '从 商品带图 转换文件\帮助程序查询'
+
+	annotation PBI_QueryGroupOrder = 0
+
+queryGroup '从 08-1关键词报表数据 转换文件'
+
+	annotation PBI_QueryGroupOrder = 99
+
+queryGroup '从 08-1关键词报表数据 转换文件\帮助程序查询'
+
+	annotation PBI_QueryGroupOrder = 0
+
+queryGroup '从 08-2人群报表数据 转换文件'
+
+	annotation PBI_QueryGroupOrder = 101
+
+queryGroup '从 08-2人群报表数据 转换文件\帮助程序查询'
+
+	annotation PBI_QueryGroupOrder = 0
+
+queryGroup '从 月 转换文件'
+
+	annotation PBI_QueryGroupOrder = 103
+
+queryGroup '从 月 转换文件\帮助程序查询'
+
+	annotation PBI_QueryGroupOrder = 0
+
+queryGroup '从 儿童床垫 转换文件'
+
+	annotation PBI_QueryGroupOrder = 105
+
+queryGroup '从 儿童床垫 转换文件\帮助程序查询'
+
+	annotation PBI_QueryGroupOrder = 0
+
+queryGroup '从 05-旗舰店ID对照表 转换文件 (2)'
+
+	annotation PBI_QueryGroupOrder = 107
+
+queryGroup '从 05-旗舰店ID对照表 转换文件 (2)\帮助程序查询'
+
+	annotation PBI_QueryGroupOrder = 0
+
+annotation PBI_QueryOrder = ["参数2","转换示例文件 (2)","示例文件 (2)","转换文件 (2)","01-店铺数据辅助表","参数3","转换示例文件 (3)","示例文件 (3)","转换文件 (3)","参数4","转换示例文件 (4)","示例文件 (4)","转换文件 (4)","参数5","转换示例文件 (5)","示例文件 (5)","转换文件 (5)","参数6","转换示例文件 (6)","示例文件 (6)","转换文件 (6)","参数7","转换示例文件 (7)","示例文件 (7)","转换文件 (7)","参数1","转换示例文件","示例文件","转换文件","参数9","转换示例文件 (9)","示例文件 (9)","转换文件 (9)","08-旗舰店推广花费","示例文件 (11)","参数11","转换示例文件 (11)","转换文件 (11)","07-旗舰店商品销售数据","参数12","转换示例文件 (12)","示例文件 (12)","转换文件 (12)","05-旗舰店ID对照表","示例文件 (13)","参数13","转换示例文件 (13)","转换文件 (13)","示例文件 (14)","参数14","转换示例文件 (14)","转换文件 (14)","04-旗舰店基础数据","参数15","转换示例文件 (15)","示例文件 (15)","转换文件 (15)","03-2店铺每天销售目标","参数16","转换示例文件 (16)","示例文件 (16)","转换文件 (16)","参数17","转换示例文件 (17)","示例文件 (17)","转换文件 (17)","参数18","转换示例文件 (18)","示例文件 (18)","转换文件 (18)","06-旗舰店流量数据","参数21","转换示例文件 (21)","示例文件 (21)","转换文件 (21)","参数22","转换示例文件 (22)","示例文件 (22)","转换文件 (22)","参数27","转换示例文件 (27)","示例文件 (27)","转换文件 (27)","00-月表汇总","03-1-各渠道目标金额","参数28","转换示例文件 (28)","示例文件 (28)","转换文件 (28)","14-推广竞品数据","参数29","转换示例文件 (29)","示例文件 (29)","转换文件 (29)","10-1淘宝客服绩效明细","参数30","转换示例文件 (30)","示例文件 (30)","转换文件 (30)","淘宝客服排班表","参数31","转换示例文件 (31)","示例文件 (31)","转换文件 (31)","辅1-店铺简称","参数34","转换示例文件 (34)","示例文件 (34)","转换文件 (34)","参数33","转换示例文件 (33)","示例文件 (33)","转换文件 (33)","转换文件 (36)","示例文件 (36)","25年双十一付定","参数35","转换示例文件 (35)","示例文件 (35)","转换文件 (35)","参数36","转换示例文件 (36)","示例文件 (37)","转换文件 (37)","10-2京东客服营销明细","参数32","转换示例文件 (32)","示例文件 (32)","转换文件 (32)","京东客服分组表","参数37","转换示例文件 (37)","示例文件 (38)","转换文件 (38)","10-3京东客服绩效数据","参数38","转换示例文件 (38)","示例文件 (39)","转换文件 (39)","10-4客服员工日报统计","参数39","转换示例文件 (39)","示例文件 (40)","转换文件 (40)","参数40","转换示例文件 (40)","示例文件 (41)","转换文件 (41)","参数41","转换示例文件 (41)","示例文件 (42)","转换文件 (42)","参数42","转换示例文件 (42)","示例文件 (43)","转换文件 (43)","接待数据","参数44","转换示例文件 (44)","示例文件 (45)","转换文件 (45)","营销数据","参数45","转换示例文件 (45)","示例文件 (46)","转换文件 (46)","考勤数据","参数46","转换示例文件 (46)","示例文件 (47)","转换文件 (47)","接待评价分析","参数47","转换示例文件 (47)","示例文件 (48)","转换文件 (48)","参数48","转换示例文件 (48)","示例文件 (49)","转换文件 (49)","参数49","转换示例文件 (49)","示例文件 (50)","转换文件 (50)","辅4-床垫编码","辅5-床类编码","参数50","转换示例文件 (50)","示例文件 (51)","转换文件 (51)","参数51","转换示例文件 (51)","示例文件 (52)","转换文件 (52)","参数52","转换示例文件 (52)","示例文件 (53)","转换文件 (53)","订单状态对应表","商家备注打标","参数55","转换示例文件 (55)","示例文件 (56)","转换文件 (56)","示例文件 (57)","参数56","转换示例文件 (56)","转换文件 (57)","示例文件 (8)","参数8","转换示例文件 (8)","转换文件 (8)","营销数据改版","参数10","转换示例文件 (10)","示例文件 (10)","转换文件 (10)","11-旗舰店UD推广计划","示例文件 (19)","参数19","转换示例文件 (19)","转换文件 (19)","参数20","转换示例文件 (20)","示例文件 (20)","转换文件 (20)","08-1关键词报表数据","示例文件 (23)","参数23","转换示例文件 (23)","转换文件 (23)","08-2人群报表数据","示例文件 (24)","参数24","转换示例文件 (24)","转换文件 (24)","参数25","转换示例文件 (25)","示例文件 (25)","转换文件 (25)","参数26","转换示例文件 (26)","示例文件 (26)","转换文件 (26)","参数43","转换示例文件 (43)","示例文件 (44)","转换文件 (44)"]
+
+annotation __PBI_TimeIntelligenceEnabled = 1
+
+annotation PBI_ProTooling = ["CopilotTooling"]
+
+ref table DateTableTemplate_7ab55d9d-e27c-4cf2-8be6-1db73ccf51bc
+ref table 01-店铺数据辅助表
+ref table LocalDateTable_06e2fae1-ec84-4d0b-9baf-3c7bf7d7dca8
+ref table 08-旗舰店推广花费
+ref table 07-旗舰店商品销售数据
+ref table 05-旗舰店ID对照表
+ref table 04-旗舰店基础数据
+ref table 03-2店铺每天销售目标
+ref table 06-旗舰店流量数据
+ref table 00-月表汇总
+ref table 03-1-各渠道目标金额
+ref table 14-推广竞品数据
+ref table 10-1淘宝客服绩效明细
+ref table 淘宝客服排班表
+ref table 10-4客服员工日报统计
+ref table 京东客服分组表
+ref table 10-2京东客服营销明细
+ref table 10-3京东客服绩效数据
+ref table LocalDateTable_a14edd28-e245-4816-92b5-f75d0784466b
+ref table LocalDateTable_ee832b9e-1a6c-43a9-97b5-c11eb130180a
+ref table 接待数据
+ref table 营销数据
+ref table 考勤数据
+ref table LocalDateTable_33431a32-8820-467d-9052-384d6c9e1632
+ref table 辅4-床垫编码
+ref table 辅5-床类编码
+ref table 营销数据改版
+ref table 11-旗舰店UD推广计划
+ref table LocalDateTable_759fd802-a71a-4418-94d6-abf867206ba8
+ref table LocalDateTable_703b6f7e-2085-400b-8ede-d676f2786224
+ref table 08-1关键词报表数据
+ref table 08-2人群报表数据
+
+ref cultureInfo zh-CN
+

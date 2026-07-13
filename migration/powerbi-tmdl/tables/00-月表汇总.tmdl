@@ -1,0 +1,416 @@
+table 00-月表汇总
+	lineageTag: a3f68cf9-6dfa-43ac-8558-ff0f8f29061b
+
+	measure 回款金额（万） = DIVIDE(SUM('00-月表汇总'[回款（减退款）]), 10000)
+		lineageTag: 030f1567-a173-44f9-8612-2142db80fb93
+
+		formatStringDefinition = "0.00万"
+
+	measure 去年（万）MTD = ```
+			
+			CALCULATE( [回款金额（万）MTD] , 
+			   SAMEPERIODLASTYEAR('00-月表汇总'[日期] ))
+			```
+		lineageTag: d0874e3e-1f6f-40c8-a713-2b6d9db7ee07
+
+		formatStringDefinition = "0.00万"
+
+	measure 各渠道金额同比 =
+			
+			VAR CurrentValue = '00-月表汇总'[回款金额（万）MTD]
+			VAR PreviousValue = '00-月表汇总'[去年（万）MTD]
+			RETURN
+			DIVIDE(CurrentValue - PreviousValue, PreviousValue, 0)
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: 3cf0bf97-c520-41cc-8203-f60b04525544
+
+	measure 昨天（万） = ```
+			
+			CALCULATE( '00-月表汇总'[回款金额（万）] , 
+			   DATEADD( '01-店铺数据辅助表'[日期], -1 , DAY ) )
+			```
+		lineageTag: 2f6481af-cd63-43ad-8971-09b160667a22
+
+		formatStringDefinition = "0.00万"
+
+	measure 各渠道金额环比 =
+			
+			VAR CurrentValue = [回款金额（万）]
+			VAR PreviousValue = [昨天（万）]
+			RETURN
+			DIVIDE(CurrentValue - PreviousValue, PreviousValue, 0)
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: b69f32e5-5f5b-4fcc-9c53-9d3b9deb05a3
+
+	measure 回款金额（万）MTD =
+			
+			CALCULATE (
+			    [回款金额（万）], // 替换为你的实际度量值，如[商品花费占比]
+			    DATESMTD ( '00-月表汇总'[日期] ) // 计算月初到筛选日期的累计
+			)
+		lineageTag: 9d70e5f4-a25b-466a-af80-e3105e3e1fd1
+
+		formatStringDefinition = "0.00万"
+
+	measure 回款率MTD = DIVIDE([回款金额（万）MTD],[GMV（万）MTD])
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: 379f34c7-42c7-4613-90d3-cccba5ec3e2d
+
+	measure 站内推广费比 = divide([站内总费用（公式）],[国补后金额(店铺)]*10000)
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: 2585f018-47a5-401d-a919-100a1f460b25
+
+	measure 推广费用(万)MTD =
+			divide(CALCULATE (
+			    SUM ( '00-月表汇总'[站内总推广费(含品销宝）] ), // 替换为你的实际度量值，如[商品花费占比]
+			    DATESMTD ( '00-月表汇总'[日期]) // 计算月初到筛选日期的累计
+			),10000)
+		lineageTag: a302d18b-38a1-4cf2-ac9c-6ef7562a00c7
+
+		formatStringDefinition = "0.00万"
+
+	measure GMV(万) = DIVIDE(SUM('00-月表汇总'[GMV]),10000)
+		lineageTag: 07bd0d7e-e144-4c28-b5df-06953d0097f3
+
+		formatStringDefinition = "0.00万"
+
+	measure 站内总推广费用（万） = divide(SUM('00-月表汇总'[站内总推广费(含品销宝）]),10000)
+		lineageTag: fe67e326-5534-4b98-89f7-bcfd5fc5db88
+
+		formatStringDefinition = "0.00万"
+
+	measure GMV（万）MTD = CALCULATE([GMV(万)],DATESMTD('00-月表汇总'[日期]))
+		lineageTag: 56ad3352-d450-4a31-9c24-547bad5e562a
+
+		formatStringDefinition = "0.00万"
+
+	measure 站外推广费比 = divide([小红书费用（万）MTD],[回款金额（万）MTD])
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: dafdc6c0-a046-423f-87ac-9a4465477155
+
+	measure 回款率 = divide(SUM('00-月表汇总'[回款（减退款）]),SUM('00-月表汇总'[GMV]))
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: 3d4b38ad-4fbd-4d7a-bbd2-a526f3981d90
+
+	measure 回款费比MTD = divide([推广费用(万)MTD],[回款金额（万）MTD])
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: ae224458-036a-47a4-ba68-26cb98a69723
+
+	measure 小红书费用（万）MTD =
+			
+			divide(
+			CALCULATE (
+			    sum('00-月表汇总'[小红书推广费]), // 替换为你的实际度量值，如[商品花费占比]
+			    DATESMTD ( '00-月表汇总'[日期] ) // 计算月初到筛选日期的累计
+			),10000)
+		lineageTag: 8816adf4-de48-4a77-9ea0-30b9013ea459
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	measure 小红书推广费比 = divide(SUM('00-月表汇总'[小红书推广费]),SUM('00-月表汇总'[回款（减退款）]))
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: 84a08a47-6afb-43f2-827d-9f7bc4a222bf
+
+	measure 总推广费比 = divide(SUM('00-月表汇总'[总推广费(含品销宝，小红书）]),SUM('00-月表汇总'[回款（减退款）]))
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: 262c5274-f89e-4d81-93f2-acc9dd4341b8
+
+	measure 站内总费用（公式） = SUM('00-月表汇总'[全站推广])+SUM('00-月表汇总'[精准人群推广])+SUM('00-月表汇总'[关键词推广])+SUM('00-月表汇总'[内容场景])+SUM('00-月表汇总'[淘客])
+		formatString: 0
+		lineageTag: 6275e2da-fd61-4619-91ea-2c7e8b2e5812
+
+	column 日期
+		dataType: dateTime
+		formatString: Long Date
+		lineageTag: 0e8980da-c81f-4e60-a955-f3426cbae16c
+		summarizeBy: none
+		sourceColumn: 日期
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation UnderlyingDateTimeDataType = Date
+
+	column 浏览量
+		dataType: int64
+		lineageTag: e2b56acd-632e-40a7-a25c-023b88243a55
+		summarizeBy: sum
+		sourceColumn: 浏览量
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 店铺客户数
+		dataType: int64
+		formatString: #,0
+		lineageTag: e6085898-f66c-4557-a254-c55784fff0a4
+		summarizeBy: sum
+		sourceColumn: 店铺客户数
+
+		annotation SummarizationSetBy = Automatic
+
+	column GMV
+		dataType: double
+		lineageTag: 745bb148-b96e-4a11-9c70-55c5535167e0
+		summarizeBy: sum
+		sourceColumn: GMV
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 成功退款金额
+		dataType: double
+		lineageTag: 6cfa4c14-c201-47d8-8044-296aaaa47739
+		summarizeBy: sum
+		sourceColumn: 成功退款金额
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 当日净成交金额
+		dataType: double
+		lineageTag: 23d5834a-f737-43e7-b23f-f1341ff9a4c9
+		summarizeBy: sum
+		sourceColumn: 当日净成交金额
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 回款（减退款）
+		dataType: double
+		lineageTag: ead444cd-a5b9-4016-a6da-5042f16d4921
+		summarizeBy: sum
+		sourceColumn: 回款（减退款）
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 总推广费(含品销宝，小红书）
+		dataType: double
+		lineageTag: 0725ab10-004e-45a3-858c-b2eb0100a002
+		summarizeBy: sum
+		sourceColumn: 总推广费(含品销宝，小红书）
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 站内总推广费(含品销宝）
+		dataType: double
+		lineageTag: f60a89fb-6998-4735-a597-cfa986601744
+		summarizeBy: sum
+		sourceColumn: 站内总推广费(含品销宝）
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 站内推广费%(含品销宝）
+		dataType: double
+		lineageTag: f857bb17-c9d1-4100-a42c-abecbedf5d17
+		summarizeBy: sum
+		sourceColumn: 站内推广费%(含品销宝）
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 关键词推广
+		dataType: double
+		lineageTag: 155c5c44-d3af-494c-a38a-bf69cd27ae67
+		summarizeBy: sum
+		sourceColumn: 关键词推广
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 精准人群推广
+		dataType: double
+		lineageTag: 99edfbf4-1f2c-452c-9f1b-3f1f644136b3
+		summarizeBy: sum
+		sourceColumn: 精准人群推广
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 万相台（不包含目标直投）
+		dataType: int64
+		formatString: 0
+		lineageTag: c3cf8b59-525f-4618-ab50-cb3245acc2e5
+		summarizeBy: sum
+		sourceColumn: 万相台（不包含目标直投）
+
+		annotation SummarizationSetBy = Automatic
+
+	column 多目标直投
+		dataType: int64
+		formatString: 0
+		lineageTag: 19018e0e-0e6e-4d36-8150-b6e6e04a4793
+		summarizeBy: sum
+		sourceColumn: 多目标直投
+
+		annotation SummarizationSetBy = Automatic
+
+	column 全站推广
+		dataType: double
+		lineageTag: 25fcd4b5-bf5c-4f4d-9891-9d7aa8cfa89c
+		summarizeBy: sum
+		sourceColumn: 全站推广
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 品销宝
+		dataType: int64
+		formatString: 0
+		lineageTag: e183957b-2c20-4153-9272-49e1e3e79ca0
+		summarizeBy: sum
+		sourceColumn: 品销宝
+
+		annotation SummarizationSetBy = Automatic
+
+	column 内容场景
+		dataType: double
+		lineageTag: 4bea467e-907e-4117-a110-ae02a812426a
+		summarizeBy: sum
+		sourceColumn: 内容场景
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 店铺运营
+		dataType: int64
+		formatString: 0
+		lineageTag: 499b2e73-cfdb-4712-a1ee-da38c51d6f52
+		summarizeBy: sum
+		sourceColumn: 店铺运营
+
+		annotation SummarizationSetBy = Automatic
+
+	column 小红书推广费
+		dataType: double
+		formatString: #,0
+		lineageTag: b164f1bd-1476-47e6-952c-b77f94be54ec
+		summarizeBy: sum
+		sourceColumn: 小红书推广费
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isDecimal":true}
+
+	column 渠道
+		dataType: string
+		lineageTag: 95735e9a-4e45-4553-826c-c23c018ad654
+		summarizeBy: none
+		sourceColumn: 渠道
+
+		annotation SummarizationSetBy = Automatic
+
+	column 店铺
+		dataType: string
+		lineageTag: 6f63654c-3500-416a-bacd-eb05eaa73266
+		summarizeBy: none
+		sourceColumn: 店铺
+
+		annotation SummarizationSetBy = Automatic
+
+	column 店铺排名
+		dataType: string
+		lineageTag: 743aa9c1-3cc3-4488-952f-788f2ae0e96c
+		summarizeBy: none
+		sourceColumn: 店铺排名
+
+		annotation SummarizationSetBy = Automatic
+
+	column 当日净成交金额85%
+		dataType: string
+		lineageTag: 31011460-db94-4ff2-ae67-1614dc91c079
+		summarizeBy: none
+		sourceColumn: 当日净成交金额85%
+
+		annotation SummarizationSetBy = Automatic
+
+	column 达播
+		dataType: string
+		lineageTag: 9393dd0d-787e-457a-8e07-874780217420
+		summarizeBy: none
+		sourceColumn: 达播
+
+		annotation SummarizationSetBy = Automatic
+
+	column 团购
+		dataType: string
+		lineageTag: 00d55bd6-ff62-47b4-a959-2f895b35de4a
+		summarizeBy: none
+		sourceColumn: 团购
+
+		annotation SummarizationSetBy = Automatic
+
+	column UD
+		dataType: string
+		lineageTag: 1bff8810-fd13-4e4d-9b69-4a5cf9763abb
+		summarizeBy: none
+		sourceColumn: UD
+
+		annotation SummarizationSetBy = Automatic
+
+	column 百灵
+		dataType: string
+		lineageTag: 2a94f64d-01ff-49a3-bf83-709fa5416fd5
+		summarizeBy: none
+		sourceColumn: 百灵
+
+		annotation SummarizationSetBy = Automatic
+
+	column 搜索排名数
+		dataType: string
+		lineageTag: b5c43d81-1701-42ce-b458-e8fcb6fd2749
+		summarizeBy: none
+		sourceColumn: 搜索排名数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 加购人数
+		dataType: int64
+		formatString: 0
+		lineageTag: ce2c948a-0e2a-4629-9662-a7ec638e4ac6
+		summarizeBy: sum
+		sourceColumn: 加购人数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 淘客
+		dataType: double
+		lineageTag: 57f89326-e271-4813-a63d-d6e2d9f1a887
+		summarizeBy: sum
+		sourceColumn: 淘客
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	partition 00-月表汇总 = m
+		mode: import
+		source = ```
+				let    
+				    源 = Excel.Workbook(File.Contents("D:\麻大师\日更数据\天猫旗舰店\00-各渠道销售数据\淘系.xlsx"), null, true),    
+				    Sheet4_Sheet = 源{[Item="Sheet4",Kind="Sheet"]}[Data],    
+				    提升的标题 = Table.PromoteHeaders(Sheet4_Sheet, [PromoteAllScalars=true]),    
+				    更改的类型 = Table.TransformColumnTypes(提升的标题,{{"日期", type date}, {"浏览量", Int64.Type}, {"店铺客户数", Int64.Type}, {"GMV", type number}, {"成功退款金额", type number}, {"当日净成交金额", type number}, {"回款#(lf)（减退款）", type number}, {"总推广费#(lf)(含品销宝，小红书）", type number}, {"加购人数", Int64.Type}, {"站内总推广费#(lf)(含品销宝）", type number}, {"站内推广费%#(lf)(含品销宝）", type any}, {"关键词推广", type number}, {"精准人群推广", type number}, {"万相台（不包含目标直投）", Int64.Type}, {"多目标直投", Int64.Type}, {"全站推广", type number}, {"品销宝", Int64.Type}, {"内容场景", type number}, {"店铺运营", Int64.Type}, {"小红书推广费", type number}, {"搜索排名数", type any}, {"渠道", type text}, {"店铺", type text}}),    
+				    更改的类型1 = Table.TransformColumnTypes(更改的类型,{{"站内推广费%#(lf)(含品销宝）", Percentage.Type}, {"淘客", type number}})
+				in    
+				    更改的类型1
+				```
+
+	annotation PBI_NavigationStepName = 导航
+
+	annotation PBI_ResultType = Table
+

@@ -1,0 +1,512 @@
+table 07-旗舰店商品销售数据
+	lineageTag: 1a636adc-0ad4-4bae-908c-d6062c07552d
+
+	measure 访客转化率 =
+			
+			DIVIDE(SUM('07-旗舰店商品销售数据'[支付买家数]), SUM('07-旗舰店商品销售数据'[商品访客数]))
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: 48414b6c-36fd-490a-bd1c-be16d27099b1
+
+	measure 退款金额占比 =
+			
+			DIVIDE(SUM('07-旗舰店商品销售数据'[退款金额]), SUM('07-旗舰店商品销售数据'[支付金额]))
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: ba0e008f-3435-4091-8db0-bae3505a0114
+
+	measure 商品加购率 =
+			
+			DIVIDE(SUM('07-旗舰店商品销售数据'[加购人数]), SUM('07-旗舰店商品销售数据'[商品访客数]))
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: d3cf13f4-32fe-406f-ad4c-15ee05489aff
+
+	measure TOP3支付金额总和 =
+			
+			VAR RankedTable =
+			    SUMMARIZE(
+			        ALLSELECTED('07-旗舰店商品销售数据'),
+			        '07-旗舰店商品销售数据'[商品ID],
+			        "商品减退金额", '07-旗舰店商品销售数据'[商品减退金额（万）]
+			    )
+			VAR Top3 =
+			    TOPN(
+			        3,
+			        RankedTable,
+			        [商品减退金额], DESC
+			    )
+			RETURN
+			    SUMX(Top3, [商品减退金额])
+		formatString: "¥"#,0.###############;"¥"-#,0.###############;"¥"#,0.###############
+		lineageTag: 51071b0a-4fa5-4b20-8fc1-0e8537df183c
+
+		annotation PBI_FormatHint = {"currencyCulture":"zh-CN"}
+
+	measure 商品TOP3减退金额占比 = DIVIDE('07-旗舰店商品销售数据'[TOP3支付金额总和], '07-旗舰店商品销售数据'[商品减退金额（万）])
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: 478887d3-7ab0-450b-997d-89fa6b9a2b86
+
+	measure TOP1支付金额总和 =
+			VAR RankedTable =
+			    SUMMARIZE(
+			        ALLSELECTED('07-旗舰店商品销售数据'),
+			        '07-旗舰店商品销售数据'[商品ID],
+			        "商品减退金额", '07-旗舰店商品销售数据'[商品减退金额（万）]
+			    )
+			VAR Top1 =
+			    TOPN(
+			        1,
+			        RankedTable,
+			        [商品减退金额], DESC
+			    )
+			RETURN
+			    SUMX(Top1, [商品减退金额])
+		formatString: "¥"#,0.###############;"¥"-#,0.###############;"¥"#,0.###############
+		lineageTag: f451b73a-c8dc-41eb-9244-a8e5ff7f1a0c
+
+		annotation PBI_FormatHint = {"currencyCulture":"zh-CN"}
+
+	measure 商品TOP1减退金额占比 = DIVIDE('07-旗舰店商品销售数据'[TOP1支付金额总和], '07-旗舰店商品销售数据'[商品减退金额（万）])
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: 833a5c88-5058-4f5f-9f63-42bc81773bdf
+
+	measure TOP5支付金额总和 =
+			VAR RankedTable =
+			    SUMMARIZE(
+			        ALLSELECTED('07-旗舰店商品销售数据'),
+			        '07-旗舰店商品销售数据'[商品ID],
+			        "商品减退金额", '07-旗舰店商品销售数据'[商品减退金额（万）]
+			    )
+			VAR Top5 =
+			    TOPN(
+			        5,
+			        RankedTable,
+			        [商品减退金额], DESC
+			    )
+			RETURN
+			    SUMX(Top5, [商品减退金额])
+		formatString: "¥"#,0.###############;"¥"-#,0.###############;"¥"#,0.###############
+		lineageTag: 9c4f170b-2e4a-4507-b7e7-cf68ba7021ce
+
+		annotation PBI_FormatHint = {"currencyCulture":"zh-CN"}
+
+	measure 商品TOP5减退金额占比 = DIVIDE('07-旗舰店商品销售数据'[TOP5支付金额总和], '07-旗舰店商品销售数据'[商品减退金额（万）])
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: 7ca26837-e15b-46ab-8372-4cb65a990831
+
+	measure TOP10支付金额总和 =
+			VAR RankedTable =
+			    SUMMARIZE(
+			        ALLSELECTED('07-旗舰店商品销售数据'),
+			        '07-旗舰店商品销售数据'[商品ID],
+			        "商品减退金额", '07-旗舰店商品销售数据'[商品减退金额（万）]
+			    )
+			VAR Top10 =
+			    TOPN(
+			        10,
+			        RankedTable,
+			        [商品减退金额], DESC
+			    )
+			RETURN
+			    SUMX(Top10, [商品减退金额])
+		formatString: "¥"#,0.###############;"¥"-#,0.###############;"¥"#,0.###############
+		lineageTag: 7d99648b-a04c-43fc-a167-e458d1ed68ac
+
+		annotation PBI_FormatHint = {"currencyCulture":"zh-CN"}
+
+	measure 商品TOP10减退金额占比 = DIVIDE([TOP10支付金额总和],'07-旗舰店商品销售数据'[商品减退金额（万）])
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: 8473b041-5e00-40bd-a0ae-66a01ab82194
+
+	measure 商品减退金额（万） = divide((SUM('07-旗舰店商品销售数据'[支付金额])-SUM('07-旗舰店商品销售数据'[退款金额])),10000)
+		lineageTag: 1f782c29-85a6-4396-bee1-486967ca140a
+
+		formatStringDefinition = "0.00万"
+
+	measure 商品支付金额（万） = DIVIDE(SUM('07-旗舰店商品销售数据'[支付金额]), 10000)
+		lineageTag: 7e906d5d-2117-4367-8ee5-41f4011bd0f5
+
+		formatStringDefinition = "0.00万"
+
+	measure 件单价 = divide(SUM('07-旗舰店商品销售数据'[支付金额]),SUM('07-旗舰店商品销售数据'[商品支付件数]))
+		formatString: #,0
+		lineageTag: c725dcec-3c71-4847-a686-8d920dbcc437
+
+	measure 商品减退金额占比 =
+			
+			DIVIDE(
+			    [商品减退金额（万）],
+			    CALCULATE(
+			        [商品减退金额（万）],
+			        ALLSELECTED()
+			))
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: 5d54ab37-a048-4dbf-af4f-6d52033652b1
+
+	measure 商品减退金额 = [商品减退金额（万）]*10000
+		formatString: #,0
+		lineageTag: 9e8fea3b-85de-4e07-9fdb-fecd588c3f93
+
+	measure 客单价（商品） =
+			
+			DIVIDE(SUM('07-旗舰店商品销售数据'[支付金额]), SUM('07-旗舰店商品销售数据'[支付买家数]))
+		lineageTag: 6f475773-0b86-45c4-8569-09b39e8e9956
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	measure 商品费比 =
+			
+			DIVIDE([花费(万)], [商品减退金额（万）])
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: f2106023-0dda-46f1-ba9d-982027163540
+
+	measure 支付件数（排除补差） =
+			CALCULATE(
+			    SUM('07-旗舰店商品销售数据'[商品支付件数]),
+			    NOT (CONTAINSSTRING('07-旗舰店商品销售数据'[商品名称], "差价") )
+			)
+		formatString: 0
+		lineageTag: cd9ff64b-02ff-4a7b-bb9a-e3ffa77df66a
+
+	measure 国补后费比 = divide([花费(万)],[商品减退金额（万）]*0.85)
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: f3ebbe40-6185-435f-9cb6-c2bec90fb503
+
+	measure 国补后金额(万) = [商品减退金额（万）]*0.85
+		lineageTag: b594bdc6-6398-4d96-b30a-c2ce77a2dc10
+
+		formatStringDefinition = "0.00万"
+
+	measure 去年国补后金额（万） = ```
+			CALCULATE( [国补后金额(万)] , 
+			   DATEADD( '01-店铺数据辅助表'[日期].[Date], -365 , DAY ) )
+			```
+		lineageTag: ac8ff2c5-a024-4c75-96c4-ccf2fdc1945c
+
+		formatStringDefinition = "0.00万"
+
+	measure 国补后金额同比 = DIVIDE(([国补后金额(万)]-[去年国补后金额（万）]),[去年国补后金额（万）])
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: 91b4abb0-b87f-4874-a185-ce21b28403f0
+
+	column 商品名称
+		dataType: string
+		lineageTag: 8255c224-732c-443e-8597-47113d966af7
+		summarizeBy: none
+		sourceColumn: 商品名称
+
+		annotation SummarizationSetBy = Automatic
+
+	column 商品ID
+		dataType: string
+		lineageTag: 0d216848-dd24-4cc5-b6d9-e3a2b1c269d9
+		summarizeBy: none
+		sourceColumn: 商品ID
+
+		annotation SummarizationSetBy = Automatic
+
+	column 商品状态
+		dataType: string
+		lineageTag: d1f110c6-33c0-466c-856d-280255a97b4f
+		summarizeBy: none
+		sourceColumn: 商品状态
+
+		annotation SummarizationSetBy = Automatic
+
+	column 支付金额
+		dataType: decimal
+		lineageTag: 5ee8742a-d73b-4d2b-aced-ced6c98d5454
+		summarizeBy: sum
+		sourceColumn: 支付金额
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 退款金额
+		dataType: decimal
+		formatString: #,0
+		lineageTag: d2a1b566-4f9a-40a6-b339-4e93422d1b58
+		summarizeBy: sum
+		sourceColumn: 退款金额
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isDecimal":true}
+
+	column 商品支付件数
+		dataType: int64
+		formatString: 0
+		lineageTag: 33589240-a5db-4c87-a518-83926db656a5
+		summarizeBy: sum
+		sourceColumn: 商品支付件数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 支付买家数
+		dataType: int64
+		formatString: 0
+		lineageTag: 6e412094-31e5-467b-acc5-34a031960fda
+		summarizeBy: sum
+		sourceColumn: 支付买家数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 支付转化率
+		dataType: string
+		lineageTag: d88d9f4e-59b5-47a8-8926-f8ff94a34ae9
+		summarizeBy: none
+		sourceColumn: 支付转化率
+
+		annotation SummarizationSetBy = Automatic
+
+	column 支付新买家数
+		dataType: int64
+		formatString: 0
+		lineageTag: d44d0b06-fbb8-4b58-9010-003f80cbbad3
+		summarizeBy: sum
+		sourceColumn: 支付新买家数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 支付老买家数
+		dataType: string
+		lineageTag: 8ea63954-62ce-4670-9bd1-57a3b388557a
+		summarizeBy: none
+		sourceColumn: 支付老买家数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 老买家支付金额
+		dataType: string
+		lineageTag: 8821c636-e71c-4a37-acac-46d4bbb587fd
+		summarizeBy: none
+		sourceColumn: 老买家支付金额
+
+		annotation SummarizationSetBy = Automatic
+
+	column 聚划算支付金额
+		dataType: string
+		lineageTag: fdc3ddda-e172-4d46-88a4-d09f71bbb1ba
+		summarizeBy: none
+		sourceColumn: 聚划算支付金额
+
+		annotation SummarizationSetBy = Automatic
+
+	column 月累计支付金额
+		dataType: string
+		lineageTag: 36575e74-3d8a-4ad8-91b3-b58de36a7725
+		summarizeBy: none
+		sourceColumn: 月累计支付金额
+
+		annotation SummarizationSetBy = Automatic
+
+	column 月累计支付件数
+		dataType: string
+		lineageTag: 083f5bb1-7457-4977-ac65-b9b4febdde17
+		summarizeBy: none
+		sourceColumn: 月累计支付件数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 年累计支付金额
+		dataType: string
+		lineageTag: f792a76b-1bde-479f-813a-593e340e96b2
+		summarizeBy: none
+		sourceColumn: 年累计支付金额
+
+		annotation SummarizationSetBy = Automatic
+
+	column 下单件数
+		dataType: string
+		lineageTag: be512c70-0444-454d-9b7a-d0e1fb3db218
+		summarizeBy: none
+		sourceColumn: 下单件数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 下单金额
+		dataType: string
+		lineageTag: 8f2dcd98-d894-4676-bec3-e52286983f81
+		summarizeBy: none
+		sourceColumn: 下单金额
+
+		annotation SummarizationSetBy = Automatic
+
+	column 下单买家数
+		dataType: string
+		lineageTag: 89dc2639-d0d2-4fe2-9968-91d81f23ff33
+		summarizeBy: none
+		sourceColumn: 下单买家数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 下单转化率
+		dataType: string
+		lineageTag: c11e4981-01cd-4a36-bb10-c79c7463120a
+		summarizeBy: none
+		sourceColumn: 下单转化率
+
+		annotation SummarizationSetBy = Automatic
+
+	column 加购件数
+		dataType: double
+		formatString: 0
+		lineageTag: 5773a560-28cf-4a0e-bd4b-10644ea8c971
+		summarizeBy: sum
+		sourceColumn: 加购件数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 加购人数
+		dataType: int64
+		formatString: 0
+		lineageTag: bbab16e4-527c-4221-afe2-cedea2e56cf2
+		summarizeBy: sum
+		sourceColumn: 加购人数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 收藏人数
+		dataType: string
+		lineageTag: 5bc853f4-a19f-45e8-822a-f6476b72b17e
+		summarizeBy: none
+		sourceColumn: 收藏人数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 访问加购转化率
+		dataType: string
+		lineageTag: 4d2ce79e-9dd7-4b17-b041-0055218d37a1
+		summarizeBy: none
+		sourceColumn: 访问加购转化率
+
+		annotation SummarizationSetBy = Automatic
+
+	column 访问收藏转化率
+		dataType: string
+		lineageTag: 5d90ba57-ac85-451c-a0c4-7d63ffa84b0d
+		summarizeBy: none
+		sourceColumn: 访问收藏转化率
+
+		annotation SummarizationSetBy = Automatic
+
+	column 商品访客数
+		dataType: int64
+		formatString: 0
+		lineageTag: a0576b3c-4c1e-4273-ac8d-e060cb1fc417
+		summarizeBy: sum
+		sourceColumn: 商品访客数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 商品浏览量
+		dataType: string
+		lineageTag: 8d5a1f7c-8eb5-48f0-a6f0-c0542f43df36
+		summarizeBy: none
+		sourceColumn: 商品浏览量
+
+		annotation SummarizationSetBy = Automatic
+
+	column 平均停留时长
+		dataType: string
+		lineageTag: 7c544f4f-f854-4c36-83b9-560d7cb108c2
+		summarizeBy: none
+		sourceColumn: 平均停留时长
+
+		annotation SummarizationSetBy = Automatic
+
+	column 跳失率
+		dataType: string
+		lineageTag: 0ca90228-b200-426f-a237-aed48afe1973
+		summarizeBy: none
+		sourceColumn: 跳失率
+
+		annotation SummarizationSetBy = Automatic
+
+	column 搜索引导访客数
+		dataType: string
+		lineageTag: 0b02eb20-b72b-476b-8201-1a290812285f
+		summarizeBy: none
+		sourceColumn: 搜索引导访客数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 搜索引导支付买家数
+		dataType: string
+		lineageTag: e60d85d3-9a81-467b-91a2-9d3914e170ee
+		summarizeBy: none
+		sourceColumn: 搜索引导支付买家数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 搜索引导支付转化率
+		dataType: string
+		lineageTag: 49a24dbc-16dc-4953-8bf0-0707985cf099
+		summarizeBy: none
+		sourceColumn: 搜索引导支付转化率
+
+		annotation SummarizationSetBy = Automatic
+
+	column UV价值
+		dataType: double
+		lineageTag: 3dc9456e-eb47-4767-866c-eff290c30194
+		summarizeBy: sum
+		sourceColumn: UV价值
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 客单价
+		dataType: double
+		lineageTag: afb52dfc-c64d-413d-a306-e634d99b2ac2
+		summarizeBy: sum
+		sourceColumn: 客单价
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 日期
+		dataType: dateTime
+		formatString: Long Date
+		lineageTag: af1d60b6-a30c-4aeb-8c48-502cf4d79de9
+		summarizeBy: none
+		sourceColumn: 日期
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation UnderlyingDateTimeDataType = Date
+
+	column 收藏加购率
+		dataType: string
+		lineageTag: d842fe14-1415-4a20-a6cb-c8bcb75ea54c
+		summarizeBy: none
+		sourceColumn: 收藏加购率
+
+		annotation SummarizationSetBy = Automatic
+
+	partition 07-旗舰店商品销售数据 = m
+		mode: import
+		source =
+				let
+				    源 = Folder.Files("D:\麻大师\日更数据\天猫旗舰店\07-旗舰店商品销售数据"),
+				    已添加自定义 = Table.AddColumn(源, "自定义", each Excel.Workbook([Content])),
+				    排序的行 = Table.Sort(已添加自定义,{{"Date created", Order.Descending}}),
+				    #"展开的“自定义”" = Table.ExpandTableColumn(排序的行, "自定义", {"Name", "Data", "Item", "Kind", "Hidden"}, {"Name.1", "Data", "Item", "Kind", "Hidden"}),
+				    #"展开的“Data”" = Table.ExpandTableColumn(#"展开的“自定义”", "Data", {"Column1", "Column2", "Column3", "Column4", "Column5", "Column6", "Column7", "Column8", "Column9", "Column10", "Column11", "Column12", "Column13", "Column14", "Column15", "Column16", "Column17", "Column18", "Column19", "Column20", "Column21", "Column22", "Column23", "Column24", "Column25", "Column26", "Column27", "Column28", "Column29", "Column30", "Column31", "Column32", "Column33", "Column34", "Column35", "Column36", "Column37", "Column38"}, {"Column1", "Column2", "Column3", "Column4", "Column5", "Column6", "Column7", "Column8", "Column9", "Column10", "Column11", "Column12", "Column13", "Column14", "Column15", "Column16", "Column17", "Column18", "Column19", "Column20", "Column21", "Column22", "Column23", "Column24", "Column25", "Column26", "Column27", "Column28", "Column29", "Column30", "Column31", "Column32", "Column33", "Column34", "Column35", "Column36", "Column37", "Column38"}),
+				    删除的列2 = Table.RemoveColumns(#"展开的“Data”",{"Content", "Name", "Extension", "Date accessed", "Date modified", "Date created", "Attributes", "Folder Path", "Name.1", "Item", "Kind", "Hidden", "Column4", "Column37", "Column38"}),
+				    删除的副本1 = Table.Distinct(删除的列2),
+				    提升的标题1 = Table.PromoteHeaders(删除的副本1, [PromoteAllScalars=true]),
+				    更改的类型 = Table.TransformColumnTypes(提升的标题1,{{"退款金额", Currency.Type}, {"支付金额", Currency.Type}, {"商品访客数", Int64.Type}, {"日期", type date}, {"支付买家数", Int64.Type}}),
+				    删除的副本 = Table.Distinct(更改的类型, {"日期", "商品名称", "商品ID", "支付金额"}),
+				    已删除的空行 = Table.SelectRows(删除的副本, each not List.IsEmpty(List.RemoveMatchingItems(Record.FieldValues(_), {"", null}))),
+				    更改的类型1 = Table.TransformColumnTypes(已删除的空行,{{"支付金额", Currency.Type}, {"退款金额", Currency.Type}, {"支付买家数", Int64.Type}, {"支付件数", Int64.Type}, {"商品ID", type text}, {"商品访客数", Int64.Type}, {"加购人数", Int64.Type}, {"支付新买家数", Int64.Type}}),
+				    重命名的列 = Table.RenameColumns(更改的类型1,{{"支付件数", "商品支付件数"}}),
+				    更改的类型2 = Table.TransformColumnTypes(重命名的列,{{"UV价值", type number}, {"客单价", type number}, {"加购件数", type number}})
+				in
+				    更改的类型2
+
+	annotation PBI_ResultType = Table
+
+	annotation PBI_NavigationStepName = 导航
+

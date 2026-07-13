@@ -1,0 +1,754 @@
+table 08-1关键词报表数据
+	lineageTag: c0f1e83e-2c6f-45c5-8053-3e5f40eb393f
+
+	measure ROI（关键词） = divide(sum('08-1关键词报表数据'[总成交金额]),sum('08-1关键词报表数据'[花费]))
+		lineageTag: a4ab9937-37df-46bf-a12a-75b6c6d13836
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	measure 加购成本（关键词） = divide(SUM('08-1关键词报表数据'[花费]),SUM('08-1关键词报表数据'[总购物车数]))
+		lineageTag: 68af5b36-f927-4a92-b3d9-4d5ef4f2d13b
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	measure 点击率() = DIVIDE(SUM('08-1关键词报表数据'[点击量]),SUM('08-1关键词报表数据'[展现量]))
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: d92f0906-5c06-4eab-a36a-1846aca222e0
+
+	column 'Source.Name'
+		dataType: string
+		lineageTag: b92deaac-a94c-4928-833c-2cdc3c90a6c7
+		summarizeBy: none
+		sourceColumn: Source.Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 日期
+		dataType: dateTime
+		formatString: Long Date
+		lineageTag: bbe5ff10-7c4d-47a9-8e5e-d5df047f8954
+		summarizeBy: none
+		sourceColumn: 日期
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation UnderlyingDateTimeDataType = Date
+
+	column 场景ID
+		dataType: int64
+		formatString: 0
+		lineageTag: c1185db2-18d6-4d9f-8f1a-fbfd93f666c0
+		summarizeBy: count
+		sourceColumn: 场景ID
+
+		annotation SummarizationSetBy = Automatic
+
+	column 场景名字
+		dataType: string
+		lineageTag: 3fba7a58-1359-43f8-a3e2-4f8a9671d278
+		summarizeBy: none
+		sourceColumn: 场景名字
+
+		annotation SummarizationSetBy = Automatic
+
+	column 原二级场景ID
+		dataType: int64
+		formatString: 0
+		lineageTag: ecb1535a-191c-4209-b44f-a212f67823fc
+		summarizeBy: count
+		sourceColumn: 原二级场景ID
+
+		annotation SummarizationSetBy = Automatic
+
+	column 原二级场景名字
+		dataType: string
+		lineageTag: a256515a-75ff-40c3-b7ee-ef7b50ddbca4
+		summarizeBy: none
+		sourceColumn: 原二级场景名字
+
+		annotation SummarizationSetBy = Automatic
+
+	column 计划ID
+		dataType: string
+		lineageTag: e64cb806-d3d1-48ea-9ca2-d5cceb965d88
+		summarizeBy: none
+		sourceColumn: 计划ID
+
+		annotation SummarizationSetBy = Automatic
+
+	column 计划名字
+		dataType: string
+		lineageTag: 8267a839-944a-4530-a722-1c6577099e4f
+		summarizeBy: none
+		sourceColumn: 计划名字
+
+		annotation SummarizationSetBy = Automatic
+
+	column 单元ID
+		dataType: string
+		lineageTag: 3837efc8-4054-40d1-a24d-570c43f6d5c1
+		summarizeBy: none
+		sourceColumn: 单元ID
+
+		annotation SummarizationSetBy = Automatic
+
+	column 单元名字
+		dataType: string
+		lineageTag: 18545558-47bd-43db-99c9-d707fc790fa9
+		summarizeBy: none
+		sourceColumn: 单元名字
+
+		annotation SummarizationSetBy = Automatic
+
+	column 宝贝ID
+		dataType: string
+		lineageTag: db255519-c56d-4230-8f80-2dbe27282cbd
+		summarizeBy: none
+		sourceColumn: 宝贝ID
+
+		annotation SummarizationSetBy = Automatic
+
+	column 宝贝名称
+		dataType: string
+		lineageTag: 89fdc92b-1884-4fae-ad4c-e46140e6f201
+		summarizeBy: none
+		sourceColumn: 宝贝名称
+
+		annotation SummarizationSetBy = Automatic
+
+	column 词类型
+		dataType: string
+		lineageTag: b32b2503-b2f0-4030-8a10-59ac85a21a7a
+		summarizeBy: none
+		sourceColumn: 词类型
+
+		annotation SummarizationSetBy = Automatic
+
+	column 词ID/词包ID
+		dataType: string
+		lineageTag: ebc98bbd-68d8-45e7-916d-928adad6d5ac
+		summarizeBy: none
+		sourceColumn: 词ID/词包ID
+
+		annotation SummarizationSetBy = Automatic
+
+	column 词名字/词包名字
+		dataType: string
+		lineageTag: 9b9f6438-3422-41f6-895e-1e9cfb90701d
+		summarizeBy: none
+		sourceColumn: 词名字/词包名字
+
+		annotation SummarizationSetBy = Automatic
+
+	column 展现量
+		dataType: int64
+		formatString: 0
+		lineageTag: c4891c67-ac18-439f-ac9d-a56e4715fa03
+		summarizeBy: sum
+		sourceColumn: 展现量
+
+		annotation SummarizationSetBy = Automatic
+
+	column 点击量
+		dataType: int64
+		formatString: 0
+		lineageTag: 7274dff5-7c03-4cf6-b94d-06a51fb88e01
+		summarizeBy: sum
+		sourceColumn: 点击量
+
+		annotation SummarizationSetBy = Automatic
+
+	column 花费
+		dataType: double
+		lineageTag: f922c987-776f-43f8-a2f5-dcc1e30f54e7
+		summarizeBy: sum
+		sourceColumn: 花费
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 点击率
+		dataType: double
+		lineageTag: ce66aa2d-1092-4782-af30-9bc59bb05125
+		summarizeBy: sum
+		sourceColumn: 点击率
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 平均点击花费
+		dataType: double
+		lineageTag: df67f1aa-b8d9-4b68-8bfd-257f32abf613
+		summarizeBy: sum
+		sourceColumn: 平均点击花费
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 千次展现花费
+		dataType: double
+		lineageTag: 2fd720d9-57c2-4e37-ae3e-92ff96c9360b
+		summarizeBy: sum
+		sourceColumn: 千次展现花费
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 总预售成交金额
+		dataType: int64
+		formatString: 0
+		lineageTag: 69d367b0-3feb-430c-84c3-b148b3efc6c7
+		summarizeBy: sum
+		sourceColumn: 总预售成交金额
+
+		annotation SummarizationSetBy = Automatic
+
+	column 总预售成交笔数
+		dataType: int64
+		formatString: 0
+		lineageTag: 2a616683-5082-4a9b-b7d0-634f434f15ff
+		summarizeBy: sum
+		sourceColumn: 总预售成交笔数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 直接预售成交金额
+		dataType: int64
+		formatString: 0
+		lineageTag: 3e386fee-baaf-4885-b77d-62623fd6e4a4
+		summarizeBy: sum
+		sourceColumn: 直接预售成交金额
+
+		annotation SummarizationSetBy = Automatic
+
+	column 直接预售成交笔数
+		dataType: int64
+		formatString: 0
+		lineageTag: f80ea4bd-2811-46a1-8915-7485595436c9
+		summarizeBy: sum
+		sourceColumn: 直接预售成交笔数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 间接预售成交金额
+		dataType: int64
+		formatString: 0
+		lineageTag: 7a7a1ef9-1869-403e-ba98-ff7dc61b3283
+		summarizeBy: sum
+		sourceColumn: 间接预售成交金额
+
+		annotation SummarizationSetBy = Automatic
+
+	column 间接预售成交笔数
+		dataType: int64
+		formatString: 0
+		lineageTag: 7b3f9505-3703-43cf-981f-b928f6d62ef3
+		summarizeBy: sum
+		sourceColumn: 间接预售成交笔数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 直接成交金额
+		dataType: double
+		lineageTag: a06a10da-875b-4e25-8255-902a5ab74233
+		summarizeBy: sum
+		sourceColumn: 直接成交金额
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 间接成交金额
+		dataType: double
+		lineageTag: 71647690-8463-47b2-9216-9c59bbeef359
+		summarizeBy: sum
+		sourceColumn: 间接成交金额
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 总成交金额
+		dataType: double
+		formatString: 0
+		lineageTag: 61450092-9812-4dad-b27b-9dad0e641099
+		summarizeBy: sum
+		sourceColumn: 总成交金额
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isDecimal":true}
+
+	column 总成交笔数
+		dataType: int64
+		formatString: 0
+		lineageTag: 7d49e6bc-e31c-46c0-8546-5aae9cb051f6
+		summarizeBy: sum
+		sourceColumn: 总成交笔数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 直接成交笔数
+		dataType: int64
+		formatString: 0
+		lineageTag: 2bb54c11-8292-4a99-b7c8-6a837a8f71c5
+		summarizeBy: sum
+		sourceColumn: 直接成交笔数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 间接成交笔数
+		dataType: int64
+		formatString: 0
+		lineageTag: 709844d4-c054-4b64-9523-df3601c3a539
+		summarizeBy: sum
+		sourceColumn: 间接成交笔数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 点击转化率
+		dataType: double
+		lineageTag: 9aa6b9f9-eb66-4817-b2ca-9500d4ea788c
+		summarizeBy: sum
+		sourceColumn: 点击转化率
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 投入产出比
+		dataType: double
+		lineageTag: 434816ba-8aa8-41c3-a5ab-2bbe842752c8
+		summarizeBy: sum
+		sourceColumn: 投入产出比
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 含预售投产比
+		dataType: double
+		lineageTag: d0004c36-b117-4b15-a54f-849a75cd583b
+		summarizeBy: sum
+		sourceColumn: 含预售投产比
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 总成交成本
+		dataType: double
+		lineageTag: 4b3839c6-9172-4f54-9151-1fa1c6ca8c92
+		summarizeBy: sum
+		sourceColumn: 总成交成本
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 总购物车数
+		dataType: int64
+		formatString: 0
+		lineageTag: ca47ce13-36dd-4e8e-bc7c-235c2b92d91d
+		summarizeBy: sum
+		sourceColumn: 总购物车数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 直接购物车数
+		dataType: int64
+		formatString: 0
+		lineageTag: 7779684f-30f1-4929-8a32-b0dca8a17460
+		summarizeBy: sum
+		sourceColumn: 直接购物车数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 间接购物车数
+		dataType: int64
+		formatString: 0
+		lineageTag: ad1f94ce-9de4-461a-a423-0a9a8cf856be
+		summarizeBy: sum
+		sourceColumn: 间接购物车数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 加购率
+		dataType: double
+		lineageTag: 640e1893-e547-40e2-9bdd-e22676ff1d6b
+		summarizeBy: sum
+		sourceColumn: 加购率
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 收藏宝贝数
+		dataType: int64
+		formatString: 0
+		lineageTag: ca61b6e8-99eb-45a6-9c17-aa4f9fda16dc
+		summarizeBy: sum
+		sourceColumn: 收藏宝贝数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 收藏店铺数
+		dataType: int64
+		formatString: 0
+		lineageTag: 9ab82105-d20c-4e22-b52f-daa0c915eaa2
+		summarizeBy: sum
+		sourceColumn: 收藏店铺数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 店铺收藏成本
+		dataType: double
+		lineageTag: 85efb8b3-4abf-47d1-b9ce-7a839bb45c90
+		summarizeBy: sum
+		sourceColumn: 店铺收藏成本
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 总收藏加购数
+		dataType: int64
+		formatString: 0
+		lineageTag: 2b768202-6c96-4a36-a58b-685fb81d61c6
+		summarizeBy: sum
+		sourceColumn: 总收藏加购数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 总收藏加购成本
+		dataType: double
+		lineageTag: 5f312ec8-b5c4-45aa-b256-e99dd8cf6972
+		summarizeBy: sum
+		sourceColumn: 总收藏加购成本
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 宝贝收藏加购数
+		dataType: int64
+		formatString: 0
+		lineageTag: 3b36f76c-3226-4819-90e6-03574772782e
+		summarizeBy: sum
+		sourceColumn: 宝贝收藏加购数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 宝贝收藏加购成本
+		dataType: double
+		lineageTag: 5289a5ad-f57f-42da-9d14-b595f702f638
+		summarizeBy: sum
+		sourceColumn: 宝贝收藏加购成本
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 总收藏数
+		dataType: int64
+		formatString: 0
+		lineageTag: bac49398-975c-4bf4-842e-e020837fca5b
+		summarizeBy: sum
+		sourceColumn: 总收藏数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 宝贝收藏成本
+		dataType: double
+		lineageTag: 99139136-4aaf-454d-a2e8-4b77f2862b72
+		summarizeBy: sum
+		sourceColumn: 宝贝收藏成本
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 宝贝收藏率
+		dataType: double
+		lineageTag: b8cc72ca-9944-44ad-bf59-6cac388b238f
+		summarizeBy: sum
+		sourceColumn: 宝贝收藏率
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 加购成本
+		dataType: double
+		lineageTag: ca05f27d-3c4f-4bba-a983-c6a09437ff01
+		summarizeBy: sum
+		sourceColumn: 加购成本
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 拍下订单笔数
+		dataType: int64
+		formatString: 0
+		lineageTag: e4e91a19-4f71-4311-8a88-aec63d18eb69
+		summarizeBy: sum
+		sourceColumn: 拍下订单笔数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 拍下订单金额
+		dataType: int64
+		formatString: 0
+		lineageTag: b350e659-9eb8-45e2-af6e-f99953d10621
+		summarizeBy: sum
+		sourceColumn: 拍下订单金额
+
+		annotation SummarizationSetBy = Automatic
+
+	column 直接收藏宝贝数
+		dataType: int64
+		formatString: 0
+		lineageTag: f147f7d2-c330-4572-8ab9-e08c5584363e
+		summarizeBy: sum
+		sourceColumn: 直接收藏宝贝数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 间接收藏宝贝数
+		dataType: int64
+		formatString: 0
+		lineageTag: ade32b18-832e-4120-a4b8-6627eb4e1ad5
+		summarizeBy: sum
+		sourceColumn: 间接收藏宝贝数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 优惠券领取量
+		dataType: int64
+		formatString: 0
+		lineageTag: 6a844eba-d80b-4b31-af96-132694436025
+		summarizeBy: sum
+		sourceColumn: 优惠券领取量
+
+		annotation SummarizationSetBy = Automatic
+
+	column 购物金充值笔数
+		dataType: int64
+		formatString: 0
+		lineageTag: 872a8325-0a76-4421-8107-d391007e812a
+		summarizeBy: sum
+		sourceColumn: 购物金充值笔数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 购物金充值金额
+		dataType: int64
+		formatString: 0
+		lineageTag: bb38f2e0-0317-47f3-9d0f-4e3bfb84961f
+		summarizeBy: sum
+		sourceColumn: 购物金充值金额
+
+		annotation SummarizationSetBy = Automatic
+
+	column 旺旺咨询量
+		dataType: int64
+		formatString: 0
+		lineageTag: 03d79c31-c1e9-4cc9-a9e3-cb08ed55f87d
+		summarizeBy: sum
+		sourceColumn: 旺旺咨询量
+
+		annotation SummarizationSetBy = Automatic
+
+	column 引导访问量
+		dataType: int64
+		formatString: 0
+		lineageTag: 84b6e486-18a8-403e-a0f1-f2073a2d7b14
+		summarizeBy: sum
+		sourceColumn: 引导访问量
+
+		annotation SummarizationSetBy = Automatic
+
+	column 引导访问人数
+		dataType: int64
+		formatString: 0
+		lineageTag: 06464fb6-321b-44a1-b27a-afdef2b36066
+		summarizeBy: sum
+		sourceColumn: 引导访问人数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 引导访问潜客数
+		dataType: int64
+		formatString: 0
+		lineageTag: 3cf94b1e-b655-4a02-9efe-69cf4f0772e9
+		summarizeBy: sum
+		sourceColumn: 引导访问潜客数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 引导访问潜客占比
+		dataType: double
+		lineageTag: 6c0b483e-379a-450d-8721-d6a9816e06f9
+		summarizeBy: sum
+		sourceColumn: 引导访问潜客占比
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 入会率
+		dataType: double
+		lineageTag: bc7c69f0-e4b5-4e53-b2bd-bbdfb8fa00e4
+		summarizeBy: sum
+		sourceColumn: 入会率
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 入会量
+		dataType: int64
+		formatString: 0
+		lineageTag: e02de80c-1619-41ce-a7e5-19b25308ae95
+		summarizeBy: sum
+		sourceColumn: 入会量
+
+		annotation SummarizationSetBy = Automatic
+
+	column 引导访问率
+		dataType: double
+		lineageTag: e33b8426-4905-4324-8a31-7299701a8fdf
+		summarizeBy: sum
+		sourceColumn: 引导访问率
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 深度访问量
+		dataType: int64
+		formatString: 0
+		lineageTag: 59dfa078-c4a2-497a-ba4e-be4579d6ecb9
+		summarizeBy: sum
+		sourceColumn: 深度访问量
+
+		annotation SummarizationSetBy = Automatic
+
+	column 平均访问页面数
+		dataType: int64
+		formatString: 0
+		lineageTag: 784aca62-b7f3-48e3-9416-dfbd36fb8a49
+		summarizeBy: sum
+		sourceColumn: 平均访问页面数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 成交新客数
+		dataType: int64
+		formatString: 0
+		lineageTag: 51f6225a-3f1e-43e3-9abc-78f16ba96836
+		summarizeBy: sum
+		sourceColumn: 成交新客数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 成交新客占比
+		dataType: int64
+		formatString: 0
+		lineageTag: e3bc9316-59f9-4e9a-afb8-311c1a7927de
+		summarizeBy: sum
+		sourceColumn: 成交新客占比
+
+		annotation SummarizationSetBy = Automatic
+
+	column 会员首购人数
+		dataType: int64
+		formatString: 0
+		lineageTag: 70d41421-1522-4728-bed7-50771e4abc5c
+		summarizeBy: sum
+		sourceColumn: 会员首购人数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 会员成交金额
+		dataType: double
+		lineageTag: f017ae82-6f4f-44f4-885d-6da8f7e996d0
+		summarizeBy: sum
+		sourceColumn: 会员成交金额
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 会员成交笔数
+		dataType: int64
+		formatString: 0
+		lineageTag: 041f415e-9aa7-4854-88f4-6c58ff26802a
+		summarizeBy: sum
+		sourceColumn: 会员成交笔数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 成交人数
+		dataType: int64
+		formatString: 0
+		lineageTag: a26c3365-16ee-44a8-a305-d6796a1b415b
+		summarizeBy: sum
+		sourceColumn: 成交人数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 人均成交笔数
+		dataType: int64
+		formatString: 0
+		lineageTag: faa959dd-443e-4893-804d-60700393fa36
+		summarizeBy: sum
+		sourceColumn: 人均成交笔数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 人均成交金额
+		dataType: double
+		lineageTag: 17500b9e-5e18-4c22-a0fa-3a4a000a2adc
+		summarizeBy: sum
+		sourceColumn: 人均成交金额
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 平均展现排名
+		dataType: double
+		lineageTag: 2afa4ad3-1d8a-4b3a-b1e3-b2edd76e9f76
+		summarizeBy: sum
+		sourceColumn: 平均展现排名
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	partition 08-1关键词报表数据 = m
+		mode: import
+		source =
+				let
+				    源 = Folder.Files("D:\麻大师\日更数据\天猫旗舰店\08-1关键词报表数据"),
+				    筛选的隐藏文件1 = Table.SelectRows(源, each [Attributes]?[Hidden]? <> true),
+				    调用自定义函数1 = Table.AddColumn(筛选的隐藏文件1, "转换文件 (23)", each #"转换文件 (23)"([Content])),
+				    重命名的列1 = Table.RenameColumns(调用自定义函数1, {"Name", "Source.Name"}),
+				    排序的行 = Table.Sort(重命名的列1,{{"Date created", Order.Descending}}),
+				    删除的其他列1 = Table.SelectColumns(排序的行, {"Source.Name", "转换文件 (23)"}),
+				    扩展的表格列1 = Table.ExpandTableColumn(删除的其他列1, "转换文件 (23)", Table.ColumnNames(#"转换文件 (23)"(#"示例文件 (23)"))),
+				    更改的类型 = Table.TransformColumnTypes(扩展的表格列1,{{"Source.Name", type text}, {"日期", type date}, {"场景ID", Int64.Type}, {"场景名字", type text}, {"原二级场景ID", Int64.Type}, {"原二级场景名字", type text}, {"计划ID", type text}, {"计划名字", type text}, {"单元ID", type text}, {"单元名字", type text}, {"宝贝ID", type text}, {"宝贝名称", type text}, {"词类型", type text}, {"词ID/词包ID", type text}, {"词名字/词包名字", type text}, {"展现量", Int64.Type}, {"点击量", Int64.Type}, {"花费", type number}, {"点击率", type number}, {"平均点击花费", type number}, {"千次展现花费", type number}, {"总预售成交金额", Int64.Type}, {"总预售成交笔数", Int64.Type}, {"直接预售成交金额", Int64.Type}, {"直接预售成交笔数", Int64.Type}, {"间接预售成交金额", Int64.Type}, {"间接预售成交笔数", Int64.Type}, {"直接成交金额", type number}, {"间接成交金额", type number}, {"总成交金额", type number}, {"总成交笔数", Int64.Type}, {"直接成交笔数", Int64.Type}, {"间接成交笔数", Int64.Type}, {"点击转化率", type number}, {"投入产出比", type number}, {"含预售投产比", type number}, {"总成交成本", type number}, {"总购物车数", Int64.Type}, {"直接购物车数", Int64.Type}, {"间接购物车数", Int64.Type}, {"加购率", type number}, {"收藏宝贝数", Int64.Type}, {"收藏店铺数", Int64.Type}, {"店铺收藏成本", type number}, {"总收藏加购数", Int64.Type}, {"总收藏加购成本", type number}, {"宝贝收藏加购数", Int64.Type}, {"宝贝收藏加购成本", type number}, {"总收藏数", Int64.Type}, {"宝贝收藏成本", type number}, {"宝贝收藏率", type number}, {"加购成本", type number}, {"拍下订单笔数", Int64.Type}, {"拍下订单金额", Int64.Type}, {"直接收藏宝贝数", Int64.Type}, {"间接收藏宝贝数", Int64.Type}, {"优惠券领取量", Int64.Type}, {"购物金充值笔数", Int64.Type}, {"购物金充值金额", Int64.Type}, {"旺旺咨询量", Int64.Type}, {"引导访问量", Int64.Type}, {"引导访问人数", Int64.Type}, {"引导访问潜客数", Int64.Type}, {"引导访问潜客占比", type number}, {"入会率", type number}, {"入会量", Int64.Type}, {"引导访问率", type number}, {"深度访问量", Int64.Type}, {"平均访问页面数", Int64.Type}, {"成交新客数", Int64.Type}, {"成交新客占比", Int64.Type}, {"会员首购人数", Int64.Type}, {"会员成交金额", type number}, {"会员成交笔数", Int64.Type}, {"成交人数", Int64.Type}, {"人均成交笔数", Int64.Type}, {"人均成交金额", type number}, {"平均展现排名", type number}}),
+				    删除的副本 = Table.Distinct(更改的类型, {"日期", "场景ID", "场景名字", "原二级场景ID", "原二级场景名字", "计划ID", "计划名字", "单元ID", "单元名字", "宝贝ID", "宝贝名称", "词类型", "词ID/词包ID", "词名字/词包名字"})
+				in
+				    删除的副本
+
+	annotation PBI_NavigationStepName = 导航
+
+	annotation PBI_ResultType = Table
+

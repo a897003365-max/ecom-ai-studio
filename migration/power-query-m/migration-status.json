@@ -1,0 +1,210 @@
+{
+  "generatedAt": "2026-07-12T11:47:23.290098+08:00",
+  "queryCount": 25,
+  "completedQueries": 25,
+  "sourceFileCount": 3828,
+  "parquetPartitionCount": 3828,
+  "rowCount": 2407712,
+  "queries": [
+    {
+      "query": "00-月表汇总",
+      "files": 1,
+      "partitions": 1,
+      "rows": 986,
+      "failedFiles": 0,
+      "status": "migrated"
+    },
+    {
+      "query": "01-店铺数据辅助表",
+      "files": 1,
+      "partitions": 1,
+      "rows": 1154,
+      "failedFiles": 0,
+      "status": "migrated"
+    },
+    {
+      "query": "03-1-各渠道目标金额",
+      "files": 1,
+      "partitions": 1,
+      "rows": 108,
+      "failedFiles": 0,
+      "status": "migrated"
+    },
+    {
+      "query": "03-2店铺每天销售目标",
+      "files": 1,
+      "partitions": 1,
+      "rows": 3325,
+      "failedFiles": 0,
+      "status": "migrated"
+    },
+    {
+      "query": "04-旗舰店基础数据",
+      "files": 239,
+      "partitions": 239,
+      "rows": 7032,
+      "failedFiles": 0,
+      "status": "migrated"
+    },
+    {
+      "query": "05-旗舰店ID对照表",
+      "files": 1,
+      "partitions": 1,
+      "rows": 120,
+      "failedFiles": 0,
+      "status": "migrated"
+    },
+    {
+      "query": "06-旗舰店流量数据",
+      "files": 120,
+      "partitions": 120,
+      "rows": 11002,
+      "failedFiles": 0,
+      "status": "migrated"
+    },
+    {
+      "query": "07-旗舰店商品销售数据",
+      "files": 651,
+      "partitions": 651,
+      "rows": 68057,
+      "failedFiles": 0,
+      "status": "migrated"
+    },
+    {
+      "query": "08-1关键词报表数据",
+      "files": 122,
+      "partitions": 122,
+      "rows": 1082385,
+      "failedFiles": 0,
+      "status": "migrated"
+    },
+    {
+      "query": "08-2人群报表数据",
+      "files": 124,
+      "partitions": 124,
+      "rows": 212748,
+      "failedFiles": 0,
+      "status": "migrated"
+    },
+    {
+      "query": "08-旗舰店推广花费",
+      "files": 420,
+      "partitions": 420,
+      "rows": 988302,
+      "failedFiles": 0,
+      "status": "migrated"
+    },
+    {
+      "query": "10-1淘宝客服绩效明细",
+      "files": 543,
+      "partitions": 543,
+      "rows": 9436,
+      "failedFiles": 0,
+      "status": "migrated"
+    },
+    {
+      "query": "10-2京东客服营销明细",
+      "files": 249,
+      "partitions": 249,
+      "rows": 1917,
+      "failedFiles": 0,
+      "status": "migrated"
+    },
+    {
+      "query": "10-3京东客服绩效数据",
+      "files": 249,
+      "partitions": 249,
+      "rows": 1923,
+      "failedFiles": 0,
+      "status": "migrated"
+    },
+    {
+      "query": "10-4客服员工日报统计",
+      "files": 258,
+      "partitions": 258,
+      "rows": 3175,
+      "failedFiles": 0,
+      "status": "migrated"
+    },
+    {
+      "query": "11-旗舰店UD推广计划",
+      "files": 102,
+      "partitions": 102,
+      "rows": 421,
+      "failedFiles": 0,
+      "status": "migrated"
+    },
+    {
+      "query": "14-推广竞品数据",
+      "files": 46,
+      "partitions": 46,
+      "rows": 1288,
+      "failedFiles": 0,
+      "status": "migrated"
+    },
+    {
+      "query": "辅4-床垫编码",
+      "files": 1,
+      "partitions": 1,
+      "rows": 7949,
+      "failedFiles": 0,
+      "status": "migrated"
+    },
+    {
+      "query": "辅5-床类编码",
+      "files": 1,
+      "partitions": 1,
+      "rows": 488,
+      "failedFiles": 0,
+      "status": "migrated"
+    },
+    {
+      "query": "接待数据",
+      "files": 235,
+      "partitions": 235,
+      "rows": 1851,
+      "failedFiles": 0,
+      "status": "migrated"
+    },
+    {
+      "query": "京东客服分组表",
+      "files": 1,
+      "partitions": 1,
+      "rows": 61,
+      "failedFiles": 0,
+      "status": "migrated"
+    },
+    {
+      "query": "考勤数据",
+      "files": 229,
+      "partitions": 229,
+      "rows": 1765,
+      "failedFiles": 0,
+      "status": "migrated"
+    },
+    {
+      "query": "淘宝客服排班表",
+      "files": 1,
+      "partitions": 1,
+      "rows": 398,
+      "failedFiles": 0,
+      "status": "migrated"
+    },
+    {
+      "query": "营销数据",
+      "files": 27,
+      "partitions": 27,
+      "rows": 202,
+      "failedFiles": 0,
+      "status": "migrated"
+    },
+    {
+      "query": "营销数据改版",
+      "files": 205,
+      "partitions": 205,
+      "rows": 1619,
+      "failedFiles": 0,
+      "status": "migrated"
+    }
+  ]
+}

@@ -1,0 +1,418 @@
+table 10-2京东客服营销明细
+	lineageTag: 539f958b-bbd0-4bde-b5bb-f81ce7c5e355
+
+	measure 接待量环比 =
+			
+			VAR CurrentValue = sum('10-2京东客服营销明细'[接待量])
+			VAR PreviousValue = CALCULATE(sum('10-2京东客服营销明细'[接待量]), DATEADD('01-店铺数据辅助表'[日期].[Date], -1 , DAY ))
+			RETURN
+			DIVIDE(CurrentValue - PreviousValue, PreviousValue, 0)
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: 059a0f17-c166-43e8-ae8a-e986e69ef7d8
+
+	measure 30S应答率环比 =
+			
+			VAR CurrentValue = sum('10-2京东客服营销明细'[30s应答率])
+			VAR PreviousValue = CALCULATE(sum('10-2京东客服营销明细'[30s应答率]), DATEADD('01-店铺数据辅助表'[日期].[Date], -1 , DAY ))
+			RETURN
+			DIVIDE(CurrentValue - PreviousValue, PreviousValue, 0)
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: de88d9af-fcc2-4435-bab7-223f5b544570
+
+	measure 首响京东环比 =
+			
+			VAR CurrentValue = sum('10-2京东客服营销明细'[首次平均响应时间])
+			VAR PreviousValue = CALCULATE(sum('10-2京东客服营销明细'[首次平均响应时间]), DATEADD('01-店铺数据辅助表'[日期].[Date], -1 , DAY ))
+			RETURN
+			DIVIDE(CurrentValue - PreviousValue, PreviousValue, 0)
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: 2abbd218-bb5f-43ce-b85c-0560cdae419f
+
+	measure 京东班次 =
+			
+			VAR CurrentDate =MIN('10-2京东客服营销明细'[日期])
+			VAR CurrentNickname = MIN('京东客服分组表'[客服])
+			RETURN
+			MAXX(
+			    FILTER(
+			        '淘宝客服排班表',
+			        '淘宝客服排班表'[旺旺昵称] = CurrentNickname &&
+			        CurrentDate >= '淘宝客服排班表'[开始时间] &&
+			        CurrentDate <= '淘宝客服排班表'[结束时间]
+			    ),
+			    '淘宝客服排班表'[班次]
+			)
+		lineageTag: 33972b3f-cf8f-47ef-8a2d-c36ced89ebda
+
+	column 'Source.Name'
+		dataType: string
+		lineageTag: 17e3db6a-29c5-438f-a5de-395942378de4
+		summarizeBy: none
+		sourceColumn: Source.Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 客服
+		dataType: string
+		lineageTag: e73f5ef8-7867-4e82-afbd-5fcefa9caab0
+		summarizeBy: none
+		sourceColumn: 客服
+
+		annotation SummarizationSetBy = Automatic
+
+	column 登录时长
+		dataType: string
+		lineageTag: da8e9575-da6a-48cb-ac39-7946d7de1789
+		summarizeBy: none
+		sourceColumn: 登录时长
+
+		annotation SummarizationSetBy = Automatic
+
+	column 接待时长
+		dataType: double
+		lineageTag: ac8870d0-49da-48c9-8fe8-839a33b094ab
+		summarizeBy: sum
+		sourceColumn: 接待时长
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 咨询量
+		dataType: string
+		lineageTag: 57a25470-c224-4705-bed3-7a8648345b74
+		summarizeBy: none
+		sourceColumn: 咨询量
+
+		annotation SummarizationSetBy = Automatic
+
+	column 接待量
+		dataType: double
+		formatString: 0
+		lineageTag: 88b8e21e-a074-4e64-89d2-f339b743f60e
+		summarizeBy: sum
+		sourceColumn: 接待量
+
+		annotation SummarizationSetBy = Automatic
+
+	column 无响应量
+		dataType: string
+		lineageTag: 9e6442ab-4f82-4c30-bcc3-1af68ee702a1
+		summarizeBy: none
+		sourceColumn: 无响应量
+
+		annotation SummarizationSetBy = Automatic
+
+	column 回复率
+		dataType: string
+		lineageTag: a319aecd-e779-4f8c-a037-d969123421c0
+		summarizeBy: none
+		sourceColumn: 回复率
+
+		annotation SummarizationSetBy = Automatic
+
+	column 30s应答率
+		dataType: double
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: 897edeb0-42ca-4db3-b2f9-4c1e30df3c3b
+		summarizeBy: sum
+		sourceColumn: 30s应答率
+
+		annotation SummarizationSetBy = Automatic
+
+	column 满意率
+		dataType: string
+		lineageTag: a02f0579-4042-40cd-bf2d-d76e7ce24627
+		summarizeBy: none
+		sourceColumn: 满意率
+
+		annotation SummarizationSetBy = Automatic
+
+	column 邀评率
+		dataType: string
+		lineageTag: edb1c2e1-475d-4663-8baa-9d441605ba4d
+		summarizeBy: none
+		sourceColumn: 邀评率
+
+		annotation SummarizationSetBy = Automatic
+
+	column 平均回复消息数
+		dataType: double
+		lineageTag: b3df0665-de4d-4dc9-8f2d-dcadfc892231
+		summarizeBy: sum
+		sourceColumn: 平均回复消息数
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 平均会话时长
+		dataType: string
+		lineageTag: 90efe4bd-f8f6-4800-8d10-16db1b57cefe
+		summarizeBy: none
+		sourceColumn: 平均会话时长
+
+		annotation SummarizationSetBy = Automatic
+
+	column 首次平均响应时间
+		dataType: double
+		lineageTag: 8569a799-7dd9-4ecc-a928-fc7625d699e1
+		summarizeBy: sum
+		sourceColumn: 首次平均响应时间
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 留言分配量
+		dataType: string
+		lineageTag: f85cc532-95bd-45f9-a050-68f653e09daf
+		summarizeBy: none
+		sourceColumn: 留言分配量
+
+		annotation SummarizationSetBy = Automatic
+
+	column 留言接待量
+		dataType: string
+		lineageTag: 32385338-b4ac-48ec-af2f-5136290bf76b
+		summarizeBy: none
+		sourceColumn: 留言接待量
+
+		annotation SummarizationSetBy = Automatic
+
+	column 留言响应率
+		dataType: string
+		lineageTag: eae4273c-f8cc-455a-b6a0-e461d3879284
+		summarizeBy: none
+		sourceColumn: 留言响应率
+
+		annotation SummarizationSetBy = Automatic
+
+	column 解决率
+		dataType: string
+		lineageTag: c5513c80-cb20-4640-bdda-32a4489f9926
+		summarizeBy: none
+		sourceColumn: 解决率
+
+		annotation SummarizationSetBy = Automatic
+
+	column 新平均响应时间
+		dataType: double
+		lineageTag: 1bbc870d-d1df-4251-83ca-39b4c0159de9
+		summarizeBy: sum
+		sourceColumn: 新平均响应时间
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 服务时长
+		dataType: double
+		lineageTag: f9c1220d-ff17-461f-bf1d-cd2de3b14312
+		summarizeBy: sum
+		sourceColumn: 服务时长
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 平均响应时间
+		dataType: double
+		lineageTag: 8ea5c43a-bed9-4345-a7bf-52548c295e11
+		summarizeBy: sum
+		sourceColumn: 平均响应时间
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 3分钟回复率（客服维度-不含留言）
+		dataType: double
+		lineageTag: bd9a78c5-35c6-455d-9e6f-9e5196930549
+		summarizeBy: sum
+		sourceColumn: 3分钟回复率（客服维度-不含留言）
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 邀评数
+		dataType: double
+		lineageTag: e533847d-355e-4ba1-b678-1da23f2ed8d6
+		summarizeBy: sum
+		sourceColumn: 邀评数
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 评价量
+		dataType: int64
+		formatString: 0
+		lineageTag: b6028251-2467-49f7-839c-c969c42f5129
+		summarizeBy: sum
+		sourceColumn: 评价量
+
+		annotation SummarizationSetBy = Automatic
+
+	column 评价率
+		dataType: string
+		lineageTag: ceea04ef-06a0-444e-b074-e4619f41729b
+		summarizeBy: none
+		sourceColumn: 评价率
+
+		annotation SummarizationSetBy = Automatic
+
+	column 好评量
+		dataType: double
+		lineageTag: 4d46a32f-2ec6-4dc6-979b-a444cba160ad
+		summarizeBy: sum
+		sourceColumn: 好评量
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 差评量
+		dataType: double
+		lineageTag: 0350c8c1-d9ee-468a-870f-62e5612c7793
+		summarizeBy: sum
+		sourceColumn: 差评量
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 不满意率
+		dataType: string
+		lineageTag: c3431681-c4f9-4c02-adbf-f9a44cccdacf
+		summarizeBy: none
+		sourceColumn: 不满意率
+
+		annotation SummarizationSetBy = Automatic
+
+	column 一般评价量
+		dataType: int64
+		formatString: 0
+		lineageTag: 949d4b54-6aa4-4779-a422-e9b68d4b510f
+		summarizeBy: sum
+		sourceColumn: 一般评价量
+
+		annotation SummarizationSetBy = Automatic
+
+	column 咨询差评率
+		dataType: double
+		lineageTag: fa4c47d2-df15-4068-b07b-a3cbb3be789d
+		summarizeBy: sum
+		sourceColumn: 咨询差评率
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 解决量
+		dataType: double
+		lineageTag: a0d49511-f7b5-4fbe-8635-e75ccfcf850a
+		summarizeBy: sum
+		sourceColumn: 解决量
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 未解决量
+		dataType: double
+		lineageTag: c9651262-edf7-4bb6-9ef6-7663f0e5559c
+		summarizeBy: sum
+		sourceColumn: 未解决量
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 留言回复量
+		dataType: string
+		lineageTag: 4d3cd9dd-3e3a-4bc1-8c2d-121d40ea75d0
+		summarizeBy: none
+		sourceColumn: 留言回复量
+
+		annotation SummarizationSetBy = Automatic
+
+	column 日期
+		dataType: dateTime
+		formatString: Long Date
+		lineageTag: aeeeb827-b007-4199-a701-35417efa4cc7
+		summarizeBy: none
+		sourceColumn: 日期
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation UnderlyingDateTimeDataType = Date
+
+	partition 10-2京东客服营销明细 = m
+		mode: import
+		source = ```
+				let
+				    源 = Folder.Files("D:\麻大师\日更数据\天猫旗舰店\10-2京东客服绩效明细\工作量数据"),
+				    筛选的隐藏文件1 = Table.SelectRows(源, each [Attributes]?[Hidden]? <> true),
+				    调用自定义函数1 = Table.AddColumn(筛选的隐藏文件1, "转换文件 (43)", each #"转换文件 (43)"([Content])),
+				    重命名的列1 = Table.RenameColumns(调用自定义函数1, {"Name", "Source.Name"}),
+				    删除的其他列1 = Table.SelectColumns(重命名的列1, {"Source.Name", "转换文件 (43)"}),
+				    扩展的表格列1 = Table.ExpandTableColumn(删除的其他列1, "转换文件 (43)", Table.ColumnNames(#"转换文件 (43)"(#"示例文件 (43)"))),
+				    筛选的行 = Table.SelectRows(扩展的表格列1, each ([客服] <> "均值" and [客服] <> "总值")),
+				    追加的查询 = Table.Combine({筛选的行, 接待数据}),
+				    ExtractDate = Table.AddColumn(追加的查询, "日期", each 
+				 let
+				    FullText = [Source.Name],
+				    
+				    // 使用正则表达式思路提取日期（日） - 保持不变
+				    DateMatch = Text.Select(Text.BetweenDelimiters(FullText, " ", " ", 1), {"0".."9"}),
+				    Day = if DateMatch <> "" then Number.FromText(DateMatch) else null,
+				    
+				    // 月份查找 - 保持不变
+				    Month = List.First(List.RemoveNulls(List.Transform(
+				        {"Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"},
+				        (m) => if Text.Contains(FullText, m) then 
+				            List.PositionOf({"Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"}, m) + 1 
+				            else null
+				    )), null),
+				    
+				    // 提取年份 - 简化版直接查找4位数字
+				    YearMatch = 
+				        let
+				            // 直接在整个文本中查找4位连续数字
+				            // 方法1: 使用Text.PositionOf和Text.Middle
+				            YearPattern = " " & Text.Combine(List.Transform({0..9}, Text.From)) & " ",
+				            YearStart = Text.PositionOf(FullText, " CST ", Occurrence.First) + 5, // 找到第一个"CST "之后的位置
+				            YearText = if YearStart > 4 then 
+				                Text.Middle(FullText, YearStart, 4) else null,
+				            Year = if YearText <> null and 
+				                    Text.Length(Text.Select(YearText, {"0".."9"})) = 4 then 
+				                Number.FromText(YearText) else null
+				        in
+				            Year,
+				    
+				    // 创建日期值
+				    DateValue = try 
+				        if Month <> null and Day <> null then 
+				            if YearMatch <> null then 
+				                #date(YearMatch, Month, Day)
+				            else 
+				                #date(2025, Month, Day)
+				        else 
+				            null 
+				    otherwise null
+				    
+				in
+				    DateValue)
+				,
+				    更改的类型 = Table.TransformColumnTypes(ExtractDate,{{"日期", type date}, {"30s应答率", Percentage.Type}, {"平均回复消息数", type number}, {"首次平均响应时间", type number}, {"新平均响应时间", type number}, {"接待量", type number}, {"接待时长", type number}}),
+				    删除的副本 = Table.Distinct(更改的类型, {"客服", "日期"})
+				in
+				    删除的副本
+				```
+
+	annotation PBI_NavigationStepName = 导航
+
+	annotation PBI_ResultType = Table
+

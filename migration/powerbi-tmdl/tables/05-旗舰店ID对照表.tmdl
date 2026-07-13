@@ -1,0 +1,146 @@
+table 05-旗舰店ID对照表
+	lineageTag: cb418c44-02c3-4ce7-b852-7f5e642991c9
+
+	column 商品ID
+		dataType: string
+		lineageTag: ee48b33a-56b8-4dae-a21b-7a04862d8f8d
+		summarizeBy: none
+		sourceColumn: 商品ID
+
+		annotation SummarizationSetBy = Automatic
+
+	column 商家编码
+		dataType: string
+		lineageTag: 93e9e765-42b3-4f87-ba7f-0b7229fc7157
+		summarizeBy: none
+		sourceColumn: 商家编码
+
+		annotation SummarizationSetBy = Automatic
+
+	column 类目名称
+		dataType: string
+		lineageTag: be95975f-07da-4205-8341-6e4c77af0faf
+		summarizeBy: none
+		sourceColumn: 类目名称
+
+		annotation SummarizationSetBy = Automatic
+
+	column 商品名称
+		dataType: string
+		lineageTag: 5da1d82a-fa10-425f-87d5-662ccfc5cf93
+		summarizeBy: none
+		sourceColumn: 商品名称
+
+		annotation SummarizationSetBy = Automatic
+
+	column 商品图片
+		dataType: string
+		lineageTag: 2cf8b983-adba-4926-8242-8f99e9429e83
+		dataCategory: ImageUrl
+		summarizeBy: none
+		sourceColumn: 商品图片
+
+		annotation SummarizationSetBy = Automatic
+
+	column 商品价格
+		dataType: double
+		lineageTag: aa1dee0c-71d5-4c4b-ab09-99103de5dc8d
+		summarizeBy: sum
+		sourceColumn: 商品价格
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 库存
+		dataType: int64
+		formatString: 0
+		lineageTag: 3584cc16-bde4-4d1d-83dd-c24fea144c56
+		summarizeBy: sum
+		sourceColumn: 库存
+
+		annotation SummarizationSetBy = Automatic
+
+	column 累计销量
+		dataType: int64
+		formatString: 0
+		lineageTag: 7d3f2c4e-6597-4420-a65c-ee8c96166f2a
+		summarizeBy: sum
+		sourceColumn: 累计销量
+
+		annotation SummarizationSetBy = Automatic
+
+	column 30日销量
+		dataType: int64
+		formatString: 0
+		lineageTag: a813e848-0d54-41f6-8b7a-20ac8faaf8db
+		summarizeBy: sum
+		sourceColumn: 30日销量
+
+		annotation SummarizationSetBy = Automatic
+
+	column 创建时间
+		dataType: dateTime
+		formatString: General Date
+		lineageTag: c726f040-b6e4-4857-b9f3-bb32c3bc3944
+		summarizeBy: none
+		sourceColumn: 创建时间
+
+		variation 变体
+			isDefault
+			relationship: b9d12664-bc5c-4480-930d-48e038dea48a
+			defaultHierarchy: LocalDateTable_703b6f7e-2085-400b-8ede-d676f2786224.日期层次结构
+
+		annotation SummarizationSetBy = Automatic
+
+	column 基础分
+		dataType: string
+		lineageTag: 8c98229f-8cd2-4289-8626-848f4a1ea593
+		summarizeBy: none
+		sourceColumn: 基础分
+
+		annotation SummarizationSetBy = Automatic
+
+	column 扶优分
+		dataType: string
+		lineageTag: 5f4e60b5-40ea-4a5d-a6d7-a66175a30930
+		summarizeBy: none
+		sourceColumn: 扶优分
+
+		annotation SummarizationSetBy = Automatic
+
+	column 'Source.Name'
+		dataType: string
+		lineageTag: feccc1be-480e-467e-94d5-c87062995b36
+		summarizeBy: none
+		sourceColumn: Source.Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 商品状态
+		dataType: string
+		lineageTag: 300ebfab-153b-46f6-8711-198a0481b3f5
+		summarizeBy: none
+		sourceColumn: 商品状态
+
+		annotation SummarizationSetBy = Automatic
+
+	partition 05-旗舰店ID对照表 = m
+		mode: import
+		source =
+				let
+				    源 = Folder.Files("D:\麻大师\日更数据\天猫旗舰店\05-旗舰店ID对照表"),
+				    筛选的隐藏文件1 = Table.SelectRows(源, each [Attributes]?[Hidden]? <> true),
+				    调用自定义函数1 = Table.AddColumn(筛选的隐藏文件1, "转换文件 (44)", each #"转换文件 (44)"([Content])),
+				    重命名的列1 = Table.RenameColumns(调用自定义函数1, {"Name", "Source.Name"}),
+				    删除的其他列1 = Table.SelectColumns(重命名的列1, {"Source.Name", "转换文件 (44)"}),
+				    扩展的表格列1 = Table.ExpandTableColumn(删除的其他列1, "转换文件 (44)", Table.ColumnNames(#"转换文件 (44)"(#"示例文件 (44)"))),
+				    更改的类型 = Table.TransformColumnTypes(扩展的表格列1,{{"Source.Name", type text}, {"商品名称", type text}, {"商品ID", type text}, {"商品图片", type text}, {"商家编码", type text}, {"类目名称", type text}, {"商品价格", type number}, {"库存", Int64.Type}, {"累计销量", Int64.Type}, {"30日销量", Int64.Type}, {"基础分", type any}, {"扶优分", type any}, {"创建时间", type datetime}, {"商品状态", type text}}),
+				    删除的副本 = Table.Distinct(更改的类型)
+				in
+				    删除的副本
+
+	annotation PBI_NavigationStepName = 导航
+
+	annotation PBI_ResultType = Table
+

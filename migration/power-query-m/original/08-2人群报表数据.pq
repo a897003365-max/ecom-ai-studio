@@ -1,0 +1,12 @@
+let
+    源 = Folder.Files("D:\麻大师\日更数据\天猫旗舰店\08-2人群报表数据"),
+    筛选的隐藏文件1 = Table.SelectRows(源, each [Attributes]?[Hidden]? <> true),
+    排序的行 = Table.Sort(筛选的隐藏文件1,{{"Date created", Order.Descending}}),
+    调用自定义函数1 = Table.AddColumn(排序的行, "转换文件 (24)", each #"转换文件 (24)"([Content])),
+    重命名的列1 = Table.RenameColumns(调用自定义函数1, {"Name", "Source.Name"}),
+    删除的其他列1 = Table.SelectColumns(重命名的列1, {"Source.Name", "转换文件 (24)"}),
+    扩展的表格列1 = Table.ExpandTableColumn(删除的其他列1, "转换文件 (24)", Table.ColumnNames(#"转换文件 (24)"(#"示例文件 (24)"))),
+    更改的类型 = Table.TransformColumnTypes(扩展的表格列1,{{"Source.Name", type text}, {"日期", type date}, {"场景ID", Int64.Type}, {"场景名字", type text}, {"原二级场景ID", Int64.Type}, {"原二级场景名字", type text}, {"计划ID", type text}, {"计划名字", type text}, {"单元ID", type text}, {"单元名字", type text}, {"人群名字", type text}, {"主体ID", type text}, {"主体类型", type text}, {"主体名称", type text}, {"展现量", Int64.Type}, {"点击量", Int64.Type}, {"花费", type number}, {"点击率", type number}, {"平均点击花费", type number}, {"千次展现花费", type number}, {"总预售成交金额", Int64.Type}, {"总预售成交笔数", Int64.Type}, {"直接预售成交金额", Int64.Type}, {"直接预售成交笔数", Int64.Type}, {"间接预售成交金额", Int64.Type}, {"间接预售成交笔数", Int64.Type}, {"直接成交金额", type number}, {"间接成交金额", type number}, {"总成交金额", type number}, {"总成交笔数", Int64.Type}, {"直接成交笔数", Int64.Type}, {"间接成交笔数", Int64.Type}, {"点击转化率", type number}, {"投入产出比", type number}, {"含预售投产比", type number}, {"总成交成本", type number}, {"总购物车数", Int64.Type}, {"直接购物车数", Int64.Type}, {"间接购物车数", Int64.Type}, {"加购率", type number}, {"收藏宝贝数", Int64.Type}, {"收藏店铺数", Int64.Type}, {"店铺收藏成本", type number}, {"总收藏加购数", Int64.Type}, {"总收藏加购成本", type number}, {"宝贝收藏加购数", Int64.Type}, {"宝贝收藏加购成本", type number}, {"总收藏数", Int64.Type}, {"宝贝收藏成本", type number}, {"宝贝收藏率", type number}, {"加购成本", type number}, {"拍下订单笔数", Int64.Type}, {"拍下订单金额", Int64.Type}, {"直接收藏宝贝数", Int64.Type}, {"间接收藏宝贝数", Int64.Type}, {"优惠券领取量", Int64.Type}, {"购物金充值笔数", Int64.Type}, {"购物金充值金额", Int64.Type}, {"旺旺咨询量", Int64.Type}, {"引导访问量", Int64.Type}, {"引导访问人数", Int64.Type}, {"引导访问潜客数", Int64.Type}, {"引导访问潜客占比", type number}, {"入会率", type number}, {"入会量", Int64.Type}, {"引导访问率", type number}, {"深度访问量", Int64.Type}, {"平均访问页面数", Int64.Type}, {"成交新客数", Int64.Type}, {"成交新客占比", type number}, {"会员首购人数", Int64.Type}, {"会员成交金额", type number}, {"会员成交笔数", Int64.Type}, {"成交人数", Int64.Type}, {"人均成交笔数", Int64.Type}, {"人均成交金额", type number}}),
+    删除的副本 = Table.Distinct(更改的类型, {"日期", "场景ID", "场景名字", "原二级场景ID", "原二级场景名字", "计划ID", "计划名字", "单元ID", "单元名字", "人群名字", "主体ID", "主体类型", "主体名称"})
+in
+    删除的副本

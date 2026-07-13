@@ -1,0 +1,338 @@
+table 辅4-床垫编码
+	excludeFromModelRefresh
+	lineageTag: dc79dc8d-6f7d-444b-8051-11e44a79fab1
+
+	column 产品名称
+		dataType: string
+		lineageTag: d44759e5-dc86-4fd5-bc9b-4dba64b99091
+		summarizeBy: none
+		sourceColumn: 产品名称
+
+		annotation SummarizationSetBy = Automatic
+
+	column 子名称
+		dataType: string
+		lineageTag: 7313fda2-05a3-4742-a0df-f44abad0e6ca
+		summarizeBy: none
+		sourceColumn: 子名称
+
+		annotation SummarizationSetBy = Automatic
+
+	column 做货工厂
+		dataType: string
+		lineageTag: 4c4c5184-1254-435c-8d2e-4212a9ebd5d3
+		summarizeBy: none
+		sourceColumn: 做货工厂
+
+		annotation SummarizationSetBy = Automatic
+
+	column SPU产品商编
+		dataType: string
+		lineageTag: a0915ce8-e34f-449d-a7a0-21500276e8a3
+		summarizeBy: none
+		sourceColumn: SPU产品商编
+
+		annotation SummarizationSetBy = Automatic
+
+	column sku产品编码
+		dataType: string
+		lineageTag: 36c97575-0eb1-4d45-8a1b-01958e3bdf4d
+		summarizeBy: none
+		sourceColumn: sku产品编码
+
+		annotation SummarizationSetBy = Automatic
+
+	column 床垫类别
+		dataType: string
+		lineageTag: 86fa05c2-5309-4cd8-b404-07058c4f051c
+		summarizeBy: none
+		sourceColumn: 床垫类别
+
+		annotation SummarizationSetBy = Automatic
+
+	column 商品ID
+		dataType: string
+		lineageTag: e90f5311-5960-458f-be36-1ba64c55759c
+		summarizeBy: none
+		sourceColumn: 商品ID
+
+		annotation SummarizationSetBy = Automatic
+
+	column 商家规编（后台）
+		dataType: string
+		lineageTag: b549ee62-e469-459a-860e-59d5741eb0f4
+		summarizeBy: none
+		sourceColumn: 商家规编（后台）
+
+		annotation SummarizationSetBy = Automatic
+
+	column 规格名称（工厂看）
+		dataType: string
+		lineageTag: c7a6d8bb-3aa0-460c-b34d-ce8273f13ac0
+		summarizeBy: none
+		sourceColumn: 规格名称（工厂看）
+
+		annotation SummarizationSetBy = Automatic
+
+	column sku名称（后台）
+		dataType: string
+		lineageTag: b347decf-417f-4c99-9e63-3118c58e4643
+		summarizeBy: none
+		sourceColumn: sku名称（后台）
+
+		annotation SummarizationSetBy = Automatic
+
+	column 辅助列1
+		dataType: string
+		lineageTag: 542e5ec4-29f8-460a-a140-e722d82d84c9
+		summarizeBy: none
+		sourceColumn: 辅助列1
+
+		annotation SummarizationSetBy = Automatic
+
+	column 辅助列2
+		dataType: string
+		lineageTag: 88480af6-00e5-4372-9430-d7c75d926647
+		summarizeBy: none
+		sourceColumn: 辅助列2
+
+		annotation SummarizationSetBy = Automatic
+
+	column 辅助列3
+		dataType: string
+		lineageTag: ca19538c-538b-48c5-be76-95d4c14a7119
+		summarizeBy: none
+		sourceColumn: 辅助列3
+
+		annotation SummarizationSetBy = Automatic
+
+	column 辅助列4
+		dataType: string
+		lineageTag: 8f30c1ba-b62f-467d-87ac-5085db10501a
+		summarizeBy: none
+		sourceColumn: 辅助列4
+
+		annotation SummarizationSetBy = Automatic
+
+	column 厚度
+		dataType: string
+		lineageTag: 4f9879ba-3cc7-4a71-8620-76e86e2f4eb9
+		summarizeBy: none
+		sourceColumn: 厚度
+
+		annotation SummarizationSetBy = Automatic
+
+	column 面料层
+		dataType: string
+		lineageTag: f7f40368-bf1a-4d59-bf6e-2e0bf2b1b3bb
+		summarizeBy: none
+		sourceColumn: 面料层
+
+		annotation SummarizationSetBy = Automatic
+
+	column 舒适层
+		dataType: string
+		lineageTag: b63a99d5-e307-412e-ba87-bcd1005ba8a0
+		summarizeBy: none
+		sourceColumn: 舒适层
+
+		annotation SummarizationSetBy = Automatic
+
+	column 支撑层
+		dataType: string
+		lineageTag: e61a15b0-a4bd-4b9b-8fda-24053a3f9dc6
+		summarizeBy: none
+		sourceColumn: 支撑层
+
+		annotation SummarizationSetBy = Automatic
+
+	column 款式结构
+		dataType: string
+		lineageTag: cf952067-69e1-496b-a12a-aa0f7f06bd68
+		summarizeBy: none
+		sourceColumn: 款式结构
+
+		annotation SummarizationSetBy = Automatic
+
+	column 是否折叠
+		dataType: string
+		lineageTag: 06546fe1-33f0-4427-94b4-d21a6be4fbb8
+		summarizeBy: none
+		sourceColumn: 是否折叠
+
+		annotation SummarizationSetBy = Automatic
+
+	column 尺寸
+		dataType: string
+		lineageTag: da89fa26-e894-41a6-bd07-212e343d4035
+		summarizeBy: none
+		sourceColumn: 尺寸
+
+		annotation SummarizationSetBy = Automatic
+
+	column 尺寸代码
+		dataType: string
+		lineageTag: abc92827-b4b0-4ed1-a91a-331e206c50cd
+		summarizeBy: none
+		sourceColumn: 尺寸代码
+
+		annotation SummarizationSetBy = Automatic
+
+	column 厚度数值
+		dataType: string
+		lineageTag: 8ff81403-a4ea-4ccf-917f-aeee9673f9c0
+		summarizeBy: none
+		sourceColumn: 厚度数值
+
+		annotation SummarizationSetBy = Automatic
+
+	column 成本
+		dataType: string
+		lineageTag: 0596e5b5-4ef9-4213-960c-e0630743ef2d
+		summarizeBy: none
+		sourceColumn: 成本
+
+		annotation SummarizationSetBy = Automatic
+
+	column 原价
+		dataType: string
+		lineageTag: f3722478-d543-4c7d-b471-997f512a97dd
+		summarizeBy: none
+		sourceColumn: 原价
+
+		annotation SummarizationSetBy = Automatic
+
+	column 日常到手价
+		dataType: string
+		lineageTag: 8da74104-d330-4941-9dfb-e7ce953aa2b0
+		summarizeBy: none
+		sourceColumn: 日常到手价
+
+		annotation SummarizationSetBy = Automatic
+
+	column 活动到手价
+		dataType: string
+		lineageTag: 6c0620b5-9291-4ed8-972b-0a4a911df2e3
+		summarizeBy: none
+		sourceColumn: 活动到手价
+
+		annotation SummarizationSetBy = Automatic
+
+	column 毛利
+		dataType: string
+		lineageTag: 8bddb3fb-8372-417f-8900-8176e47e02f3
+		summarizeBy: none
+		sourceColumn: 毛利
+
+		annotation SummarizationSetBy = Automatic
+
+	column 备注
+		dataType: string
+		lineageTag: cb462534-8575-4966-a69e-175322113767
+		summarizeBy: none
+		sourceColumn: 备注
+
+		annotation SummarizationSetBy = Automatic
+
+	column 大促到手价
+		dataType: string
+		lineageTag: ba06c306-c901-49f0-a5de-a7883778a4fd
+		summarizeBy: none
+		sourceColumn: 大促到手价
+
+		annotation SummarizationSetBy = Automatic
+
+	column 活动倍率
+		dataType: string
+		lineageTag: 7f871705-00e2-4924-ab44-a293ddb22b27
+		summarizeBy: none
+		sourceColumn: 活动倍率
+
+		annotation SummarizationSetBy = Automatic
+
+	column 调整后原价
+		dataType: string
+		lineageTag: d7b113ae-cc8e-4144-8319-402aad83f5cb
+		summarizeBy: none
+		sourceColumn: 调整后原价
+
+		annotation SummarizationSetBy = Automatic
+
+	column 活动9折调整价
+		dataType: string
+		lineageTag: 4eb39768-9c14-4885-b754-3145555bdd92
+		summarizeBy: none
+		sourceColumn: 活动9折调整价
+
+		annotation SummarizationSetBy = Automatic
+
+	column 差价
+		dataType: string
+		lineageTag: b91aaa0c-5815-4d8b-af88-eed797421ede
+		summarizeBy: none
+		sourceColumn: 差价
+
+		annotation SummarizationSetBy = Automatic
+
+	column 旧版成本
+		dataType: string
+		lineageTag: 5de44010-4975-4cef-aeaf-322fe777a9ec
+		summarizeBy: none
+		sourceColumn: 旧版成本
+
+		annotation SummarizationSetBy = Automatic
+
+	column 原价_1
+		dataType: string
+		lineageTag: 8bca1b54-76ad-4117-9659-72c4791292e5
+		summarizeBy: none
+		sourceColumn: 原价_1
+
+		annotation SummarizationSetBy = Automatic
+
+	column 日常到手价_2
+		dataType: string
+		lineageTag: efce37bf-e05c-49ad-821c-431ba3f4bb32
+		summarizeBy: none
+		sourceColumn: 日常到手价_2
+
+		annotation SummarizationSetBy = Automatic
+
+	column 活动到手价_3
+		dataType: string
+		lineageTag: 9dcdb2d9-e72a-45a9-9607-e6e7b3fc4f3b
+		summarizeBy: none
+		sourceColumn: 活动到手价_3
+
+		annotation SummarizationSetBy = Automatic
+
+	column 备注_4
+		dataType: string
+		lineageTag: d0017714-8054-4c09-b5ea-5b438ffd4f9c
+		summarizeBy: none
+		sourceColumn: 备注_4
+
+		annotation SummarizationSetBy = Automatic
+
+	column 活动倍率_5
+		dataType: string
+		lineageTag: 4f35b572-ffe3-41af-a248-f0c3b9ce8179
+		summarizeBy: none
+		sourceColumn: 活动倍率_5
+
+		annotation SummarizationSetBy = Automatic
+
+	partition 辅4-床垫编码 = m
+		mode: import
+		source =
+				let
+				    源 = Excel.Workbook(File.Contents("D:\麻大师\日更数据\天猫旗舰店\商品信息文件\产品明细.xlsx"), null, true),
+				    Sheet1_Sheet = 源{[Item="Sheet1",Kind="Sheet"]}[Data],
+				    提升的标题 = Table.PromoteHeaders(Sheet1_Sheet, [PromoteAllScalars=true])
+				in
+				    提升的标题
+
+	annotation PBI_NavigationStepName = 导航
+
+	annotation PBI_ResultType = Table
+
