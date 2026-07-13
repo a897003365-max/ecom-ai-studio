@@ -162,6 +162,36 @@ button {
     @apply w-full overflow-x-auto rounded-[4px] border border-[var(--border)];
   }
 
+  .date-filter {
+    @apply relative;
+  }
+
+  .date-filter-panel {
+    @apply absolute right-0 top-[calc(100%+8px)] z-50 w-[380px] rounded-lg border border-[var(--border-2)] bg-[var(--panel-solid)] p-4;
+    box-shadow: 0 18px 48px rgba(0, 0, 0, 0.45);
+  }
+
+  .date-field {
+    @apply grid gap-1.5 text-[11px] font-semibold text-[var(--muted)];
+  }
+
+  .date-field input {
+    @apply min-h-9 w-full rounded-md border border-[var(--border)] bg-white/[0.04] px-2.5 text-[12px] text-[var(--text)] outline-none;
+    color-scheme: dark;
+  }
+
+  .date-field input:focus {
+    border-color: var(--brand);
+  }
+
+  .icon-btn {
+    @apply inline-flex h-8 w-8 items-center justify-center rounded-md text-[var(--muted)] transition hover:bg-white/[0.05] hover:text-[var(--text)];
+  }
+
+  .insight-row {
+    @apply flex items-center justify-between gap-4 border-b border-[var(--border)] pb-3 text-xs;
+  }
+
   .data-table {
     @apply w-full border-collapse;
   }
@@ -177,6 +207,10 @@ button {
 
   .data-table tbody tr:last-child td {
     border-bottom: 0;
+  }
+
+  .data-table tfoot td {
+    @apply border-t border-[var(--border-2)] bg-white/[0.025] px-2.5 py-2.5 text-[12.5px];
   }
 
   .data-table tbody tr:hover {
@@ -343,6 +377,23 @@ button {
 
 @media (max-width: 1100px) {
   .split-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .split-grid > * {
+    min-width: 0;
+  }
+}
+
+@media (max-width: 520px) {
+  .date-filter,
+  .date-filter > .btn-select {
+    width: 100%;
+  }
+
+  .date-filter-panel {
+    left: 0;
+    right: auto;
+    width: min(360px, calc(100vw - 32px));
   }
 }

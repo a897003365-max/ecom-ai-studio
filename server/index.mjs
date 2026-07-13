@@ -4,7 +4,7 @@ import { createServer } from "node:http";
 import { extname, join, normalize } from "node:path";
 import { createServer as createViteServer } from "vite";
 import { parseDingTalkFile } from "./dingtalk.mjs";
-import { checkDingTalkApi, syncDingTalkApi } from "./dingtalk-api.mjs";
+import { checkDingTalkApi, filterDingTalkSnapshot, syncDingTalkApi } from "./dingtalk-api.mjs";
 import { checkFeishu, sheetInventory, syncFeishu } from "./feishu.mjs";
 import { checkWarehouse, readWarehouseSnapshot, syncWarehouse } from "./warehouse.mjs";
 import {
@@ -212,10 +212,17 @@ async function handleApi(request, response, url) {
     return sendJson(response, 200, await getDataSources());
   }
   if (request.method === "GET" && path === "/api/analytics") {
+    const dingtalkSnapshot = latestSnapshot("dingtalk")?.snapshot ?? null;
+    const dingtalk = dingtalkSnapshot
+      ? filterDingTalkSnapshot(dingtalkSnapshot, {
+        start: url.searchParams.get("start") || undefined,
+        end: url.searchParams.get("end") || undefined,
+      })
+      : null;
     return sendJson(response, 200, {
       warehouse: await readWarehouseSnapshot(),
       feishu: latestSnapshot("feishu")?.snapshot ?? null,
-      dingtalk: latestSnapshot("dingtalk")?.snapshot ?? null,
+      dingtalk,
       history: listSyncRuns(12),
     });
   }

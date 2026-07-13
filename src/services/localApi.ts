@@ -18,8 +18,9 @@ export function getDataSources() {
   return request<DataSourcesPayload>("/api/data-sources");
 }
 
-export function getAnalyticsData() {
-  return request<AnalyticsIntegrationPayload>("/api/analytics");
+export function getAnalyticsData(filters?: { start: string; end: string }) {
+  const query = filters ? `?${new URLSearchParams(filters).toString()}` : "";
+  return request<AnalyticsIntegrationPayload>(`/api/analytics${query}`);
 }
 
 export function syncDataSource(source: "warehouse" | "feishu" | "dingtalk") {

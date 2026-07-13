@@ -168,7 +168,7 @@ export interface DingTalkMetricTotals {
   spend: number;
   paidOrders: number;
   gmv: number;
-  netRevenue?: number;
+  netRevenue: number;
   refund: number;
   favorite: number;
   addToCart: number;
@@ -177,6 +177,21 @@ export interface DingTalkMetricTotals {
   ctr: number;
   roi: number;
   completionRate?: number;
+  feeRate?: number;
+  recoveryRate?: number;
+  refundRate?: number;
+  channelShare?: number;
+}
+
+export interface DingTalkReportingPeriod {
+  start: string;
+  end: string;
+}
+
+export interface DingTalkStoreMetric extends DingTalkMetricTotals {
+  platform: string;
+  store: string;
+  offsiteSpend?: number;
 }
 
 export interface DingTalkSnapshot {
@@ -186,7 +201,16 @@ export interface DingTalkSnapshot {
   period: { start: string | null; end: string | null };
   totals: DingTalkMetricTotals;
   platforms: Array<{ platform: string } & DingTalkMetricTotals>;
+  stores: DingTalkStoreMetric[];
   daily: Array<{ date: string } & DingTalkMetricTotals>;
+  reporting?: {
+    availablePeriod: DingTalkReportingPeriod;
+    completedThrough: string;
+    selectedPeriod: DingTalkReportingPeriod | null;
+    dailyPlatforms?: Array<{ date: string; platform: string } & DingTalkMetricTotals>;
+    dailyStores?: Array<{ date: string; platform: string; store: string } & DingTalkMetricTotals>;
+    dailyOffsiteSpend?: Array<{ date: string; spend: number }>;
+  };
   inventory: Array<{
     name: string;
     headerRow: number;
