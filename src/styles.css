@@ -63,6 +63,33 @@ button {
   cursor: pointer;
 }
 
+select {
+  color: var(--text);
+  background-color: var(--panel-solid);
+  color-scheme: dark;
+}
+
+select option {
+  background-color: var(--panel-solid);
+  color: var(--text);
+}
+
+select option:checked {
+  background-color: #2b3b19;
+  color: #f7ffe8;
+  font-weight: 700;
+}
+
+select option:hover,
+select option:focus {
+  background-color: #243318;
+  color: #f7ffe8;
+}
+
+select option:disabled {
+  color: var(--muted);
+}
+
 @layer components {
   .app-shell {
     @apply flex min-h-screen text-[var(--text)];
