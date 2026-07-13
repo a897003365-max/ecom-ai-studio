@@ -189,7 +189,7 @@ function findColumn(headers = [], patterns = []) {
 
 function platformName(value) {
   const name = textValue(value);
-  if (/淘宝|天猫/.test(name)) return "天猫";
+  if (/淘宝|天猫|崔氏/.test(name)) return "天猫";
   if (/京东/.test(name)) return "京东";
   if (/抖音/.test(name)) return "抖音";
   if (/拼/.test(name)) return "拼多多";
@@ -475,7 +475,9 @@ function normalizedReportingPeriod(snapshot, range = {}) {
 export function filterDingTalkSnapshot(snapshot, range = {}) {
   if (!snapshot?.reporting?.dailyPlatforms?.length) return snapshot;
   const period = normalizedReportingPeriod(snapshot, range);
-  const platformDaily = snapshot.reporting.dailyPlatforms.filter((row) => dateInRange(row.date, period.start, period.end));
+  const platformDaily = snapshot.reporting.dailyPlatforms
+    .filter((row) => dateInRange(row.date, period.start, period.end))
+    .map((row) => ({ ...row, platform: platformName(row.platform) }));
   const platformBase = aggregateMetricRows(platformDaily, ["platform"]);
   const totalsBase = platformBase.reduce((current, row) => addMetrics(current, row), metricShape());
   const totals = reportingMetricShape(totalsBase, 1);
@@ -483,14 +485,16 @@ export function filterDingTalkSnapshot(snapshot, range = {}) {
     .map((row) => reportingMetricShape(row, totals.netRevenue ? row.netRevenue / totals.netRevenue : 0))
     .sort((left, right) => right.netRevenue - left.netRevenue);
 
-  const storeDaily = snapshot.reporting.dailyStores.filter((row) => dateInRange(row.date, period.start, period.end));
+  const storeDaily = snapshot.reporting.dailyStores
+    .filter((row) => dateInRange(row.date, period.start, period.end))
+    .map((row) => ({ ...row, platform: platformName(row.platform) }));
   const offsiteSpend = snapshot.reporting.dailyOffsiteSpend
     .filter((row) => dateInRange(row.date, period.start, period.end))
     .reduce((sum, row) => sum + Number(row.spend || 0), 0);
   const stores = aggregateMetricRows(storeDaily, ["platform", "store"])
     .map((row) => ({
       ...reportingMetricShape(row, totals.netRevenue ? row.netRevenue / totals.netRevenue : 0),
-      offsiteSpend: row.store === "麻大师旗舰店" ? offsiteSpend : 0,
+      offsiteSpend: row.platform === "天猫" && row.store === "麻大师旗舰店" ? offsiteSpend : 0,
     }))
     .sort((left, right) => right.netRevenue - left.netRevenue);
   const daily = aggregateMetricRows(platformDaily, ["date"])
@@ -504,7 +508,11 @@ export function filterDingTalkSnapshot(snapshot, range = {}) {
     platforms,
     stores,
     daily,
-    reporting: { ...snapshot.reporting, selectedPeriod: period },
+    reporting: {
+      availablePeriod: snapshot.reporting.availablePeriod,
+      completedThrough: snapshot.reporting.completedThrough,
+      selectedPeriod: period,
+    },
   };
 }
 
