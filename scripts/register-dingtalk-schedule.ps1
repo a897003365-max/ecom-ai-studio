@@ -1,6 +1,6 @@
 param(
   [string]$TaskName = "EcomAIStudio-DingTalk-Sync",
-  [string[]]$Times = @("09:30", "12:30", "16:30", "21:30")
+  [string[]]$Times = @("10:00", "12:30", "17:30")
 )
 
 $ErrorActionPreference = "Stop"
@@ -27,7 +27,7 @@ Register-ScheduledTask `
   -Action $action `
   -Trigger $triggers `
   -Settings $settings `
-  -Description "Ecom AI Studio DingTalk read-only sync to local sanitized snapshots, four times daily." `
+  -Description "Ecom AI Studio DingTalk read-only sync to local sanitized snapshots, three times daily." `
   -Force | Out-Null
 
 $task = Get-ScheduledTask -TaskName $TaskName

@@ -2,7 +2,7 @@
 
 React + TypeScript + Vite + TailwindCSS 的电商 AI 本地 MVP。页面继承 `E:\Github\电商工作台样板图` 的深色科技风、荧光绿色品牌色、紧凑卡片、固定导航、状态标签、进度条和可横向滚动的表格。
 
-本版本通过一个本机端口同时提供网页和 API。运营数据不再依赖 Power BI Desktop 动态端口：PBIX 中的 25 个 Power Query M 已导出并迁移到 Python + Polars + DuckDB + Parquet 本地数仓；钉钉共享表采用只读 Sheet API，每日四次同步；飞书只读聚合保留在同一数据入口。
+本版本通过一个本机端口同时提供网页和 API。运营数据不再依赖 Power BI Desktop 动态端口：PBIX 中的 25 个 Power Query M 已导出并迁移到 Python + Polars + DuckDB + Parquet 本地数仓；钉钉共享表采用只读 Sheet API，每日三次同步；飞书只读聚合保留在同一数据入口。
 
 ## 安装与启动
 
@@ -48,7 +48,7 @@ D:\麻大师\日更数据 本地源文件
   -> 单端口 /api/analytics
   -> React 运营数据页面
 
-钉钉共享表 Sheet API（只读，每日 09:30 / 12:30 / 16:30 / 21:30）
+钉钉共享表 Sheet API（只读，每日 10:00 / 12:30 / 17:30）
   -> local-data 脱敏聚合快照
   -> 单端口 /api/analytics
 
@@ -81,7 +81,7 @@ DINGTALK_APP_SECRET
 DINGTALK_WORKBOOK_ID
 DINGTALK_OPERATOR_ID
 DINGTALK_OPERATOR_USER_ID
-DINGTALK_SYNC_TIMES=09:30,12:30,16:30,21:30
+DINGTALK_SYNC_TIMES=10:00,12:30,17:30
 ```
 
 手动同步、试运行和注册计划任务：
