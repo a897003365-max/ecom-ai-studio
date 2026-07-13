@@ -5,9 +5,9 @@ import json
 import os
 import time
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
-from typing import Any, Callable, Iterable
+from typing import Any, Callable
 
 import duckdb
 import polars as pl
@@ -15,9 +15,16 @@ import polars as pl
 from .catalog import QuerySpec, load_catalog
 from .config import WarehousePaths
 from .readers import discover_files, read_source_file
-from .transforms import canonical_column, transform_source_file
+from .source_policy import (
+    DINGTALK_COVERED_QUERIES,
+    PARTIAL_OVERLAP_QUERIES,
+    select_sync_specs,
+    unique_domain_catalog,
+)
+from .transforms import transform_source_file
 
 ProgressCallback = Callable[[dict[str, Any]], None]
+POWERBI_PAGE_WINDOW_DAYS = 60
 
 
 @dataclass(frozen=True)
@@ -195,22 +202,6 @@ def _view_columns(connection: duckdb.DuckDBPyConnection, view_name: str) -> list
     return [row[0] for row in connection.execute(f"DESCRIBE {_quote_identifier(view_name)}").fetchall()]
 
 
-def _matching_column(columns: Iterable[str], *candidates: str) -> str | None:
-    lookup = {canonical_column(column): column for column in columns}
-    for candidate in candidates:
-        match = lookup.get(canonical_column(candidate))
-        if match:
-            return match
-    return None
-
-
-def _column_sql(column: str | None, fallback: str, cast: str | None = None) -> str:
-    if not column:
-        return fallback
-    value = _quote_identifier(column)
-    return f"try_cast({value} AS {cast})" if cast else value
-
-
 def _create_source_views(
     connection: duckdb.DuckDBPyConnection,
     paths: WarehousePaths,
@@ -269,6 +260,20 @@ def _create_source_views(
                 result.get("status", "cached" if partitions else "empty"),
             ],
         )
+
+
+def _deactivate_dingtalk_overlap(
+    connection: duckdb.DuckDBPyConnection,
+    paths: WarehousePaths,
+    excluded_specs: list[QuerySpec],
+) -> None:
+    """Remove duplicate data from active models while preserving source partitions."""
+
+    for spec in excluded_specs:
+        connection.execute(f"DROP VIEW IF EXISTS {_quote_identifier(f'model_{spec.key}')}")
+        connection.execute(f"DROP VIEW IF EXISTS {_quote_identifier(spec.view_name)}")
+    connection.execute("DROP TABLE IF EXISTS fact_channel_daily")
+    (paths.marts_root / "fact_channel_daily.parquet").unlink(missing_ok=True)
 
 
 def _replace_model_view(
@@ -331,178 +336,281 @@ def _create_composite_views(connection: duckdb.DuckDBPyConnection, specs: list[Q
             )
 
 
-def _create_fact_mart(
+def _records(
     connection: duckdb.DuckDBPyConnection,
-    paths: WarehousePaths,
-    specs: list[QuerySpec],
-) -> dict[str, Any]:
-    by_name = {spec.name: spec for spec in specs}
-    source_spec = by_name["00-月表汇总"]
-    source_view = f"model_{source_spec.key}"
-    columns = _view_columns(connection, source_view)
-    if columns == ["_empty"]:
-        return {"rows": 0, "reason": "00-月表汇总尚未同步"}
-
-    date_column = _matching_column(columns, "日期")
-    channel_column = _matching_column(columns, "渠道")
-    store_column = _matching_column(columns, "店铺")
-    gmv_column = _matching_column(columns, "GMV")
-    refund_column = _matching_column(columns, "成功退款金额", "退款金额")
-    net_column = _matching_column(columns, "回款#(lf)（减退款）", "当日净成交金额", "回款额")
-    daily_net_column = _matching_column(columns, "当日净成交金额")
-    spend_column = _matching_column(columns, "总推广费#(lf)(含品销宝，小红书）", "总推广费", "花费")
-    onsite_column = _matching_column(columns, "站内总推广费#(lf)(含品销宝）", "站内总推广费")
-    exposure_column = _matching_column(columns, "浏览量", "曝光量", "展现量")
-    click_column = _matching_column(columns, "店铺客户数", "点击量")
-    cart_column = _matching_column(columns, "加购人数")
-
-    gmv = _column_sql(gmv_column, "0", "DOUBLE")
-    refund = _column_sql(refund_column, "0", "DOUBLE")
-    net_candidates = [
-        _column_sql(net_column, "NULL", "DOUBLE") if net_column else "NULL",
-        _column_sql(daily_net_column, "NULL", "DOUBLE") if daily_net_column and daily_net_column != net_column else "NULL",
-        f"coalesce({gmv}, 0) - coalesce({refund}, 0)",
-    ]
-    date_sql = _column_sql(date_column, "NULL", "DATE")
-    channel_sql = _column_sql(channel_column, "'未知渠道'")
-    store_sql = _column_sql(store_column, "'未知店铺'")
-    connection.execute("DROP TABLE IF EXISTS fact_channel_daily")
-    connection.execute(
-        f"""
-        CREATE TABLE fact_channel_daily AS
-        SELECT
-          {date_sql} AS metric_date,
-          CASE
-            WHEN regexp_matches(cast({channel_sql} AS VARCHAR), '淘宝|天猫|淘系') THEN '天猫'
-            WHEN regexp_matches(cast({channel_sql} AS VARCHAR), '京东') THEN '京东'
-            WHEN regexp_matches(cast({channel_sql} AS VARCHAR), '抖音') THEN '抖音'
-            WHEN regexp_matches(cast({channel_sql} AS VARCHAR), '拼') THEN '拼多多'
-            WHEN regexp_matches(cast({channel_sql} AS VARCHAR), '小红书|薯店') THEN '小红书'
-            WHEN regexp_matches(cast({channel_sql} AS VARCHAR), '唯品') THEN '唯品'
-            ELSE coalesce(cast({channel_sql} AS VARCHAR), '其他')
-          END AS platform,
-          coalesce(cast({store_sql} AS VARCHAR), '未知店铺') AS store,
-          coalesce({gmv}, 0) AS gmv,
-          coalesce({refund}, 0) AS refund,
-          coalesce({', '.join(net_candidates)}) AS net_revenue,
-          coalesce({_column_sql(spend_column, '0', 'DOUBLE')}, 0) AS spend,
-          coalesce({_column_sql(onsite_column, '0', 'DOUBLE')}, 0) AS onsite_spend,
-          coalesce({_column_sql(exposure_column, '0', 'DOUBLE')}, 0) AS exposure,
-          coalesce({_column_sql(click_column, '0', 'DOUBLE')}, 0) AS clicks,
-          coalesce({_column_sql(cart_column, '0', 'DOUBLE')}, 0) AS add_to_cart
-        FROM {_quote_identifier(source_view)}
-        WHERE {date_sql} IS NOT NULL AND {date_sql} <= current_date
-        """
-    )
-    mart_path = paths.marts_root / "fact_channel_daily.parquet"
-    connection.execute(f"COPY fact_channel_daily TO '{_sql_path(mart_path)}' (FORMAT PARQUET, COMPRESSION ZSTD)")
-    return {"rows": connection.execute("SELECT count(*) FROM fact_channel_daily").fetchone()[0], "path": str(mart_path)}
-
-
-def _records(connection: duckdb.DuckDBPyConnection, sql: str, parameters: list[Any] | None = None) -> list[dict[str, Any]]:
+    sql: str,
+    parameters: list[Any] | None = None,
+) -> list[dict[str, Any]]:
     cursor = connection.execute(sql, parameters or [])
     columns = [item[0] for item in cursor.description]
     return [dict(zip(columns, row, strict=True)) for row in cursor.fetchall()]
 
 
-def _build_snapshot(
+def _model_view(connection: duckdb.DuckDBPyConnection, query_name: str) -> str:
+    row = connection.execute(
+        "SELECT model_view FROM warehouse_query_catalog WHERE query_name = ?",
+        [query_name],
+    ).fetchone()
+    if not row:
+        raise ValueError(f"未找到 PowerBI 查询模型：{query_name}")
+    return _quote_identifier(row[0])
+
+
+def _build_powerbi_pages(connection: duckdb.DuckDBPyConnection) -> dict[str, Any]:
+    """Build compact daily aggregates for the three PBIX-derived website pages."""
+
+    base_view = _model_view(connection, "04-旗舰店基础数据")
+    product_view = _model_view(connection, "07-旗舰店商品销售数据")
+    promotion_view = _model_view(connection, "08-旗舰店推广花费")
+    catalog_view = _model_view(connection, "05-旗舰店ID对照表")
+
+    latest_candidates = [
+        connection.execute(
+            f'SELECT max(try_cast("统计日期" AS DATE)) FROM {base_view} '
+            'WHERE try_cast("统计日期" AS DATE) <= current_date'
+        ).fetchone()[0],
+        connection.execute(
+            f'SELECT max(try_cast("日期" AS DATE)) FROM {product_view} '
+            'WHERE try_cast("日期" AS DATE) <= current_date'
+        ).fetchone()[0],
+        connection.execute(
+            f'SELECT max(try_cast("日期" AS DATE)) FROM {promotion_view} '
+            'WHERE try_cast("日期" AS DATE) <= current_date'
+        ).fetchone()[0],
+    ]
+    latest_dates = [value for value in latest_candidates if value]
+    if not latest_dates:
+        return {
+            "source": "powerbi_local_logic",
+            "period": None,
+            "overallDaily": [],
+            "productDaily": [],
+            "promotionSceneDaily": [],
+            "promotionProductDaily": [],
+            "products": [],
+        }
+    period_end = max(latest_dates)
+    period_start = period_end - timedelta(days=POWERBI_PAGE_WINDOW_DAYS - 1)
+
+    overall_daily = _records(
+        connection,
+        f"""
+        WITH dedup AS (
+          SELECT * EXCLUDE (_snapshot_rank) FROM (
+            SELECT *, row_number() OVER (
+              PARTITION BY try_cast("统计日期" AS DATE), cast("店铺名称" AS VARCHAR)
+              ORDER BY "_source_mtime_ns" DESC, "_source_path" DESC
+            ) AS _snapshot_rank
+            FROM {base_view}
+            WHERE try_cast("统计日期" AS DATE) BETWEEN ? AND ?
+          ) WHERE _snapshot_rank = 1
+        )
+        SELECT
+          try_cast("统计日期" AS DATE) AS date,
+          sum(coalesce(try_cast("访客数" AS DOUBLE), 0)) AS visitors,
+          sum(coalesce(try_cast("商品访客数" AS DOUBLE), 0)) AS productVisitors,
+          sum(coalesce(try_cast("加购人数" AS DOUBLE), 0)) AS addToCart,
+          sum(coalesce(try_cast("支付买家数" AS DOUBLE), 0)) AS payBuyers,
+          sum(coalesce(try_cast("支付金额" AS DOUBLE), 0)) AS payAmount,
+          sum(coalesce(try_cast("成功退款金额" AS DOUBLE), 0)) AS refund,
+          sum(coalesce(try_cast("全站推广花费" AS DOUBLE), 0)) AS fullSiteSpend,
+          sum(coalesce(try_cast("关键词推广花费" AS DOUBLE), 0)) AS keywordSpend,
+          sum(coalesce(try_cast("精准人群推广花费" AS DOUBLE), 0)) AS audienceSpend,
+          sum(coalesce(try_cast("新访客数" AS DOUBLE), 0)) AS newVisitors,
+          sum(coalesce(try_cast("老访客数" AS DOUBLE), 0)) AS returningVisitors,
+          avg(try_cast("平均停留时长" AS DOUBLE)) AS avgStaySeconds,
+          avg(try_cast("跳失率" AS DOUBLE)) AS bounceRate
+        FROM dedup
+        GROUP BY 1 ORDER BY 1
+        """,
+        [period_start, period_end],
+    )
+
+    product_daily = _records(
+        connection,
+        f"""
+        WITH dedup AS (
+          SELECT * EXCLUDE (_snapshot_rank) FROM (
+            SELECT *, row_number() OVER (
+              PARTITION BY try_cast("日期" AS DATE), cast("商品ID" AS VARCHAR)
+              ORDER BY "_source_mtime_ns" DESC, "_source_path" DESC
+            ) AS _snapshot_rank
+            FROM {product_view}
+            WHERE try_cast("日期" AS DATE) BETWEEN ? AND ? AND "商品ID" IS NOT NULL
+          ) WHERE _snapshot_rank = 1
+        ), ranked AS (
+          SELECT cast("商品ID" AS VARCHAR) AS productId,
+                 sum(coalesce(try_cast("商品访客数" AS DOUBLE), 0)) AS visitors
+          FROM dedup
+          GROUP BY 1 ORDER BY visitors DESC LIMIT 60
+        )
+        SELECT
+          try_cast(data."日期" AS DATE) AS date,
+          cast(data."商品ID" AS VARCHAR) AS productId,
+          any_value(cast(data."商品名称" AS VARCHAR)) AS productName,
+          sum(coalesce(try_cast(data."商品访客数" AS DOUBLE), 0)) AS visitors,
+          sum(coalesce(try_cast(data."加购人数" AS DOUBLE), 0)) AS addToCart,
+          sum(coalesce(try_cast(data."支付买家数" AS DOUBLE), 0)) AS payBuyers,
+          sum(coalesce(try_cast(data."支付金额" AS DOUBLE), 0)) AS payAmount,
+          sum(coalesce(try_cast(data."退款金额" AS DOUBLE), 0)) AS refund,
+          sum(coalesce(try_cast(data."商品支付件数" AS DOUBLE), 0)) AS paidUnits
+        FROM dedup AS data
+        INNER JOIN ranked ON ranked.productId = cast(data."商品ID" AS VARCHAR)
+        GROUP BY 1, 2 ORDER BY 1, visitors DESC
+        """,
+        [period_start, period_end],
+    )
+
+    promotion_scene_daily = _records(
+        connection,
+        f"""
+        WITH dedup AS (
+          SELECT * EXCLUDE (_snapshot_rank) FROM (
+            SELECT *, row_number() OVER (
+              PARTITION BY
+                try_cast("日期" AS DATE),
+                coalesce(cast("场景ID" AS VARCHAR), ''),
+                coalesce(cast("计划ID" AS VARCHAR), ''),
+                coalesce(cast("商品ID" AS VARCHAR), ''),
+                coalesce(cast("主体名称" AS VARCHAR), ''),
+                coalesce(cast("_source_sheet" AS VARCHAR), '')
+              ORDER BY "_source_mtime_ns" DESC, "_source_path" DESC
+            ) AS _snapshot_rank
+            FROM {promotion_view}
+            WHERE try_cast("日期" AS DATE) BETWEEN ? AND ?
+          ) WHERE _snapshot_rank = 1
+        )
+        SELECT
+          try_cast("日期" AS DATE) AS date,
+          coalesce(nullif(cast("场景名字" AS VARCHAR), ''), '未分类场景') AS scene,
+          sum(coalesce(try_cast("展现量" AS DOUBLE), 0)) AS impressions,
+          sum(coalesce(try_cast("点击量" AS DOUBLE), 0)) AS clicks,
+          sum(coalesce(try_cast("花费（未含达人）" AS DOUBLE), try_cast("花费" AS DOUBLE), 0)) AS spend,
+          sum(coalesce(try_cast("总成交金额" AS DOUBLE), 0)) AS revenue,
+          sum(coalesce(try_cast("总购物车数" AS DOUBLE), 0)) AS carts,
+          sum(coalesce(try_cast("直接购物车数" AS DOUBLE), 0)) AS directCarts,
+          sum(coalesce(try_cast("旺旺咨询量" AS DOUBLE), 0)) AS consultations
+        FROM dedup
+        GROUP BY 1, 2 ORDER BY 1, spend DESC
+        """,
+        [period_start, period_end],
+    )
+
+    promotion_product_daily = _records(
+        connection,
+        f"""
+        WITH dedup AS (
+          SELECT * EXCLUDE (_snapshot_rank) FROM (
+            SELECT *, row_number() OVER (
+              PARTITION BY
+                try_cast("日期" AS DATE),
+                coalesce(cast("场景ID" AS VARCHAR), ''),
+                coalesce(cast("计划ID" AS VARCHAR), ''),
+                coalesce(cast("商品ID" AS VARCHAR), ''),
+                coalesce(cast("主体名称" AS VARCHAR), ''),
+                coalesce(cast("_source_sheet" AS VARCHAR), '')
+              ORDER BY "_source_mtime_ns" DESC, "_source_path" DESC
+            ) AS _snapshot_rank
+            FROM {promotion_view}
+            WHERE try_cast("日期" AS DATE) BETWEEN ? AND ? AND "商品ID" IS NOT NULL
+          ) WHERE _snapshot_rank = 1
+        ), ranked AS (
+          SELECT cast("商品ID" AS VARCHAR) AS productId,
+                 sum(coalesce(try_cast("花费（未含达人）" AS DOUBLE), try_cast("花费" AS DOUBLE), 0)) AS spend
+          FROM dedup
+          GROUP BY 1 ORDER BY spend DESC LIMIT 60
+        )
+        SELECT
+          try_cast(data."日期" AS DATE) AS date,
+          cast(data."商品ID" AS VARCHAR) AS productId,
+          coalesce(nullif(cast(data."场景名字" AS VARCHAR), ''), '未分类场景') AS scene,
+          sum(coalesce(try_cast(data."展现量" AS DOUBLE), 0)) AS impressions,
+          sum(coalesce(try_cast(data."点击量" AS DOUBLE), 0)) AS clicks,
+          sum(coalesce(try_cast(data."花费（未含达人）" AS DOUBLE), try_cast(data."花费" AS DOUBLE), 0)) AS spend,
+          sum(coalesce(try_cast(data."总成交金额" AS DOUBLE), 0)) AS revenue,
+          sum(coalesce(try_cast(data."总购物车数" AS DOUBLE), 0)) AS carts,
+          sum(coalesce(try_cast(data."直接购物车数" AS DOUBLE), 0)) AS directCarts,
+          sum(coalesce(try_cast(data."旺旺咨询量" AS DOUBLE), 0)) AS consultations
+        FROM dedup AS data
+        INNER JOIN ranked ON ranked.productId = cast(data."商品ID" AS VARCHAR)
+        GROUP BY 1, 2, 3 ORDER BY 1, spend DESC
+        """,
+        [period_start, period_end],
+    )
+
+    product_ids = sorted(
+        {str(item["productId"]) for item in product_daily + promotion_product_daily if item.get("productId")}
+    )
+    products: list[dict[str, Any]] = []
+    if product_ids:
+        placeholders = ", ".join("?" for _ in product_ids)
+        products = _records(
+            connection,
+            f"""
+            SELECT cast("商品ID" AS VARCHAR) AS productId,
+                   any_value(cast("商品名称" AS VARCHAR)) AS productName,
+                   any_value(cast("商家编码" AS VARCHAR)) AS merchantCode,
+                   max(coalesce(try_cast("30日销量" AS DOUBLE), 0)) AS sales30d,
+                   max(coalesce(try_cast("累计销量" AS DOUBLE), 0)) AS cumulativeSales
+            FROM {catalog_view}
+            WHERE cast("商品ID" AS VARCHAR) IN ({placeholders})
+            GROUP BY 1 ORDER BY sales30d DESC
+            """,
+            product_ids,
+        )
+
+    return {
+        "source": "powerbi_local_logic",
+        "period": {"start": period_start, "end": period_end},
+        "overallDaily": overall_daily,
+        "productDaily": product_daily,
+        "promotionSceneDaily": promotion_scene_daily,
+        "promotionProductDaily": promotion_product_daily,
+        "products": products,
+        "privacy": {"rawRowsExposed": False, "sourcePathsExposed": False, "remoteImagesExposed": False},
+    }
+
+
+def _build_unique_snapshot(
     connection: duckdb.DuckDBPyConnection,
     paths: WarehousePaths,
     query_results: list[dict[str, Any]],
-    fact: dict[str, Any],
 ) -> dict[str, Any]:
-    if fact.get("rows", 0) == 0:
-        snapshot = {
-            "source": "local_warehouse",
-            "refreshedAt": datetime.now().astimezone().isoformat(),
-            "recordCount": 0,
-            "totals": {},
-            "daily": [],
-            "platforms": [],
-            "stores": [],
-            "quality": {"status": "empty", "queries": query_results},
-        }
-        _write_json_atomic(paths.snapshot, snapshot)
-        return snapshot
-
-    latest_date = connection.execute("SELECT max(metric_date) FROM fact_channel_daily").fetchone()[0]
-    month_start = latest_date.replace(day=1)
-    totals = _records(
-        connection,
-        """
-        SELECT
-          sum(exposure) AS exposure,
-          sum(clicks) AS clicks,
-          sum(spend) AS spend,
-          sum(onsite_spend) AS onsiteSpend,
-          sum(gmv) AS gmv,
-          sum(net_revenue) AS netRevenue,
-          sum(refund) AS refund,
-          sum(add_to_cart) AS addToCart,
-          CASE WHEN sum(exposure) = 0 THEN 0 ELSE sum(clicks) / sum(exposure) END AS ctr,
-          CASE WHEN sum(spend) = 0 THEN 0 ELSE sum(gmv) / sum(spend) END AS roi
-        FROM fact_channel_daily
-        WHERE metric_date BETWEEN ? AND ?
-        """,
-        [month_start, latest_date],
-    )[0]
-    daily = _records(
-        connection,
-        """
-        SELECT metric_date AS date, sum(exposure) AS exposure, sum(clicks) AS clicks,
-               sum(spend) AS spend, sum(gmv) AS gmv, sum(net_revenue) AS netRevenue,
-               sum(refund) AS refund, sum(add_to_cart) AS addToCart,
-               CASE WHEN sum(exposure) = 0 THEN 0 ELSE sum(clicks) / sum(exposure) END AS ctr,
-               CASE WHEN sum(spend) = 0 THEN 0 ELSE sum(gmv) / sum(spend) END AS roi
-        FROM fact_channel_daily
-        WHERE metric_date BETWEEN ? AND ?
-        GROUP BY metric_date ORDER BY metric_date
-        """,
-        [max(date(2000, 1, 1), latest_date.fromordinal(latest_date.toordinal() - 59)), latest_date],
-    )
-    platforms = _records(
-        connection,
-        """
-        SELECT platform, sum(exposure) AS exposure, sum(clicks) AS clicks, sum(spend) AS spend,
-               sum(gmv) AS gmv, sum(net_revenue) AS netRevenue, sum(refund) AS refund,
-               sum(add_to_cart) AS addToCart,
-               CASE WHEN sum(exposure) = 0 THEN 0 ELSE sum(clicks) / sum(exposure) END AS ctr,
-               CASE WHEN sum(spend) = 0 THEN 0 ELSE sum(gmv) / sum(spend) END AS roi
-        FROM fact_channel_daily WHERE metric_date BETWEEN ? AND ?
-        GROUP BY platform ORDER BY netRevenue DESC
-        """,
-        [month_start, latest_date],
-    )
-    stores = _records(
-        connection,
-        """
-        SELECT platform, store, sum(spend) AS spend, sum(gmv) AS gmv,
-               sum(net_revenue) AS netRevenue, sum(refund) AS refund,
-               CASE WHEN sum(spend) = 0 THEN 0 ELSE sum(gmv) / sum(spend) END AS roi
-        FROM fact_channel_daily WHERE metric_date BETWEEN ? AND ?
-        GROUP BY platform, store ORDER BY netRevenue DESC LIMIT 100
-        """,
-        [month_start, latest_date],
-    )
     failures = sum(item.get("failed", 0) for item in query_results)
+    rows = sum(int(item.get("rows", 0)) for item in query_results)
+    result_by_query = {item["query"]: item for item in query_results}
+    powerbi_pages = _build_powerbi_pages(connection)
     snapshot = {
         "source": "local_warehouse",
+        "scope": "powerbi_unique_only",
         "engine": {"transform": "Polars", "storage": "Parquet", "query": "DuckDB"},
         "refreshedAt": datetime.now().astimezone().isoformat(),
-        "period": {"start": month_start, "end": latest_date},
-        "totals": totals,
-        "daily": daily,
-        "platforms": platforms,
-        "stores": stores,
-        "recordCount": fact["rows"],
+        "period": None,
+        "totals": {},
+        "daily": [],
+        "platforms": [],
+        "stores": [],
+        "uniqueDomains": unique_domain_catalog(result_by_query),
+        "powerbiPages": powerbi_pages,
+        "recordCount": rows,
+        "overlapPolicy": {
+            "authority": "dingtalk",
+            "excludedQueries": [
+                {"query": name, **policy} for name, policy in DINGTALK_COVERED_QUERIES.items()
+            ],
+            "partialOverlap": [
+                {"query": name, **policy} for name, policy in PARTIAL_OVERLAP_QUERIES.items()
+            ],
+        },
         "quality": {
-            "status": "healthy" if failures == 0 else "partial",
+            "status": "empty" if rows == 0 else "healthy" if failures == 0 else "partial",
             "queryCount": len(query_results),
+            "excludedQueryCount": len(DINGTALK_COVERED_QUERIES),
             "failedFiles": failures,
             "queries": query_results,
         },
         "privacy": {
-            "webExposure": "aggregated_metrics_only",
+            "webExposure": "domain_inventory_only",
             "rawCustomerServiceRowsExposed": False,
             "sourcePathsExposed": False,
         },
@@ -521,12 +629,16 @@ def _build_snapshot(
     )
     connection.execute(
         "INSERT INTO analytics_snapshots VALUES (current_timestamp, ?, ?, ?, ?)",
-        [month_start, latest_date, fact["rows"], json.dumps(snapshot, ensure_ascii=False, default=_json_value)],
+        [None, None, rows, json.dumps(snapshot, ensure_ascii=False, default=_json_value)],
     )
     return snapshot
 
 
-def _write_migration_status(paths: WarehousePaths, results: list[dict[str, Any]]) -> dict[str, Any]:
+def _write_migration_status(
+    paths: WarehousePaths,
+    results: list[dict[str, Any]],
+    excluded_specs: list[QuerySpec],
+) -> dict[str, Any]:
     output_root = paths.project_root / "migration" / "power-query-m"
     output_root.mkdir(parents=True, exist_ok=True)
     rows = []
@@ -552,6 +664,12 @@ def _write_migration_status(paths: WarehousePaths, results: list[dict[str, Any]]
         "sourceFileCount": sum(item["files"] for item in rows),
         "parquetPartitionCount": sum(item["partitions"] for item in rows),
         "rowCount": sum(item["rows"] for item in rows),
+        "scope": "powerbi_unique_only",
+        "excludedQueryCount": len(excluded_specs),
+        "excludedQueries": [
+            {"query": spec.name, **DINGTALK_COVERED_QUERIES[spec.name]}
+            for spec in excluded_specs
+        ],
         "queries": rows,
     }
     _write_json_atomic(output_root / "migration-status.json", payload)
@@ -559,13 +677,17 @@ def _write_migration_status(paths: WarehousePaths, results: list[dict[str, Any]]
         f"| {item['query']} | {item['files']} | {item['partitions']} | {item['rows']} | {item['failedFiles']} | {'已迁移' if item['status'] == 'migrated' else '部分迁移'} |"
         for item in rows
     )
+    excluded_table = "\n".join(
+        f"| {spec.name} | {DINGTALK_COVERED_QUERIES[spec.name]['authority']} | {DINGTALK_COVERED_QUERIES[spec.name]['grain']} |"
+        for spec in excluded_specs
+    )
     report = f"""# Power Query 开源迁移状态
 
-生成日期：{datetime.now().date().isoformat()}  
-查询完成：{completed}/{len(rows)}  
-源文件：{payload['sourceFileCount']}  
-Parquet 分区：{payload['parquetPartitionCount']}  
-可查询行：{payload['rowCount']}
+- 生成日期：{datetime.now().date().isoformat()}
+- 查询完成：{completed}/{len(rows)}
+- 源文件：{payload['sourceFileCount']}
+- Parquet 分区：{payload['parquetPartitionCount']}
+- 可查询行：{payload['rowCount']}
 
 ## M 到开源实现映射
 
@@ -588,9 +710,16 @@ Parquet 分区：{payload['parquetPartitionCount']}
 |---|---:|---:|---:|---:|---|
 {table}
 
+## 与钉钉重叠的排除项
+
+| Power Query | 权威来源 | 重叠粒度 |
+|---|---|---|
+{excluded_table}
+
 ## 数据边界
 
-- 网站 API 只读取 `analytics-snapshot.json` 中的聚合指标。
+- 钉钉负责全渠道日经营汇总和月度销售目标，本地同步不再复制这两个口径。
+- 网站 API 当前只读取 `analytics-snapshot.json` 中的独有领域目录与质量摘要。
 - 客服、商品和投放明细只保留在本机 Parquet/DuckDB，不通过前端接口返回。
 - PBIX 和 Power BI Desktop 不再是网站同步依赖。
 """
@@ -610,9 +739,8 @@ def sync_warehouse(
         unknown = options.query_names - {spec.name for spec in specs}
         if unknown:
             raise ValueError(f"未知查询：{', '.join(sorted(unknown))}")
-        selected_specs = [spec for spec in specs if spec.name in options.query_names]
-    else:
-        selected_specs = specs
+    active_specs, excluded_specs = select_sync_specs(specs)
+    selected_specs, requested_exclusions = select_sync_specs(specs, options.query_names)
 
     state = _read_state(paths.state_file)
     results = []
@@ -623,7 +751,7 @@ def sync_warehouse(
         _write_json_atomic(paths.state_file, state)
 
     cached_results = {item["query"]: item for item in results}
-    for spec in specs:
+    for spec in active_specs:
         if spec.name in cached_results:
             continue
         active = [
@@ -646,25 +774,28 @@ def sync_warehouse(
             "status": "cached" if active else "empty",
         }
 
-    ordered_results = [cached_results[spec.name] for spec in specs]
+    ordered_results = [cached_results[spec.name] for spec in active_specs]
     connection = duckdb.connect(str(paths.database))
     try:
-        _create_source_views(connection, paths, specs, cached_results)
-        _create_composite_views(connection, specs)
-        fact = _create_fact_mart(connection, paths, specs)
-        snapshot = _build_snapshot(connection, paths, ordered_results, fact)
+        _deactivate_dingtalk_overlap(connection, paths, excluded_specs)
+        _create_source_views(connection, paths, active_specs, cached_results)
+        _create_composite_views(connection, active_specs)
+        snapshot = _build_unique_snapshot(connection, paths, ordered_results)
     finally:
         connection.close()
 
-    migration = _write_migration_status(paths, ordered_results)
+    migration = _write_migration_status(paths, ordered_results, excluded_specs)
     summary = {
-        "ok": fact.get("rows", 0) > 0,
+        "ok": snapshot.get("recordCount", 0) > 0,
         "manifestQueries": manifest["queryCount"],
         "selectedQueries": len(selected_specs),
+        "activeQueries": len(active_specs),
+        "excludedQueries": [spec.name for spec in excluded_specs],
+        "requestedExclusions": [spec.name for spec in requested_exclusions],
         "processedFiles": sum(item["processed"] for item in results),
         "reusedFiles": sum(item["reused"] for item in results),
         "failedFiles": sum(item["failed"] for item in results),
-        "factRows": fact.get("rows", 0),
+        "factRows": snapshot.get("recordCount", 0),
         "period": snapshot.get("period"),
         "database": str(paths.database),
         "snapshot": str(paths.snapshot),
@@ -680,12 +811,16 @@ def warehouse_status() -> dict[str, Any]:
     paths = WarehousePaths.discover()
     state = _read_state(paths.state_file)
     snapshot = json.loads(paths.snapshot.read_text(encoding="utf-8")) if paths.snapshot.exists() else None
+    active_files = [
+        item for item in state["files"].values()
+        if item.get("query") not in DINGTALK_COVERED_QUERIES
+    ]
     return {
         "configured": paths.manifest.exists(),
         "databaseExists": paths.database.exists(),
         "snapshotExists": paths.snapshot.exists(),
-        "partitionCount": sum(1 for item in state["files"].values() if item.get("parquet") and Path(item["parquet"]).exists()),
-        "failedPartitionCount": sum(1 for item in state["files"].values() if item.get("error")),
+        "partitionCount": sum(1 for item in active_files if item.get("parquet") and Path(item["parquet"]).exists()),
+        "failedPartitionCount": sum(1 for item in active_files if item.get("error")),
         "updatedAt": state.get("updatedAt"),
         "snapshot": snapshot,
     }

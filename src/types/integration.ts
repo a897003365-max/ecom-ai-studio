@@ -82,12 +82,86 @@ export interface WarehouseMetricTotals {
   roi: number;
 }
 
+export interface WarehouseUniqueDomain {
+  id: string;
+  label: string;
+  priority: "P0" | "P1" | "support";
+  queryCount: number;
+  rowCount: number;
+  failedFiles: number;
+  queries: string[];
+}
+
+export interface PowerBiOverallDaily {
+  date: string;
+  visitors: number;
+  productVisitors: number;
+  addToCart: number;
+  payBuyers: number;
+  payAmount: number;
+  refund: number;
+  fullSiteSpend: number;
+  keywordSpend: number;
+  audienceSpend: number;
+  newVisitors: number;
+  returningVisitors: number;
+  avgStaySeconds: number;
+  bounceRate: number;
+}
+
+export interface PowerBiProductDaily {
+  date: string;
+  productId: string;
+  productName: string;
+  visitors: number;
+  addToCart: number;
+  payBuyers: number;
+  payAmount: number;
+  refund: number;
+  paidUnits: number;
+}
+
+export interface PowerBiPromotionDaily {
+  date: string;
+  productId?: string;
+  scene?: string;
+  impressions: number;
+  clicks: number;
+  spend: number;
+  revenue: number;
+  carts: number;
+  directCarts: number;
+  consultations: number;
+}
+
+export interface PowerBiPages {
+  source: "powerbi_local_logic";
+  period: { start: string; end: string } | null;
+  overallDaily: PowerBiOverallDaily[];
+  productDaily: PowerBiProductDaily[];
+  promotionSceneDaily: PowerBiPromotionDaily[];
+  promotionProductDaily: PowerBiPromotionDaily[];
+  products: Array<{
+    productId: string;
+    productName: string;
+    merchantCode: string;
+    sales30d: number;
+    cumulativeSales: number;
+  }>;
+  privacy: {
+    rawRowsExposed: boolean;
+    sourcePathsExposed: boolean;
+    remoteImagesExposed: boolean;
+  };
+}
+
 export interface WarehouseSnapshot {
   source: "local_warehouse";
+  scope: "powerbi_unique_only";
   engine: { transform: string; storage: string; query: string };
   refreshedAt: string;
-  period: { start: string; end: string };
-  totals: WarehouseMetricTotals;
+  period: { start: string; end: string } | null;
+  totals: Partial<WarehouseMetricTotals>;
   daily: Array<{ date: string } & WarehouseMetricTotals>;
   platforms: Array<{ platform: string } & WarehouseMetricTotals>;
   stores: Array<{
@@ -99,9 +173,27 @@ export interface WarehouseSnapshot {
     refund: number;
     roi: number;
   }>;
+  uniqueDomains: WarehouseUniqueDomain[];
+  powerbiPages: PowerBiPages;
+  overlapPolicy: {
+    authority: "dingtalk";
+    excludedQueries: Array<{
+      query: string;
+      authority: string;
+      grain: string;
+      overlap: string[];
+      reason: string;
+    }>;
+    partialOverlap: Array<{
+      query: string;
+      retainBecause: string;
+      doNotRepublish: string[];
+    }>;
+  };
   quality: {
     status: "healthy" | "partial" | "empty";
     queryCount: number;
+    excludedQueryCount: number;
     failedFiles: number;
     queries: Array<{
       query: string;

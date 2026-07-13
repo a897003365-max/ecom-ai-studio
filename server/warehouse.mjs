@@ -32,7 +32,8 @@ export async function checkWarehouse() {
     readJson(statePath, { files: {} }),
     readJson(migrationStatusPath, null),
   ]);
-  const files = Object.values(state?.files ?? {});
+  const excludedQueries = new Set((migration?.excludedQueries ?? []).map((item) => item.query));
+  const files = Object.values(state?.files ?? {}).filter((item) => !excludedQueries.has(item?.query));
   const partitionCount = files.filter((item) => item?.parquet).length;
   const failedPartitionCount = files.filter((item) => item?.error).length;
   const databasePath = join(warehouseRoot, "ecom.duckdb");
@@ -64,7 +65,7 @@ async function executeSync() {
     env: { ...process.env, PYTHONIOENCODING: "utf-8" },
   });
   const result = JSON.parse(stdout);
-  if (!result.ok) throw new Error("本地数仓同步完成，但经营事实表为空");
+  if (!result.ok) throw new Error("本地数仓同步完成，但 PowerBI 独有数据目录为空");
   const snapshot = await readWarehouseSnapshot();
   if (!snapshot) throw new Error("本地数仓未生成 analytics-snapshot.json");
   return { ...snapshot, syncSummary: result };

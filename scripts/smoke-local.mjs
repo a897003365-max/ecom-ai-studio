@@ -41,8 +41,18 @@ assert(sources.sources.some((source) => source.id === "warehouse" && source.stat
 assert(sources.sources.some((source) => source.id === "dingtalk" && source.status === "connected"), "钉钉只读聚合快照未就绪");
 assert(sources.sources.some((source) => source.id === "feishu" && source.status === "connected"), "飞书聚合快照未就绪");
 assert(workflows.workflow.readyCount === workflows.workflow.expectedCount, "Claude Code Agent 配置不完整");
-assert(analytics.warehouse?.recordCount > 0, "本地数仓聚合快照为空");
-assert(analytics.warehouse?.quality?.queryCount === 25, "本地数仓查询数量异常");
+assert(analytics.warehouse?.recordCount > 0, "本地数仓 PowerBI 独有数据目录为空");
+assert(analytics.warehouse?.scope === "powerbi_unique_only", "本地数仓未启用 PowerBI 独有数据边界");
+assert(analytics.warehouse?.quality?.queryCount === 23, "本地数仓独有查询数量异常");
+assert(analytics.warehouse?.quality?.excludedQueryCount === 2, "本地数仓重叠排除数量异常");
+assert(
+  analytics.warehouse?.overlapPolicy?.excludedQueries?.some((item) => item.query === "00-月表汇总"),
+  "全渠道日经营汇总未从本地数仓排除",
+);
+assert(
+  analytics.warehouse?.overlapPolicy?.excludedQueries?.some((item) => item.query === "03-1-各渠道目标金额"),
+  "月度渠道目标未从本地数仓排除",
+);
 assert(analytics.dingtalk?.recordCount > 0, "钉钉同步快照为空");
 assert(filteredAnalytics.dingtalk?.period?.start === "2026-07-10", "日期筛选未更新钉钉开始日期");
 assert(filteredAnalytics.dingtalk?.period?.end === "2026-07-10", "日期筛选未更新钉钉结束日期");

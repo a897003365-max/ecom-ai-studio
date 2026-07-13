@@ -7,6 +7,7 @@ import { MetricCard } from "../components/MetricCard";
 import { MonthlyOverview } from "../components/MonthlyOverview";
 import { PageHeader } from "../components/PageHeader";
 import { PlatformBadge } from "../components/PlatformBadge";
+import { PowerBiReplica } from "../components/PowerBiReplica";
 import { StatusTag } from "../components/StatusTag";
 import { TableShell } from "../components/TableShell";
 import { getAnalyticsData, syncDataSource } from "../services/localApi";
@@ -146,7 +147,7 @@ export function AnalyticsPage({ onAction }: AnalyticsPageProps) {
       {loading && !dingtalk ? (
         <Card><div className="py-16 text-center text-sm text-[var(--muted)]">正在读取钉钉经营数据...</div></Card>
       ) : dingtalk ? (
-        <>
+        <PowerBiReplica dingtalk={dingtalk} warehouse={integration?.warehouse ?? null} overview={<>
           {reporting?.latestComparison && (
             <div className="mb-5" data-testid="comparison-ticker"><ComparisonTicker comparison={reporting.latestComparison} /></div>
           )}
@@ -211,7 +212,7 @@ export function AnalyticsPage({ onAction }: AnalyticsPageProps) {
                 <div className="insight-note">提示跟随日期筛选；月度概览按筛选结束日所在月计算 MTD，滚动播报固定使用最新完整日期。</div>
               </div>
           </Card>
-        </>
+        </>} />
       ) : (
         <Card><div className="py-16 text-center text-sm text-[var(--muted)]">钉钉经营数据尚未同步，请先点击“同步钉钉”。</div></Card>
       )}
