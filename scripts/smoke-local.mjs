@@ -33,6 +33,7 @@ function assert(condition, message) {
 const baseUrl = await findService();
 const sources = await json(baseUrl, "/api/data-sources");
 const analytics = await json(baseUrl, "/api/analytics");
+const filteredAnalytics = await json(baseUrl, "/api/analytics?start=2026-07-10&end=2026-07-10");
 const workflows = await json(baseUrl, "/api/workflows");
 
 assert(sources.warehouse?.available, "本地 DuckDB / Parquet 数仓不可用");
@@ -43,6 +44,11 @@ assert(workflows.workflow.readyCount === workflows.workflow.expectedCount, "Clau
 assert(analytics.warehouse?.recordCount > 0, "本地数仓聚合快照为空");
 assert(analytics.warehouse?.quality?.queryCount === 25, "本地数仓查询数量异常");
 assert(analytics.dingtalk?.recordCount > 0, "钉钉同步快照为空");
+assert(filteredAnalytics.dingtalk?.period?.start === "2026-07-10", "日期筛选未更新钉钉开始日期");
+assert(filteredAnalytics.dingtalk?.period?.end === "2026-07-10", "日期筛选未更新钉钉结束日期");
+assert(filteredAnalytics.dingtalk?.daily?.length === 1, "日期筛选未联动经营趋势");
+assert(filteredAnalytics.dingtalk?.platforms?.length > 0, "日期筛选后渠道汇总为空");
+assert(filteredAnalytics.dingtalk?.stores?.length > 0, "日期筛选后店铺汇总为空");
 assert(analytics.feishu?.content?.processedRows > 0, "飞书内容快照为空");
 
 const serialized = JSON.stringify(analytics);
