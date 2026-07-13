@@ -15,6 +15,7 @@
     "extract:power-query": "node scripts/extract-power-query.mjs",
     "test:dingtalk": "node scripts/test-dingtalk-import.mjs",
     "test:dingtalk-api": "node scripts/test-dingtalk-api.mjs",
+    "test:dashboard-ui": "node scripts/test-dashboard-ui-contract.mjs",
     "test:smoke": "node scripts/smoke-local.mjs"
   },
   "dependencies": {
