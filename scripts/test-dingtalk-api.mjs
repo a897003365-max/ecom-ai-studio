@@ -19,13 +19,22 @@ const snapshot = buildDingTalkSnapshot([
   {
     sheet: "全渠道数据表",
     data: [
-      ["月份", "月度回款额", "同比", "站内费用", "站外费用", "总费率", "总完成率"],
-      ["7月", 100, 0.2, 10, 2, 0.12, 0.5],
+      ["月份", "月度回款额", "同比", "站内费用", "站外费用", "站内月费率", "站外月费率", "总费率", "总完成率"],
+      ["12月", 1560, 0.2, 270, 12, 270 / 1560, 12 / 1560, 282 / 1560, 0.78],
       ["开始日期", "截止日期"],
       ["2024-12-01", "2024-12-02"],
       ["渠道", "GMV", "回款额", "站内费用", "加购人数", "退款金额"],
       ["天猫", 150, 100, 10, 8, 5],
       ["合计", 150, 100, 10, 8, 5],
+    ],
+  },
+  {
+    sheet: "销售目标",
+    data: [
+      ["渠道", "店铺", "1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月", "总计"],
+      rowWithColumns([[0, "天猫"], [1, "麻大师旗舰店"], [13, 1200], [14, 1200]]),
+      rowWithColumns([[0, "抖音"], [1, "抖音1"], [13, 800], [14, 800]]),
+      rowWithColumns([[0, "总计"], [1, "总计"], [13, 2000], [14, 2000]]),
     ],
   },
   {
@@ -50,12 +59,12 @@ const snapshot = buildDingTalkSnapshot([
   { sheet: "空白业务表", data: [[], ["说明", "无日期明细"]] },
 ]);
 
-assert.equal(snapshot.quality.sheetCount, 4);
-assert.equal(snapshot.monthly.netRevenue, 100);
+assert.equal(snapshot.quality.sheetCount, 5);
+assert.equal(snapshot.monthly.netRevenue, 1560);
 assert.equal(snapshot.recordCount, 4);
 assert.equal(snapshot.daily[0].date, "2024-12-01");
-assert.equal(snapshot.inventory[3].detectedMetricCount, 0);
-assert.deepEqual(snapshot.inventory[3].detectedFields, []);
+assert.equal(snapshot.inventory[4].detectedMetricCount, 0);
+assert.deepEqual(snapshot.inventory[4].detectedFields, []);
 
 assert.equal(snapshot.reporting.completedThrough, "2024-12-02");
 assert.equal(snapshot.reporting.availablePeriod.start, "2024-12-01");
@@ -75,6 +84,32 @@ assert.equal(filtered.stores.find((item) => item.store === "麻大师旗舰店")
 assert.equal(filtered.stores.find((item) => item.store === "抖音1").gmv, 300);
 assert.equal(filtered.stores.find((item) => item.store === "抖音1").refund, 50);
 assert.equal(filtered.daily.length, 1);
+assert.deepEqual(filtered.reporting.monthlyOverview.period, { start: "2024-12-01", end: "2024-12-02" });
+assert.equal(filtered.reporting.monthlyOverview.metrics.netRevenue, 1560, "最新月份 MTD 应与全渠道第 3 行回款额对账");
+assert.equal(filtered.reporting.monthlyOverview.metrics.priorYearNetRevenue, 1300);
+assert.equal(filtered.reporting.monthlyOverview.metrics.onsiteSpend, 270);
+assert.equal(filtered.reporting.monthlyOverview.metrics.offsiteSpend, 12);
+assert.equal(filtered.reporting.monthlyOverview.metrics.totalFeeRate, 282 / 1560);
+assert.equal(filtered.reporting.monthlyOverview.metrics.target, 2000, "月目标应来自销售目标对应月份总计");
+assert.equal(filtered.reporting.monthlyOverview.metrics.completionRate, 0.78);
+assert.equal(filtered.reporting.monthlyOverview.daily.length, 2);
+assert.equal(filtered.reporting.monthlyOverview.daily[1].totalNetRevenue, 760);
+assert.equal(filtered.reporting.monthlyOverview.daily[1].channels.find((item) => item.platform === "抖音").netRevenue, 400);
+assert.equal(filtered.reporting.latestComparison.asOf, "2024-12-02");
+assert.equal(filtered.reporting.latestComparison.previousDate, "2024-12-01");
+assert.equal(
+  filtered.reporting.latestComparison.channels.find((item) => item.name === "天猫").netRevenueChange,
+  360 / 560 - 1,
+);
+assert.equal(
+  filtered.reporting.latestComparison.channels.find((item) => item.name === "抖音").netRevenueChange,
+  400 / 240 - 1,
+);
+
+const firstDayFiltered = filterDingTalkSnapshot(snapshot, { start: "2024-12-01", end: "2024-12-01" });
+assert.deepEqual(firstDayFiltered.reporting.monthlyOverview.period, { start: "2024-12-01", end: "2024-12-01" });
+assert.equal(firstDayFiltered.reporting.monthlyOverview.metrics.netRevenue, 800, "历史筛选应按结束日期所在月计算 MTD");
+assert.equal(firstDayFiltered.reporting.monthlyOverview.metrics.completionRate, 0.4);
 
 const businessRuleSnapshot = structuredClone(snapshot);
 const tmallPlatformRow = businessRuleSnapshot.reporting.dailyPlatforms.find(

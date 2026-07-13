@@ -49,6 +49,10 @@ assert(filteredAnalytics.dingtalk?.period?.end === "2026-07-10", "日期筛选�
 assert(filteredAnalytics.dingtalk?.daily?.length === 1, "日期筛选未联动经营趋势");
 assert(filteredAnalytics.dingtalk?.platforms?.length > 0, "日期筛选后渠道汇总为空");
 assert(filteredAnalytics.dingtalk?.stores?.length > 0, "日期筛选后店铺汇总为空");
+assert(filteredAnalytics.dingtalk?.reporting?.monthlyOverview?.daily?.length > 0, "月度 MTD 渠道回款趋势为空");
+assert(filteredAnalytics.dingtalk?.reporting?.monthlyOverview?.metrics?.target > 0, "销售目标未进入月度经营概览");
+assert(filteredAnalytics.dingtalk?.reporting?.latestComparison?.channels?.length > 0, "最新渠道日环比为空");
+assert(filteredAnalytics.dingtalk?.reporting?.latestComparison?.stores?.length > 0, "最新店铺日环比为空");
 assert(analytics.feishu?.content?.processedRows > 0, "飞书内容快照为空");
 
 const serialized = JSON.stringify(analytics);
