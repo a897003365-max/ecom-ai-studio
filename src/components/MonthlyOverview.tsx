@@ -4,6 +4,7 @@ import { ChannelRevenueChart } from "./ChannelRevenueChart";
 
 interface MonthlyOverviewProps {
   overview: DingTalkMonthlyOverview;
+  selectedChannel: string;
 }
 
 const compactMoney = new Intl.NumberFormat("zh-CN", { style: "currency", currency: "CNY", notation: "compact", maximumFractionDigits: 1 });
@@ -16,7 +17,7 @@ function percent(value: number | null) {
   return value === null ? "—" : `${(value * 100).toFixed(2)}%`;
 }
 
-export function MonthlyOverview({ overview }: MonthlyOverviewProps) {
+export function MonthlyOverview({ overview, selectedChannel }: MonthlyOverviewProps) {
   const { metrics } = overview;
   return (
     <div className="monthly-overview-grid">
@@ -40,9 +41,9 @@ export function MonthlyOverview({ overview }: MonthlyOverviewProps) {
           <div><span><Target size={13} />月度回款目标</span><b>{money(metrics.target)}</b></div>
           <div className="monthly-target-track"><i style={{ width: `${Math.min(100, Math.max(0, metrics.completionRate * 100))}%` }} /></div>
         </div>
-        <div className="monthly-source-note">口径：{overview.source}</div>
+        <div className="monthly-source-note">数据来源：共享表格</div>
       </div>
-      <ChannelRevenueChart overview={overview} />
+      <ChannelRevenueChart overview={overview} selectedChannel={selectedChannel} />
     </div>
   );
 }

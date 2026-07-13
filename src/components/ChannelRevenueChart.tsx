@@ -3,6 +3,7 @@ import type { DingTalkMonthlyOverview } from "../types/integration";
 
 interface ChannelRevenueChartProps {
   overview: DingTalkMonthlyOverview;
+  selectedChannel: string;
 }
 
 const palette = ["var(--blue)", "var(--orange)", "var(--purple)", "var(--pink)", "#72c7a8", "#d6b869"];
@@ -36,10 +37,14 @@ function shortMoney(value: number) {
   return `${(value / 10_000).toFixed(value >= 100_000 ? 1 : 2)}万`;
 }
 
-export function ChannelRevenueChart({ overview }: ChannelRevenueChartProps) {
+export function ChannelRevenueChart({ overview, selectedChannel }: ChannelRevenueChartProps) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const daily = overview.daily;
-  const channels = useMemo(() => daily[0]?.channels.map((item) => item.platform) ?? [], [daily]);
+  const allChannels = useMemo(() => daily[0]?.channels.map((item) => item.platform) ?? [], [daily]);
+  const channels = useMemo(
+    () => selectedChannel === "all" ? allChannels : allChannels.filter((channel) => channel === selectedChannel),
+    [allChannels, selectedChannel],
+  );
   const maxValue = axisMaximum(Math.max(...daily.map((item) => item.totalNetRevenue / 10_000), 0));
   const plotWidth = width - plot.left - plot.right;
   const plotHeight = height - plot.top - plot.bottom;
@@ -55,22 +60,24 @@ export function ChannelRevenueChart({ overview }: ChannelRevenueChartProps) {
   }
 
   const hovered = hoveredIndex === null ? null : daily[hoveredIndex];
+  const hoveredChannels = hovered?.channels.filter((item) => channels.includes(item.platform)) ?? [];
   const tooltipLeft = hoveredIndex === null || daily.length <= 1 ? 50 : x(hoveredIndex) / width * 100;
+  const channelColor = (channel: string) => palette[Math.max(0, allChannels.indexOf(channel)) % palette.length];
 
   return (
     <div className="channel-chart" data-testid="channel-revenue-chart">
       <div className="channel-chart-head">
         <div>
-          <div className="text-sm font-bold">各渠道每日回款额</div>
+          <div className="text-sm font-bold">{selectedChannel === "all" ? "各渠道每日回款额" : `${selectedChannel}每日回款额`}</div>
           <div className="mt-1 text-[11px] text-[var(--muted)]">横轴日期每 5 天标注 · 纵轴单位：万元</div>
         </div>
         <div className="channel-chart-legend">
           <span><i style={{ background: "var(--brand)" }} />总回款</span>
-          {channels.map((channel, index) => <span key={channel}><i style={{ background: palette[index % palette.length] }} />{channel}</span>)}
+          {channels.map((channel) => <span key={channel}><i style={{ background: channelColor(channel) }} />{channel}</span>)}
         </div>
       </div>
       <div className="channel-chart-canvas">
-        <svg aria-label="当月各渠道每日回款额平滑折线图" role="img" viewBox={`0 0 ${width} ${height}`}>
+        <svg aria-label={selectedChannel === "all" ? "当月各渠道每日回款额平滑折线图" : `当月${selectedChannel}每日回款额平滑折线图`} role="img" viewBox={`0 0 ${width} ${height}`}>
           {[0, 0.25, 0.5, 0.75, 1].map((ratio) => {
             const value = maxValue * ratio;
             const rowY = plot.top + (1 - ratio) * plotHeight;
@@ -82,18 +89,18 @@ export function ChannelRevenueChart({ overview }: ChannelRevenueChartProps) {
             return show ? <text className="chart-x-label" key={item.date} x={x(index)} y={height - 13}>{item.date.slice(5)}</text> : null;
           })}
           <path className="chart-total-line" d={smoothPath(totalPoints)} />
-          {channels.map((channel, channelIndex) => {
+          {channels.map((channel) => {
             const points = daily.map((item, index) => ({
               x: x(index),
               y: y(item.channels.find((row) => row.platform === channel)?.netRevenue ?? 0),
             }));
-            return <path d={smoothPath(points)} fill="none" key={channel} stroke={palette[channelIndex % palette.length]} strokeWidth="2" />;
+            return <path d={smoothPath(points)} fill="none" key={channel} stroke={channelColor(channel)} strokeWidth="2" />;
           })}
           {hoveredIndex !== null && hovered && (
             <g>
               <line className="chart-hover-line" x1={x(hoveredIndex)} x2={x(hoveredIndex)} y1={plot.top} y2={plot.top + plotHeight} />
               <circle cx={x(hoveredIndex)} cy={y(hovered.totalNetRevenue)} fill="var(--brand)" r="4" stroke="var(--bg)" strokeWidth="2" />
-              {hovered.channels.map((item, index) => <circle cx={x(hoveredIndex)} cy={y(item.netRevenue)} fill={palette[index % palette.length]} key={item.platform} r="3.5" stroke="var(--bg)" strokeWidth="2" />)}
+              {hoveredChannels.map((item) => <circle cx={x(hoveredIndex)} cy={y(item.netRevenue)} fill={channelColor(item.platform)} key={item.platform} r="3.5" stroke="var(--bg)" strokeWidth="2" />)}
             </g>
           )}
           <rect fill="transparent" height={plotHeight} onPointerLeave={() => setHoveredIndex(null)} onPointerMove={move} width={plotWidth} x={plot.left} y={plot.top} />
@@ -102,8 +109,8 @@ export function ChannelRevenueChart({ overview }: ChannelRevenueChartProps) {
           <div className={`channel-chart-tooltip ${tooltipLeft > 68 ? "is-left" : ""}`} style={{ left: `${tooltipLeft}%` }}>
             <div className="channel-chart-tooltip-date">{hovered.date}</div>
             <div className="channel-chart-tooltip-total"><span>当天总回款额</span><b>{shortMoney(hovered.totalNetRevenue)}</b></div>
-            {hovered.channels.map((item, index) => (
-              <div className="channel-chart-tooltip-row" key={item.platform}><span><i style={{ background: palette[index % palette.length] }} />{item.platform}</span><b>{shortMoney(item.netRevenue)}</b></div>
+            {hoveredChannels.map((item) => (
+              <div className="channel-chart-tooltip-row" key={item.platform}><span><i style={{ background: channelColor(item.platform) }} />{item.platform}</span><b>{shortMoney(item.netRevenue)}</b></div>
             ))}
           </div>
         )}

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Filter } from "lucide-react";
 import { AnalyticsDateFilter } from "../components/AnalyticsDateFilter";
 import { Card } from "../components/Card";
 import { ComparisonTicker } from "../components/ComparisonTicker";
@@ -67,6 +68,7 @@ export function AnalyticsPage({ onAction }: AnalyticsPageProps) {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState<"warehouse" | "feishu" | "dingtalk" | null>(null);
   const [error, setError] = useState("");
+  const [selectedChannel, setSelectedChannel] = useState("all");
 
   async function loadAnalytics(period?: { start: string; end: string }) {
     setLoading(true);
@@ -91,6 +93,11 @@ export function AnalyticsPage({ onAction }: AnalyticsPageProps) {
   const stores = useMemo(() => (dingtalk?.stores ?? []).map(withBusinessRates), [dingtalk]);
   const latestSync = integration?.history.find((item) => item.sourceId === "dingtalk" && item.status === "success")?.finishedAt
     ?? dingtalk?.refreshedAt;
+  const chartChannels = useMemo(
+    () => reporting?.monthlyOverview?.daily[0]?.channels.map((item) => item.platform) ?? [],
+    [reporting?.monthlyOverview],
+  );
+  const activeChartChannel = selectedChannel === "all" || chartChannels.includes(selectedChannel) ? selectedChannel : "all";
 
   const highestRefund = [...platforms].sort((left, right) => right.refundRate - left.refundRate)[0];
   const highestFeeStore = [...stores].sort((left, right) => right.feeRate - left.feeRate)[0];
@@ -115,7 +122,7 @@ export function AnalyticsPage({ onAction }: AnalyticsPageProps) {
     <div>
       <PageHeader
         title="运营数据看板"
-        subtitle={`每日同步计划 ${dingtalk?.schedule?.join(" / ") || "10:00 / 12:30 / 17:30"} · 最近同步 ${dateTime(latestSync)} · 月度指标沿用“全渠道数据表”第 2–3 行完整跨表依赖`}
+        subtitle={`每日同步计划 ${dingtalk?.schedule?.join(" / ") || "10:00 / 12:30 / 17:30"} · 最近同步 ${dateTime(latestSync)}`}
         actions={
           <>
             <button className="btn" disabled={syncing !== null} onClick={() => void sync("dingtalk")} type="button">
@@ -148,9 +155,16 @@ export function AnalyticsPage({ onAction }: AnalyticsPageProps) {
             <section className="monthly-overview mb-5" data-testid="monthly-overview">
               <div className="monthly-overview-heading">
                 <div><span>月度经营概览</span><small>{reporting.monthlyOverview.period.start} 至 {reporting.monthlyOverview.period.end}</small></div>
-                <StatusTag label="钉钉公式链已对账" tone="green" dot />
+                <label className="channel-filter">
+                  <Filter aria-hidden="true" size={13} />
+                  <span>渠道</span>
+                  <select aria-label="筛选图表渠道" onChange={(event) => setSelectedChannel(event.target.value)} value={activeChartChannel}>
+                    <option value="all">全部渠道</option>
+                    {chartChannels.map((channel) => <option key={channel} value={channel}>{channel}</option>)}
+                  </select>
+                </label>
               </div>
-              <div><MonthlyOverview overview={reporting.monthlyOverview} /></div>
+              <div><MonthlyOverview overview={reporting.monthlyOverview} selectedChannel={activeChartChannel} /></div>
             </section>
           )}
 

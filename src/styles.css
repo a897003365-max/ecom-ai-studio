@@ -222,6 +222,23 @@ button {
     @apply text-[11px] text-[var(--muted)];
   }
 
+  .channel-filter {
+    @apply inline-flex min-h-8 shrink-0 items-center gap-1.5 rounded-[5px] border border-[rgba(166,229,54,0.28)] bg-[rgba(166,229,54,0.07)] px-2.5 text-[11px] text-[var(--muted)];
+  }
+
+  .channel-filter > svg {
+    @apply text-[var(--brand)];
+  }
+
+  .channel-filter > span {
+    @apply font-normal text-[var(--muted)];
+  }
+
+  .channel-filter select {
+    @apply min-w-[92px] cursor-pointer border-0 bg-transparent font-bold text-[var(--text)] outline-none;
+    color-scheme: dark;
+  }
+
   .monthly-overview-grid {
     @apply grid min-w-0;
     grid-template-columns: minmax(310px, 0.82fr) minmax(0, 1.7fr);
@@ -410,7 +427,7 @@ button {
 
   .comparison-ticker-track {
     @apply flex w-max items-stretch;
-    animation: ticker-scroll 72s linear infinite;
+    animation: ticker-scroll 144s linear infinite;
   }
 
   .comparison-ticker:hover .comparison-ticker-track {
@@ -681,7 +698,7 @@ button {
   }
 
   .monthly-overview-heading {
-    @apply items-start;
+    @apply flex-wrap items-start;
   }
 
   .monthly-overview-heading > div {
