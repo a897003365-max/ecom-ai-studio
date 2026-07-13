@@ -16,6 +16,7 @@
     "test:dingtalk": "node scripts/test-dingtalk-import.mjs",
     "test:dingtalk-api": "node scripts/test-dingtalk-api.mjs",
     "test:dashboard-ui": "node scripts/test-dashboard-ui-contract.mjs",
+    "test:select-theme": "node scripts/test-global-select-theme.mjs",
     "test:smoke": "node scripts/smoke-local.mjs"
   },
   "dependencies": {
