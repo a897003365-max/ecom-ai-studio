@@ -220,6 +220,18 @@ function metricShape(values = {}) {
   };
 }
 
+function reportingMetricShape(values = {}, channelShare = 0) {
+  const result = metricShape(values);
+  return {
+    ...values,
+    ...result,
+    feeRate: result.netRevenue ? result.spend / result.netRevenue : 0,
+    recoveryRate: result.gmv ? result.netRevenue / result.gmv : 0,
+    refundRate: result.gmv ? result.refund / result.gmv : 0,
+    channelShare,
+  };
+}
+
 function addMetrics(target, source) {
   for (const key of ["exposure", "clicks", "spend", "paidOrders", "gmv", "netRevenue", "refund", "favorite", "addToCart", "target", "budget"]) {
     target[key] = (target[key] || 0) + (source[key] || 0);
@@ -350,11 +362,11 @@ function detailMetricIndexes(headers) {
     gmv: findColumn(headers, [/店铺总gmv/, /^gmv$/, /总销售额/, /销售额/]),
     netRevenue: findColumn(headers, [/店铺总回款/, /回款.*减退款/, /当日净成交金额/, /实际回款/]),
     refund: findColumn(headers, [/成功退款金额/, /总退款金额/, /退款金额/]),
-    spend: findColumn(headers, [/店铺总推广费/, /总推广费/, /站内总推广费/, /^消费$/, /消耗/]),
+    spend: findColumn(headers, [/店铺总推广费/, /站内总推广费/, /^消费$/, /消耗/, /总推广费/]),
     exposure: findColumn(headers, [/商品曝光人数/, /展现量/, /^曝光$/, /浏览量/]),
     clicks: findColumn(headers, [/商品点击人数/, /点击量/, /^点击$/, /店铺客户数/]),
     paidOrders: findColumn(headers, [/成交订单量/, /支付订单/, /订单量/]),
-    addToCart: findColumn(headers, [/加购人数/, /^加购$/]),
+    addToCart: findColumn(headers, [/加购人数/, /日加购/, /^加购$/]),
     favorite: findColumn(headers, [/^收藏$/, /收藏量/]),
   };
 }
@@ -373,6 +385,7 @@ function parseDetailSheet(sheet) {
     .filter(Boolean)
     .join(" "));
   const indexes = detailMetricIndexes(headers);
+  const storeIndex = findColumn(headers, [/^店铺$/, /店铺名称/]);
   const today = new Date().toISOString().slice(0, 10);
   const daily = [];
   for (const row of rows.slice(firstDataIndex)) {
@@ -381,11 +394,118 @@ function parseDetailSheet(sheet) {
     daily.push({
       date,
       platform: platformName(sheet.sheet),
+      store: storeIndex >= 0 ? textValue(row[storeIndex]) : "",
       ...metricShape(Object.fromEntries(Object.entries(indexes).map(([field, index]) => [field, index >= 0 ? numberValue(row[index]) : 0]))),
     });
   }
   const dates = daily.map((row) => row.date).sort();
   return { rows: daily.length, period: { start: dates[0] ?? null, end: dates.at(-1) ?? null }, daily, headers };
+}
+
+const douyinStoreColumns = [
+  { store: "抖音1", gmv: 9, netRevenue: 20, spend: 24, refunds: [11, 13] },
+  { store: "抖音2", gmv: 26, netRevenue: 31, spend: 33, refunds: [28] },
+  { store: "抖音3", gmv: 35, netRevenue: 40, spend: 41, refunds: [37] },
+  { store: "抖音达人", gmv: 44, netRevenue: 53, spend: 54, refunds: [46] },
+];
+
+function hasReportingActivity(item) {
+  return ["gmv", "netRevenue", "refund", "spend", "exposure", "clicks", "paidOrders", "addToCart"]
+    .some((field) => Number(item[field] || 0) !== 0);
+}
+
+function parseDouyinStoreDaily(sheet) {
+  if (!sheet) return [];
+  const rows = sheet.data ?? [];
+  const headerIndex = rows.findIndex((row) => row.some((value) => /^日期/.test(textValue(value))));
+  if (headerIndex < 0) return [];
+  const dateIndex = rows[headerIndex].findIndex((value) => /^日期/.test(textValue(value)));
+  const today = new Date().toISOString().slice(0, 10);
+  const result = [];
+  for (const row of rows.slice(headerIndex + 1)) {
+    const date = dateValue(row[dateIndex]);
+    if (!date || date > today) continue;
+    for (const columns of douyinStoreColumns) {
+      const metrics = metricShape({
+        gmv: numberValue(row[columns.gmv]),
+        netRevenue: numberValue(row[columns.netRevenue]),
+        spend: numberValue(row[columns.spend]),
+        refund: columns.refunds.reduce((sum, index) => sum + numberValue(row[index]), 0),
+      });
+      if (hasReportingActivity(metrics)) result.push({ date, platform: "抖音", store: columns.store, ...metrics });
+    }
+  }
+  return result;
+}
+
+function aggregateMetricRows(rows, keys) {
+  const grouped = new Map();
+  for (const row of rows) {
+    const key = keys.map((field) => String(row[field] ?? "")).join("\u0000");
+    const current = grouped.get(key) ?? { ...Object.fromEntries(keys.map((field) => [field, row[field]])), ...metricShape() };
+    addMetrics(current, row);
+    grouped.set(key, current);
+  }
+  return [...grouped.values()];
+}
+
+function dateInRange(date, start, end) {
+  return date >= start && date <= end;
+}
+
+function normalizedReportingPeriod(snapshot, range = {}) {
+  const reporting = snapshot.reporting;
+  const available = reporting.availablePeriod;
+  const defaultStart = snapshot.period?.start && snapshot.period.start >= available.start
+    ? snapshot.period.start
+    : available.start;
+  const defaultEnd = snapshot.period?.end && snapshot.period.end <= reporting.completedThrough
+    ? snapshot.period.end
+    : reporting.completedThrough;
+  const start = range.start || defaultStart;
+  const end = range.end || defaultEnd;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(start) || !/^\d{4}-\d{2}-\d{2}$/.test(end)) throw new Error("日期格式必须为 YYYY-MM-DD");
+  if (start > end) throw new Error("开始日期不能晚于结束日期");
+  if (start < available.start || end > reporting.completedThrough) {
+    throw new Error(`日期范围必须在 ${available.start} 至 ${reporting.completedThrough} 之间`);
+  }
+  return { start, end };
+}
+
+export function filterDingTalkSnapshot(snapshot, range = {}) {
+  if (!snapshot?.reporting?.dailyPlatforms?.length) return snapshot;
+  const period = normalizedReportingPeriod(snapshot, range);
+  const platformDaily = snapshot.reporting.dailyPlatforms.filter((row) => dateInRange(row.date, period.start, period.end));
+  const platformBase = aggregateMetricRows(platformDaily, ["platform"]);
+  const totalsBase = platformBase.reduce((current, row) => addMetrics(current, row), metricShape());
+  const totals = reportingMetricShape(totalsBase, 1);
+  const platforms = platformBase
+    .map((row) => reportingMetricShape(row, totals.netRevenue ? row.netRevenue / totals.netRevenue : 0))
+    .sort((left, right) => right.netRevenue - left.netRevenue);
+
+  const storeDaily = snapshot.reporting.dailyStores.filter((row) => dateInRange(row.date, period.start, period.end));
+  const offsiteSpend = snapshot.reporting.dailyOffsiteSpend
+    .filter((row) => dateInRange(row.date, period.start, period.end))
+    .reduce((sum, row) => sum + Number(row.spend || 0), 0);
+  const stores = aggregateMetricRows(storeDaily, ["platform", "store"])
+    .map((row) => ({
+      ...reportingMetricShape(row, totals.netRevenue ? row.netRevenue / totals.netRevenue : 0),
+      offsiteSpend: row.store === "麻大师旗舰店" ? offsiteSpend : 0,
+    }))
+    .sort((left, right) => right.netRevenue - left.netRevenue);
+  const daily = aggregateMetricRows(platformDaily, ["date"])
+    .map((row) => ({ date: row.date, ...reportingMetricShape(row) }))
+    .sort((left, right) => left.date.localeCompare(right.date));
+
+  return {
+    ...snapshot,
+    period,
+    totals,
+    platforms,
+    stores,
+    daily,
+    reporting: { ...snapshot.reporting, selectedPeriod: period },
+  };
 }
 
 export function buildDingTalkSnapshot(sheets) {
@@ -415,6 +535,18 @@ export function buildDingTalkSnapshot(sheets) {
     end: summary.period.end ?? daily.at(-1)?.date ?? null,
   };
   const recordCount = details.reduce((sum, detail) => sum + detail.rows, 0);
+  const reportingDetails = details.filter((detail) => detail.sheet !== "小红书推广");
+  const dailyPlatforms = aggregateMetricRows(reportingDetails.flatMap((detail) => detail.daily), ["date", "platform"])
+    .sort((left, right) => left.date.localeCompare(right.date) || left.platform.localeCompare(right.platform));
+  const genericStoreDaily = reportingDetails.flatMap((detail) => detail.daily.filter((row) => row.store));
+  const douyinStoreDaily = parseDouyinStoreDaily(sheets.find((sheet) => sheet.sheet === "抖音"));
+  const dailyStores = aggregateMetricRows([...genericStoreDaily.filter((row) => row.platform !== "抖音"), ...douyinStoreDaily], ["date", "platform", "store"])
+    .sort((left, right) => left.date.localeCompare(right.date) || left.store.localeCompare(right.store));
+  const offsiteDetail = details.find((detail) => detail.sheet === "小红书推广");
+  const dailyOffsiteSpend = aggregateMetricRows(offsiteDetail?.daily ?? [], ["date"]).map((row) => ({ date: row.date, spend: row.spend }));
+  const activeDates = [...new Set(dailyPlatforms.filter(hasReportingActivity).map((row) => row.date))].sort();
+  const availablePeriod = { start: activeDates[0] ?? null, end: activeDates.at(-1) ?? null };
+  const completedThrough = activeDates.at(-1) ?? null;
 
   return {
     source: "dingtalk_api",
@@ -428,6 +560,14 @@ export function buildDingTalkSnapshot(sheets) {
     platforms,
     stores: summary.stores.slice(0, 100),
     daily,
+    reporting: {
+      availablePeriod,
+      completedThrough,
+      selectedPeriod: null,
+      dailyPlatforms,
+      dailyStores,
+      dailyOffsiteSpend,
+    },
     inventory: sheets.map((sheet) => {
       const detail = details.find((item) => item.sheet === sheet.sheet);
       return {
