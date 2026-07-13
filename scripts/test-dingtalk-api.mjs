@@ -1,5 +1,13 @@
 import assert from "node:assert/strict";
-import { buildDingTalkSnapshot, filterDingTalkSnapshot } from "../server/dingtalk-api.mjs";
+import { readFileSync } from "node:fs";
+import { buildDingTalkSnapshot, checkDingTalkApi, filterDingTalkSnapshot } from "../server/dingtalk-api.mjs";
+
+assert.deepEqual(checkDingTalkApi().schedule, ["10:00", "12:30", "17:30"], "API 应返回新的每日三次同步计划");
+assert.match(
+  readFileSync(new URL("./register-dingtalk-schedule.ps1", import.meta.url), "utf8"),
+  /\[string\[\]\]\$Times = @\("10:00", "12:30", "17:30"\)/,
+  "Windows 计划任务注册脚本应默认创建三个新时间点",
+);
 
 function rowWithColumns(entries) {
   const row = [];
