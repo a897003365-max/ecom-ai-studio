@@ -67,4 +67,45 @@ assert.equal(filtered.stores.find((item) => item.store === "麻大师旗舰店")
 assert.equal(filtered.stores.find((item) => item.store === "抖音1").gmv, 300);
 assert.equal(filtered.stores.find((item) => item.store === "抖音1").refund, 50);
 assert.equal(filtered.daily.length, 1);
+
+const businessRuleSnapshot = structuredClone(snapshot);
+const tmallPlatformRow = businessRuleSnapshot.reporting.dailyPlatforms.find(
+  (item) => item.date === "2024-12-02" && item.platform === "天猫",
+);
+const tmallStoreRow = businessRuleSnapshot.reporting.dailyStores.find(
+  (item) => item.date === "2024-12-02" && item.platform === "天猫",
+);
+businessRuleSnapshot.reporting.dailyPlatforms.push({
+  ...tmallPlatformRow,
+  platform: "崔氏家具",
+  gmv: 100,
+  netRevenue: 80,
+  spend: 10,
+  refund: 20,
+});
+businessRuleSnapshot.reporting.dailyStores.push({
+  ...tmallStoreRow,
+  platform: "拼多多",
+});
+businessRuleSnapshot.reporting.dailyOffsiteSpend = [{ date: "2024-12-02", spend: 12 }];
+
+const businessRuleFiltered = filterDingTalkSnapshot(businessRuleSnapshot, {
+  start: "2024-12-02",
+  end: "2024-12-02",
+});
+assert.equal(
+  businessRuleFiltered.platforms.some((item) => item.platform === "崔氏家具"),
+  false,
+  "崔氏家具应并入天猫渠道",
+);
+assert.equal(businessRuleFiltered.platforms.find((item) => item.platform === "天猫").gmv, 500);
+assert.equal(
+  businessRuleFiltered.stores.find((item) => item.platform === "天猫" && item.store === "麻大师旗舰店").offsiteSpend,
+  12,
+);
+assert.equal(
+  businessRuleFiltered.stores.find((item) => item.platform === "拼多多" && item.store === "麻大师旗舰店").offsiteSpend,
+  0,
+  "小红书推广费只能归入天猫麻大师旗舰店",
+);
 console.log("dingtalk-api parser: ok");
