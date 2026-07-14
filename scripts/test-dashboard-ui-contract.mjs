@@ -18,7 +18,7 @@ assert.match(analytics, /aria-label="筛选图表渠道"/, "月度概览缺少�
 assert.match(analytics, /selectedChannel=/, "渠道筛选未传递到月度图表");
 assert.match(revenueChart, /selectedChannel/, "渠道回款图未实现渠道联动");
 assert.match(monthlyOverview, /数据来源：共享表格/, "月度概览数据来源文案未更新");
-assert.match(styles, /animation:\s*ticker-scroll 144s linear infinite/, "经营播报滚动速度未降低一半");
+assert.match(styles, /animation:\s*ticker-scroll 288s linear infinite/, "经营播报滚动速度未降低一半");
 assert.doesNotMatch(analytics, /经营比率趋势/, "旧经营比率趋势模块仍然存在");
 
 console.log("dashboard-ui contract: ok");
