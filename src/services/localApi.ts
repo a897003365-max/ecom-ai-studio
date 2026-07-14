@@ -27,6 +27,15 @@ export function syncDataSource(source: "warehouse" | "feishu" | "dingtalk") {
   return request<{ runId: string; snapshot: unknown }>(`/api/sync/${source}`, { method: "POST" });
 }
 
+export function syncAnalyticsData() {
+  return request<{
+    status: "success" | "partial" | "failed";
+    runs: Array<{ runId: string; sourceId: string; recordCount: number }>;
+    failures: Array<{ sourceId: string; detail: string }>;
+    dataStatus: unknown;
+  }>("/api/sync/analytics", { method: "POST" });
+}
+
 export function getPersistedTasks() {
   return request<{ tasks: QueueTask[] }>("/api/tasks");
 }

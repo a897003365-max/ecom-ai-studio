@@ -6,6 +6,7 @@ import { createServer as createViteServer } from "vite";
 import { parseDingTalkFile } from "./dingtalk.mjs";
 import { checkDingTalkApi, filterDingTalkSnapshot, syncDingTalkApi } from "./dingtalk-api.mjs";
 import { checkFeishu, sheetInventory, syncFeishu } from "./feishu.mjs";
+import { buildDashboardDataStatus } from "./dashboard-status.mjs";
 import { checkWarehouse, readWarehouseSnapshot, syncWarehouse } from "./warehouse.mjs";
 import {
   beginSync,
@@ -203,6 +204,57 @@ async function syncSource(sourceId) {
   }
 }
 
+function dashboardDataStatus({ dingtalk, warehouse }) {
+  return buildDashboardDataStatus({
+    dingtalk: dingtalk
+      ? {
+        completedThrough: dingtalk.reporting?.completedThrough || dingtalk.period?.end,
+        quality: { anomalyCount: dingtalk.quality?.anomalyCount || 0 },
+      }
+      : null,
+    warehouse: warehouse
+      ? {
+        periodEnd: warehouse.powerbiPages?.period?.end || warehouse.period?.end,
+        quality: warehouse.quality,
+      }
+      : null,
+  });
+}
+
+let activeDashboardSync = null;
+
+async function syncDashboardSources() {
+  if (activeDashboardSync) return activeDashboardSync;
+  activeDashboardSync = (async () => {
+    const results = await Promise.allSettled([syncSource("dingtalk"), syncSource("warehouse")]);
+    const [dingtalkResult, warehouseResult] = results;
+    const dingtalk = dingtalkResult.status === "fulfilled"
+      ? dingtalkResult.value.snapshot
+      : latestSnapshot("dingtalk")?.snapshot ?? null;
+    const warehouse = warehouseResult.status === "fulfilled"
+      ? warehouseResult.value.snapshot
+      : await readWarehouseSnapshot();
+    const runs = [];
+    if (dingtalkResult.status === "fulfilled") runs.push({ runId: dingtalkResult.value.runId, sourceId: "dingtalk", recordCount: dingtalkResult.value.snapshot.recordCount ?? 0 });
+    if (warehouseResult.status === "fulfilled") runs.push({ runId: warehouseResult.value.runId, sourceId: "warehouse", recordCount: warehouseResult.value.snapshot.recordCount ?? 0 });
+    const failures = results
+      .map((result, index) => result.status === "rejected" ? { sourceId: index === 0 ? "dingtalk" : "warehouse", detail: errorMessage(result.reason) } : null)
+      .filter(Boolean);
+    return {
+      status: failures.length ? (runs.length ? "partial" : "failed") : "success",
+      runs,
+      failures,
+      detail: "钉钉经营数据 + 本地数仓（含 PowerBI 独有模块）",
+      dataStatus: dashboardDataStatus({ dingtalk, warehouse }),
+    };
+  })();
+  try {
+    return await activeDashboardSync;
+  } finally {
+    activeDashboardSync = null;
+  }
+}
+
 async function handleApi(request, response, url) {
   const path = url.pathname;
   if (request.method === "GET" && path === "/api/health") {
@@ -213,6 +265,7 @@ async function handleApi(request, response, url) {
   }
   if (request.method === "GET" && path === "/api/analytics") {
     const dingtalkSnapshot = latestSnapshot("dingtalk")?.snapshot ?? null;
+    const warehouse = await readWarehouseSnapshot();
     const dingtalk = dingtalkSnapshot
       ? filterDingTalkSnapshot(dingtalkSnapshot, {
         start: url.searchParams.get("start") || undefined,
@@ -220,11 +273,15 @@ async function handleApi(request, response, url) {
       })
       : null;
     return sendJson(response, 200, {
-      warehouse: await readWarehouseSnapshot(),
+      warehouse,
       feishu: latestSnapshot("feishu")?.snapshot ?? null,
       dingtalk,
+      dataStatus: dashboardDataStatus({ dingtalk: dingtalkSnapshot, warehouse }),
       history: listSyncRuns(12),
     });
+  }
+  if (request.method === "POST" && path === "/api/sync/analytics") {
+    return sendJson(response, 200, await syncDashboardSources());
   }
   if (request.method === "POST" && path === "/api/sync/warehouse") {
     return sendJson(response, 200, await syncSource("warehouse"));

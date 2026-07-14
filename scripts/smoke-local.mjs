@@ -54,6 +54,8 @@ assert(
   "月度渠道目标未从本地数仓排除",
 );
 assert(analytics.dingtalk?.recordCount > 0, "钉钉同步快照为空");
+assert(["green", "orange"].includes(analytics.dataStatus?.tone), "运营看板数据完整性状态缺失");
+assert(typeof analytics.dataStatus?.expectedDate === "string", "运营看板 T-1 检查日期缺失");
 assert(filteredAnalytics.dingtalk?.period?.start === "2026-07-10", "日期筛选未更新钉钉开始日期");
 assert(filteredAnalytics.dingtalk?.period?.end === "2026-07-10", "日期筛选未更新钉钉结束日期");
 assert(filteredAnalytics.dingtalk?.daily?.length === 1, "日期筛选未联动经营趋势");

@@ -10,7 +10,7 @@ import { PlatformBadge } from "../components/PlatformBadge";
 import { PowerBiReplica } from "../components/PowerBiReplica";
 import { StatusTag } from "../components/StatusTag";
 import { TableShell } from "../components/TableShell";
-import { getAnalyticsData, syncDataSource } from "../services/localApi";
+import { getAnalyticsData, syncAnalyticsData } from "../services/localApi";
 import type { KpiMetric, Platform, RegenerationSuggestion } from "../types";
 import type { AnalyticsIntegrationPayload, DingTalkMetricTotals, DingTalkSnapshot } from "../types/integration";
 
@@ -67,7 +67,7 @@ function dateTime(value?: string | null) {
 export function AnalyticsPage({ onAction }: AnalyticsPageProps) {
   const [integration, setIntegration] = useState<AnalyticsIntegrationPayload | null>(null);
   const [loading, setLoading] = useState(true);
-  const [syncing, setSyncing] = useState<"warehouse" | "feishu" | "dingtalk" | null>(null);
+  const [syncing, setSyncing] = useState<"analytics" | "warehouse" | "feishu" | "dingtalk" | null>(null);
   const [error, setError] = useState("");
   const [selectedChannel, setSelectedChannel] = useState("all");
 
@@ -89,6 +89,10 @@ export function AnalyticsPage({ onAction }: AnalyticsPageProps) {
 
   const dingtalk = integration?.dingtalk ?? null;
   const reporting = dingtalk?.reporting;
+  const globalPeriod = dingtalk?.period.start && dingtalk.period.end
+    ? { start: dingtalk.period.start, end: dingtalk.period.end }
+    : null;
+  const dataStatus = integration?.dataStatus;
   const metrics = dingtalk ? liveKpis(dingtalk) : [];
   const platforms = useMemo(() => (dingtalk?.platforms ?? []).map(withBusinessRates), [dingtalk]);
   const stores = useMemo(() => (dingtalk?.stores ?? []).map(withBusinessRates), [dingtalk]);
@@ -104,16 +108,21 @@ export function AnalyticsPage({ onAction }: AnalyticsPageProps) {
   const highestFeeStore = [...stores].sort((left, right) => right.feeRate - left.feeRate)[0];
   const leadingChannel = [...platforms].sort((left, right) => (right.channelShare || 0) - (left.channelShare || 0))[0];
 
-  async function sync(source: "warehouse" | "feishu" | "dingtalk") {
-    setSyncing(source);
-    onAction("开始同步", source === "dingtalk" ? "正在读取钉钉经营表并重建按日渠道、店铺聚合" : "正在更新本地数据源");
+  async function syncDashboard() {
+    setSyncing("analytics");
+    onAction("开始同步", "正在同步钉钉经营数据与本地数仓（含 PowerBI 独有模块）");
     try {
-      await syncDataSource(source);
-      const currentPeriod = dingtalk?.period.start && dingtalk.period.end ? { start: dingtalk.period.start, end: dingtalk.period.end } : undefined;
-      await loadAnalytics(source === "dingtalk" ? undefined : currentPeriod);
-      onAction("同步完成", source === "dingtalk" ? "钉钉经营口径与日期范围已更新" : "本地数据源已更新");
+      const syncResult = await syncAnalyticsData();
+      await loadAnalytics();
+      if (syncResult.status === "partial") {
+        onAction("同步完成（部分）", `已更新 ${syncResult.runs.map((item) => item.sourceId === "dingtalk" ? "钉钉" : "本地数仓").join("、")}；${syncResult.failures.map((item) => `${item.sourceId === "dingtalk" ? "钉钉" : "本地数仓"}：${item.detail}`).join("；")}`);
+      } else if (syncResult.status === "failed") {
+        onAction("同步失败", syncResult.failures.map((item) => item.detail).join("；") || "钉钉与本地数仓均未更新");
+      } else {
+        onAction("同步完成", "钉钉与本地数仓均已更新，PowerBI 独有模块已纳入");
+      }
     } catch (syncError) {
-      onAction("同步失败", syncError instanceof Error ? syncError.message : "本地数据源不可用");
+      onAction("同步失败", syncError instanceof Error ? syncError.message : "钉钉或本地数仓不可用");
     } finally {
       setSyncing(null);
     }
@@ -126,8 +135,8 @@ export function AnalyticsPage({ onAction }: AnalyticsPageProps) {
         subtitle={`每日同步计划 ${dingtalk?.schedule?.join(" / ") || "10:00 / 12:30 / 17:30"} · 最近同步 ${dateTime(latestSync)}`}
         actions={
           <>
-            <button className="btn" disabled={syncing !== null} onClick={() => void sync("dingtalk")} type="button">
-              {syncing === "dingtalk" ? "同步中..." : "同步钉钉"}
+            <button className="btn" disabled={syncing !== null} onClick={() => void syncDashboard()} type="button">
+              {syncing === "analytics" ? "同步中..." : "同步数据"}
             </button>
             {dingtalk && reporting && (
               <AnalyticsDateFilter
@@ -135,8 +144,19 @@ export function AnalyticsPage({ onAction }: AnalyticsPageProps) {
                 completedThrough={reporting.completedThrough}
                 loading={loading}
                 onApply={loadAnalytics}
-                period={dingtalk.period as { start: string; end: string }}
+                period={globalPeriod ?? { start: reporting.availablePeriod.start, end: reporting.completedThrough }}
               />
+            )}
+            {dataStatus && (
+              <span
+                aria-label={`${dataStatus.label}，检查日期 ${dataStatus.expectedDate}`}
+                className={`dashboard-data-status is-${dataStatus.tone}`}
+                data-testid="dashboard-data-status"
+                title={dataStatus.missing.length ? dataStatus.missing.join("；") : `所有应更新的 T-1 数据已完成同步（${dataStatus.expectedDate}）`}
+              >
+                <i aria-hidden="true" />
+                {dataStatus.tone === "green" ? "T-1 已更新" : "数据缺失"}
+              </span>
             )}
           </>
         }
@@ -147,7 +167,7 @@ export function AnalyticsPage({ onAction }: AnalyticsPageProps) {
       {loading && !dingtalk ? (
         <Card><div className="py-16 text-center text-sm text-[var(--muted)]">正在读取钉钉经营数据...</div></Card>
       ) : dingtalk ? (
-        <PowerBiReplica dingtalk={dingtalk} warehouse={integration?.warehouse ?? null} overview={<>
+        <PowerBiReplica dingtalk={dingtalk} period={globalPeriod} warehouse={integration?.warehouse ?? null} overview={<>
           {reporting?.latestComparison && (
             <div className="mb-5" data-testid="comparison-ticker"><ComparisonTicker comparison={reporting.latestComparison} /></div>
           )}
@@ -214,7 +234,7 @@ export function AnalyticsPage({ onAction }: AnalyticsPageProps) {
           </Card>
         </>} />
       ) : (
-        <Card><div className="py-16 text-center text-sm text-[var(--muted)]">钉钉经营数据尚未同步，请先点击“同步钉钉”。</div></Card>
+        <Card><div className="py-16 text-center text-sm text-[var(--muted)]">钉钉经营数据尚未同步，请先点击“同步数据”。</div></Card>
       )}
     </div>
   );

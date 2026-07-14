@@ -67,6 +67,7 @@ select {
   color: var(--text);
   background-color: var(--panel-solid);
   color-scheme: dark;
+  accent-color: var(--brand);
 }
 
 select option {
@@ -454,7 +455,32 @@ select option:disabled {
 
   .comparison-ticker-track {
     @apply flex w-max items-stretch;
-    animation: ticker-scroll 144s linear infinite;
+    animation: ticker-scroll 288s linear infinite;
+  }
+
+  .dashboard-data-status {
+    @apply inline-flex min-h-8 items-center gap-1.5 rounded-[5px] border px-2.5 py-1.5 text-[11px] font-bold;
+    white-space: nowrap;
+  }
+
+  .dashboard-data-status i {
+    width: 7px;
+    height: 7px;
+    border-radius: 999px;
+    background: currentColor;
+    box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 14%, transparent);
+  }
+
+  .dashboard-data-status.is-green {
+    border-color: rgba(133, 216, 63, 0.45);
+    color: var(--green);
+    background: var(--green-bg);
+  }
+
+  .dashboard-data-status.is-orange {
+    border-color: rgba(243, 182, 63, 0.55);
+    color: var(--orange);
+    background: var(--orange-bg);
   }
 
   .comparison-ticker:hover .comparison-ticker-track {
@@ -873,6 +899,12 @@ select option:disabled {
   background: var(--panel-solid);
   color: var(--text);
   color-scheme: dark;
+}
+
+.pb-follow-global-date {
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
 }
 
 .pb-page-heading {

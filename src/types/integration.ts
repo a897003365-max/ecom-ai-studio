@@ -399,10 +399,18 @@ export interface DingTalkSnapshot {
   recordCount: number;
 }
 
+export interface DashboardDataStatus {
+  expectedDate: string;
+  tone: "green" | "orange";
+  label: string;
+  missing: string[];
+}
+
 export interface AnalyticsIntegrationPayload {
   warehouse: WarehouseSnapshot | null;
   feishu: FeishuSnapshot | null;
   dingtalk: DingTalkSnapshot | null;
+  dataStatus: DashboardDataStatus;
   history: Array<{
     id: string;
     sourceId: string;

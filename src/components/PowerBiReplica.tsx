@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { BarChart3, CalendarDays, Database, Search, Table2 } from "lucide-react";
+import { BarChart3, Database, Search, Table2 } from "lucide-react";
 import type {
   DingTalkSnapshot,
   PowerBiOverallDaily,
@@ -12,11 +12,13 @@ import { clsx } from "../utils/format";
 
 type Workspace = "overview" | "diagnosis";
 type ReplicaPage = "overall" | "promotion" | "product";
+type DatePeriod = { start: string; end: string };
 
 interface PowerBiReplicaProps {
   overview: ReactNode;
   warehouse: WarehouseSnapshot | null;
   dingtalk: DingTalkSnapshot;
+  period?: DatePeriod | null;
 }
 
 const moneyFormat = new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 1 });
@@ -121,22 +123,6 @@ function SourceBar({ pages, dingtalk }: { pages: PowerBiPages; dingtalk: DingTal
       <span className="is-dingtalk">钉钉经营口径 <b>{dingtalk.period.start} 至 {dingtalk.period.end}</b></span>
       <small>本地源文件 → Polars → DuckDB，无 PowerBI/MCP 运行时依赖</small>
     </div>
-  );
-}
-
-function DateRange({ start, end, available, onChange }: {
-  start: string;
-  end: string;
-  available: { start: string; end: string };
-  onChange: (next: { start: string; end: string }) => void;
-}) {
-  return (
-    <label className="pb-date-range">
-      <CalendarDays size={14} />
-      <input aria-label="PowerBI 开始日期" max={end} min={available.start} onChange={(event) => onChange({ start: event.target.value, end })} type="date" value={start} />
-      <span>至</span>
-      <input aria-label="PowerBI 结束日期" max={available.end} min={start} onChange={(event) => onChange({ start, end: event.target.value })} type="date" value={end} />
-    </label>
   );
 }
 
@@ -249,7 +235,7 @@ function ProductPromotionPage({ pages, start, end }: { pages: PowerBiPages; star
   );
 }
 
-function GrowthDiagnosis({ warehouse, dingtalk }: { warehouse: WarehouseSnapshot; dingtalk: DingTalkSnapshot }) {
+function GrowthDiagnosis({ warehouse, dingtalk, globalPeriod }: { warehouse: WarehouseSnapshot; dingtalk: DingTalkSnapshot; globalPeriod?: DatePeriod | null }) {
   const pages = warehouse.powerbiPages;
   const [page, setPage] = useState<ReplicaPage>("overall");
   const defaultPeriod = useMemo(() => {
@@ -257,15 +243,22 @@ function GrowthDiagnosis({ warehouse, dingtalk }: { warehouse: WarehouseSnapshot
     const monthStart = `${pages.period.end.slice(0, 8)}01`;
     return { start: pages.period.start > monthStart ? pages.period.start : monthStart, end: pages.period.end };
   }, [pages.period]);
-  const [period, setPeriod] = useState(defaultPeriod);
-  useEffect(() => setPeriod(defaultPeriod), [defaultPeriod]);
-  if (!pages.period || !period) return <div className="pb-empty">本地 PowerBI 独有数据尚未生成，请先同步本地数仓。</div>;
+  const period = useMemo(() => {
+    if (!pages.period) return null;
+    const requested = globalPeriod ?? defaultPeriod;
+    if (!requested) return null;
+    const start = requested.start > pages.period.start ? requested.start : pages.period.start;
+    const end = requested.end < pages.period.end ? requested.end : pages.period.end;
+    return start <= end ? { start, end } : null;
+  }, [defaultPeriod, globalPeriod, pages.period]);
+  if (!pages.period) return <div className="pb-empty">本地 PowerBI 独有数据尚未生成，请先同步本地数仓。</div>;
+  if (!period) return <div className="pb-empty">当前页面日期范围与 PowerBI 本地数据范围没有交集，请调整日期筛选。</div>;
   return (
     <div className="pb-replica-canvas">
       <SourceBar dingtalk={dingtalk} pages={pages} />
       <div className="pb-replica-toolbar">
         <nav>{([{ id: "overall", label: "旗舰店整体", icon: BarChart3 }, { id: "promotion", label: "推广费用明细", icon: Table2 }, { id: "product", label: "商品推广费用", icon: Database }] as const).map((item) => <button className={page === item.id ? "is-active" : ""} key={item.id} onClick={() => setPage(item.id)} type="button"><item.icon size={14} />{item.label}</button>)}</nav>
-        <DateRange available={pages.period} end={period.end} onChange={setPeriod} start={period.start} />
+        <span className="pb-follow-global-date">跟随页面日期：{period.start} 至 {period.end}</span>
       </div>
       <header className="pb-page-heading"><div><small>POWERBI LAYOUT REPLICA</small><h2>{page === "overall" ? "天猫旗舰店整体数据" : page === "promotion" ? "天猫推广费用明细" : "天猫商品推广费用"}</h2></div><span>1280×720 原始比例 · 网页响应式适配</span></header>
       {page === "overall" ? <OverallPage dingtalk={dingtalk} end={period.end} pages={pages} start={period.start} /> : page === "promotion" ? <PromotionPage end={period.end} pages={pages} start={period.start} /> : <ProductPromotionPage end={period.end} pages={pages} start={period.start} />}
@@ -273,7 +266,7 @@ function GrowthDiagnosis({ warehouse, dingtalk }: { warehouse: WarehouseSnapshot
   );
 }
 
-export function PowerBiReplica({ overview, warehouse, dingtalk }: PowerBiReplicaProps) {
+export function PowerBiReplica({ overview, warehouse, dingtalk, period }: PowerBiReplicaProps) {
   const [workspace, setWorkspace] = useState<Workspace>("overview");
   return (
     <section data-testid="powerbi-replica">
@@ -281,7 +274,7 @@ export function PowerBiReplica({ overview, warehouse, dingtalk }: PowerBiReplica
         <button aria-selected={workspace === "overview"} className={workspace === "overview" ? "is-active" : ""} onClick={() => setWorkspace("overview")} role="tab" type="button">经营概览</button>
         <button aria-selected={workspace === "diagnosis"} className={workspace === "diagnosis" ? "is-active" : ""} onClick={() => setWorkspace("diagnosis")} role="tab" type="button">增长诊断</button>
       </div>
-      {workspace === "overview" ? overview : warehouse?.powerbiPages ? <GrowthDiagnosis dingtalk={dingtalk} warehouse={warehouse} /> : <div className="pb-empty">正在等待 PowerBI 本地数仓快照…</div>}
+      {workspace === "overview" ? overview : warehouse?.powerbiPages ? <GrowthDiagnosis dingtalk={dingtalk} globalPeriod={period} warehouse={warehouse} /> : <div className="pb-empty">正在等待 PowerBI 本地数仓快照…</div>}
     </section>
   );
 }
