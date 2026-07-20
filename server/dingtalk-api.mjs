@@ -5,8 +5,9 @@ const chunkRows = 150;
 const maxColumn = "BG";
 const maxChunks = 10;
 const maxAttempts = 6;
-const retryableStatuses = new Set([502, 503, 504]);
+const retryableStatuses = new Set([500, 502, 503, 504]);
 const ignoredDetailSheets = new Set(["全渠道数据表", "销售目标", "店铺名称对照表"]);
+const requestTimeoutMs = Math.max(10_000, Math.min(120_000, Number(readLocalEnv("DINGTALK_API_TIMEOUT_MS", "45000")) || 45_000));
 
 let tokenCache = null;
 
@@ -57,6 +58,7 @@ async function getAccessToken(force = false, attempt = 0) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ appKey, appSecret }),
+      signal: AbortSignal.timeout(requestTimeoutMs),
     });
   } catch (error) {
     if (attempt >= maxAttempts - 1) throw error;
@@ -83,6 +85,7 @@ async function request(path, { attempt = 0 } = {}) {
   try {
     response = await fetch(`${baseUrl}${path}`, {
       headers: { "x-acs-dingtalk-access-token": token },
+      signal: AbortSignal.timeout(requestTimeoutMs),
     });
   } catch (error) {
     if (attempt >= maxAttempts - 1) throw error;
@@ -337,31 +340,61 @@ function parseSummarySheet(rows) {
   return { period, monthly, platforms, stores, totals };
 }
 
-function parseTargets(rows, monthNumber) {
+function parseTargets(rows, selectedDate) {
   const headerIndex = rows.findIndex((row) => row.map(normalizedHeader).includes("渠道") && row.map(normalizedHeader).includes("店铺"));
-  if (headerIndex < 0) return { byPlatform: new Map(), total: 0, monthlyTotals: {} };
+  if (headerIndex < 0) return { byPlatform: new Map(), total: 0, monthlyTotals: {}, targetYears: [] };
   const headers = rows[headerIndex].map(textValue);
-  const monthIndex = headers.findIndex((value) => value === `${monthNumber}月`);
-  if (monthIndex < 0) return { byPlatform: new Map(), total: 0, monthlyTotals: {} };
-  const byPlatform = new Map();
-  const monthlyTotals = {};
-  let total = 0;
-  for (const row of rows.slice(headerIndex + 1)) {
-    const label = textValue(row[0]);
-    if (!label) continue;
-    const value = numberValue(row[monthIndex]);
-    if (/总计|合计/.test(label)) {
-      total = value;
-      for (let month = 1; month <= 12; month += 1) {
-        const index = headers.findIndex((header) => header === `${month}月`);
-        monthlyTotals[String(month).padStart(2, "0")] = index >= 0 ? numberValue(row[index]) : 0;
-      }
+  const monthColumns = headers
+    .map((value, index) => {
+      const match = value.match(/^(\d{1,2})月$/);
+      return match ? { index, month: match[1].padStart(2, "0") } : null;
+    })
+    .filter(Boolean);
+  const totalRowIndex = rows.findIndex((row, index) => index > headerIndex && /总计|合计/.test(textValue(row[0])));
+  if (totalRowIndex < 0 || !monthColumns.length) return { byPlatform: new Map(), total: 0, monthlyTotals: {}, targetYears: [] };
+
+  const targetMonthByColumn = new Map();
+  const alignedYears = [];
+  for (const column of monthColumns) {
+    for (const row of rows.slice(totalRowIndex + 1)) {
+      const date = dateValue(row[column.index]);
+      if (date?.slice(5, 7) !== column.month) continue;
+      targetMonthByColumn.set(column.index, date.slice(0, 7));
+      alignedYears.push(date.slice(0, 4));
       break;
     }
+  }
+  const distinctYears = [...new Set(alignedYears)];
+  if (distinctYears.length === 1) {
+    for (const column of monthColumns) {
+      if (!targetMonthByColumn.has(column.index)) {
+        targetMonthByColumn.set(column.index, `${distinctYears[0]}-${column.month}`);
+      }
+    }
+  }
+
+  const monthlyTotals = {};
+  const totalRow = rows[totalRowIndex];
+  for (const column of monthColumns) {
+    const targetMonth = targetMonthByColumn.get(column.index);
+    if (targetMonth && !isBlank(totalRow[column.index])) monthlyTotals[targetMonth] = numberValue(totalRow[column.index]);
+  }
+
+  const selectedMonth = String(selectedDate || "").slice(0, 7);
+  const selectedColumn = monthColumns.find((column) => targetMonthByColumn.get(column.index) === selectedMonth);
+  const targetYears = [...new Set(Object.keys(monthlyTotals).map((month) => month.slice(0, 4)))].sort();
+  if (!selectedColumn || !(selectedMonth in monthlyTotals)) return { byPlatform: new Map(), total: 0, monthlyTotals, targetYears };
+
+  const byPlatform = new Map();
+  for (const row of rows.slice(headerIndex + 1, totalRowIndex)) {
+    const label = textValue(row[0]);
+    if (!label) continue;
+    const value = numberValue(row[selectedColumn.index]);
     const platform = platformName(label);
     byPlatform.set(platform, (byPlatform.get(platform) || 0) + value);
   }
-  return { byPlatform, total, monthlyTotals };
+  const total = numberValue(totalRow[selectedColumn.index]);
+  return { byPlatform, total, monthlyTotals, targetYears };
 }
 
 function detailMetricIndexes(headers) {
@@ -466,6 +499,19 @@ function shiftYear(date, offset) {
   return value.toISOString().slice(0, 10);
 }
 
+function shiftMonth(date, offset) {
+  const [year, month, day] = String(date).split("-").map(Number);
+  const first = new Date(Date.UTC(year, month - 1 + offset, 1));
+  const lastDay = new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth() + 1, 0)).getUTCDate();
+  const value = new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth(), Math.min(day, lastDay)));
+  return value.toISOString().slice(0, 10);
+}
+
+function endOfMonth(month) {
+  const [year, monthNumber] = month.split("-").map(Number);
+  return new Date(Date.UTC(year, monthNumber, 0)).toISOString().slice(0, 10);
+}
+
 function shiftDay(date, offset) {
   const value = new Date(`${date}T00:00:00Z`);
   value.setUTCDate(value.getUTCDate() + offset);
@@ -522,6 +568,23 @@ function buildLatestComparison(snapshot) {
   return { asOf, previousDate, channels, stores };
 }
 
+function targetForMonth(snapshot, month) {
+  const targets = snapshot.reporting.monthlyTargets ?? {};
+  if (Object.hasOwn(targets, month)) return Number(targets[month] || 0);
+
+  const targetKeys = Object.keys(targets);
+  const legacyMonthKeys = targetKeys.length > 0 && targetKeys.every((key) => /^\d{2}$/.test(key));
+  const legacyTargetYear = snapshot.reporting.targetYears?.length === 1
+    ? snapshot.reporting.targetYears[0]
+    : snapshot.reporting.completedThrough?.slice(0, 4);
+  if (legacyMonthKeys && legacyTargetYear && month.startsWith(`${legacyTargetYear}-`)) {
+    return Number(targets[month.slice(5, 7)] || 0);
+  }
+
+  if (month === snapshot.reporting.completedThrough?.slice(0, 7)) return Number(snapshot.totals.target || 0);
+  return 0;
+}
+
 function buildMonthlyOverview(snapshot, end) {
   const month = end.slice(0, 7);
   const monthNumber = end.slice(5, 7);
@@ -535,13 +598,22 @@ function buildMonthlyOverview(snapshot, end) {
     .reduce((sum, row) => sum + Number(row.spend || 0), 0);
   const priorStart = shiftYear(start, -1);
   const priorEnd = shiftYear(end, -1);
-  const priorYearNetRevenue = snapshot.reporting.dailyPlatforms
-    .filter((row) => dateInRange(row.date, priorStart, priorEnd))
+  const priorMonthEnd = endOfMonth(priorStart.slice(0, 7));
+  const priorYearRows = snapshot.reporting.dailyPlatforms
+    .filter((row) => dateInRange(row.date, priorStart, priorMonthEnd));
+  const priorYearNetRevenue = priorYearRows
+    .filter((row) => row.date <= priorEnd)
     .reduce((sum, row) => sum + Number(row.netRevenue || 0), 0);
-  const target = Number(snapshot.reporting.monthlyTargets?.[monthNumber]
-    || (month === snapshot.reporting.completedThrough.slice(0, 7) ? snapshot.totals.target : 0)
-    || 0);
-  const sourceSummary = end === snapshot.reporting.completedThrough
+  const priorYearDailyMap = new Map(aggregateMetricRows(priorYearRows, ["date"])
+    .map((row) => [row.date, Number(row.netRevenue || 0)]));
+  const priorYearDaily = dateSequence(priorStart, priorMonthEnd).map((date) => ({
+    date,
+    netRevenue: Number(priorYearDailyMap.get(date) || 0),
+  }));
+  const priorYearFullMonthNetRevenue = priorYearDaily
+    .reduce((sum, row) => sum + row.netRevenue, 0);
+  const target = targetForMonth(snapshot, month);
+  const sourceSummary = end === snapshot.period?.end
     && snapshot.monthly?.month === `${Number(monthNumber)}月`;
   const sourceNetRevenue = Number(snapshot.monthly?.netRevenue || 0);
   const sourceYoy = Number(snapshot.monthly?.yoy || 0);
@@ -555,7 +627,7 @@ function buildMonthlyOverview(snapshot, end) {
     offsiteFeeRate: Number(snapshot.monthly?.offsiteFeeRate || (sourceNetRevenue ? snapshot.monthly?.offsiteSpend / sourceNetRevenue : 0)),
     totalFeeRate: Number(snapshot.monthly?.totalSpendRate || (sourceNetRevenue ? (snapshot.monthly?.onsiteSpend + snapshot.monthly?.offsiteSpend) / sourceNetRevenue : 0)),
     target,
-    completionRate: Number(snapshot.monthly?.completionRate || (target ? sourceNetRevenue / target : 0)),
+    completionRate: target ? Number(snapshot.monthly?.completionRate || sourceNetRevenue / target) : 0,
   } : {
     netRevenue: current.netRevenue,
     priorYearNetRevenue,
@@ -586,8 +658,58 @@ function buildMonthlyOverview(snapshot, end) {
     period: { start, end },
     metrics,
     daily,
+    priorYearDaily,
+    priorYearFullMonthNetRevenue,
     source: sourceSummary ? "全渠道数据表第2-3行及其跨表依赖" : "按筛选结束日期重算的跨渠道日明细",
   };
+}
+
+function buildMonthlyAchievement(snapshot, end) {
+  const selectedMonth = end.slice(0, 7);
+  return Array.from({ length: 12 }, (_, index) => {
+    const month = shiftMonth(`${selectedMonth}-01`, index - 11).slice(0, 7);
+    const monthEnd = month === selectedMonth ? end : endOfMonth(month);
+    const metrics = buildMonthlyOverview(snapshot, monthEnd).metrics;
+    return {
+      month,
+      netRevenue: metrics.netRevenue,
+      target: metrics.target,
+      completionRate: metrics.completionRate,
+    };
+  });
+}
+
+function aggregateReportingPeriod(snapshot, period) {
+  const rows = snapshot.reporting.dailyPlatforms
+    .filter((row) => dateInRange(row.date, period.start, period.end))
+    .map((row) => ({ ...row, platform: platformName(row.platform) }));
+  if (!rows.length) return null;
+  return reportingMetricShape(rows.reduce((total, row) => addMetrics(total, row), metricShape()));
+}
+
+function buildMetricTrends(snapshot, period) {
+  const current = aggregateReportingPeriod(snapshot, period) ?? reportingMetricShape();
+  const previous = aggregateReportingPeriod(snapshot, {
+    start: shiftMonth(period.start, -1),
+    end: shiftMonth(period.end, -1),
+  });
+  const priorYear = aggregateReportingPeriod(snapshot, {
+    start: shiftYear(period.start, -1),
+    end: shiftYear(period.end, -1),
+  });
+  return Object.fromEntries([
+    "gmv",
+    "netRevenue",
+    "recoveryRate",
+    "addToCart",
+    "spend",
+    "feeRate",
+    "refund",
+    "refundRate",
+  ].map((key) => [key, {
+    yoy: priorYear ? comparisonChange(current[key], priorYear[key]) : null,
+    mom: previous ? comparisonChange(current[key], previous[key]) : null,
+  }]));
 }
 
 function normalizedReportingPeriod(snapshot, range = {}) {
@@ -596,9 +718,7 @@ function normalizedReportingPeriod(snapshot, range = {}) {
   const defaultStart = snapshot.period?.start && snapshot.period.start >= available.start
     ? snapshot.period.start
     : available.start;
-  const defaultEnd = snapshot.period?.end && snapshot.period.end <= reporting.completedThrough
-    ? snapshot.period.end
-    : reporting.completedThrough;
+  const defaultEnd = reporting.completedThrough || snapshot.period?.end;
   const start = range.start || defaultStart;
   const end = range.end || defaultEnd;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(start) || !/^\d{4}-\d{2}-\d{2}$/.test(end)) throw new Error("日期格式必须为 YYYY-MM-DD");
@@ -619,7 +739,7 @@ export function filterDingTalkSnapshot(snapshot, range = {}) {
   const totalsBase = platformBase.reduce((current, row) => addMetrics(current, row), metricShape());
   const totals = reportingMetricShape(totalsBase, 1);
   const platforms = platformBase
-    .map((row) => reportingMetricShape(row, totals.netRevenue ? row.netRevenue / totals.netRevenue : 0))
+    .map((row) => reportingMetricShape(row, totals.gmv ? row.gmv / totals.gmv : 0))
     .sort((left, right) => right.netRevenue - left.netRevenue);
 
   const storeDaily = snapshot.reporting.dailyStores
@@ -650,6 +770,8 @@ export function filterDingTalkSnapshot(snapshot, range = {}) {
       completedThrough: snapshot.reporting.completedThrough,
       selectedPeriod: period,
       monthlyOverview: buildMonthlyOverview(snapshot, period.end),
+      monthlyAchievement: buildMonthlyAchievement(snapshot, period.end),
+      metricTrends: buildMetricTrends(snapshot, period),
       latestComparison: buildLatestComparison(snapshot),
       formulaLineage: snapshot.reporting.formulaLineage,
     },
@@ -660,8 +782,7 @@ export function buildDingTalkSnapshot(sheets) {
   const sheetMap = new Map(sheets.map((sheet) => [sheet.sheet, sheet.data]));
   const summary = parseSummarySheet(sheetMap.get("全渠道数据表") ?? []);
   const endDate = summary.period.end ?? new Date().toISOString().slice(0, 10);
-  const month = Number(endDate.slice(5, 7));
-  const targets = parseTargets(sheetMap.get("销售目标") ?? [], month);
+  const targets = parseTargets(sheetMap.get("销售目标") ?? [], endDate);
   const platforms = summary.platforms.map((item) => {
     const target = targets.byPlatform.get(item.platform) || 0;
     return { ...item, target, completionRate: target ? item.netRevenue / target : 0 };
@@ -716,10 +837,11 @@ export function buildDingTalkSnapshot(sheets) {
       dailyStores,
       dailyOffsiteSpend,
       monthlyTargets: targets.monthlyTotals,
+      targetYears: targets.targetYears,
       formulaLineage: {
         summary: "全渠道数据表!A2:I3 → C53/E53/F53/G53/H53/L57",
         monthlyRollup: "全渠道数据表!A45:L74 → 各渠道及店铺日明细",
-        target: "销售目标!A2:O10 → 对应月份总计",
+        target: "销售目标!A2:O12 → 目标总计 + 日期行 → 对应 YYYY-MM",
       },
     },
     inventory: sheets.map((sheet) => {
