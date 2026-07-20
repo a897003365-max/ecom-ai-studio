@@ -122,6 +122,30 @@ def _looks_like_html(path: Path) -> bool:
     return prefix.startswith((b"<html", b"<!doctype", b"<table")) or b"<table" in prefix
 
 
+def _read_excel_xlsx2csv(path: Path) -> pl.DataFrame:
+    """大 xlsx 文件快速路径：xlsx2csv 转 csv 再 Polars 读。
+
+    比 pandas+openpyxl 快约 3×（实测 102MB/15.8 万行：150s->51s），且能正确读取
+    calamine/fastexcel 无法解析的共享字符串文本列。仅对单首 sheet + 有表头 + >20MB
+    的 .xlsx 启用，其余场景由调用方回退 pandas。
+    """
+    import io
+
+    import xlsx2csv
+
+    buf = io.StringIO()
+    xlsx2csv.Xlsx2csv(str(path)).convert(buf)
+    buf.seek(0)
+    return pl.read_csv(
+        buf,
+        infer_schema_length=0,
+        truncate_ragged_lines=True,
+        ignore_errors=True,
+        encoding="utf8-lossy",
+        null_values=["", "null", "NULL"],
+    )
+
+
 def _read_excel(path: Path, spec: QuerySpec) -> list[tuple[str, pl.DataFrame]]:
     header = None if spec.name in HEADERLESS_QUERIES else 0
     if _looks_like_html(path):
@@ -131,6 +155,17 @@ def _read_excel(path: Path, spec: QuerySpec) -> list[tuple[str, pl.DataFrame]]:
     sheet_name: str | int | None = spec.sheet_name or 0
     if spec.name in ALL_SHEETS_QUERIES:
         sheet_name = None
+    # 大 .xlsx 快速路径：xlsx2csv 比 openpyxl 快约 3×；仅单首 sheet + 有表头 + >20MB 启用，异常回退 pandas
+    if (
+        sheet_name in (0, None)
+        and path.suffix.lower() == ".xlsx"
+        and spec.name not in HEADERLESS_QUERIES
+        and path.stat().st_size > 20 * 1024 * 1024
+    ):
+        try:
+            return [(str(sheet_name), _read_excel_xlsx2csv(path))]
+        except Exception:
+            pass
     try:
         result = pd.read_excel(path, sheet_name=sheet_name, header=header, dtype=object)
     except Exception as error:

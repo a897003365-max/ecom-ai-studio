@@ -239,7 +239,40 @@ def _create_source_views(
             connection.execute(
                 f"CREATE VIEW {_quote_identifier(source_view)} AS SELECT * FROM read_parquet('{glob}', union_by_name=true)"
             )
-            connection.execute(f"CREATE VIEW {_quote_identifier(model_view)} AS SELECT DISTINCT * FROM {_quote_identifier(source_view)}")
+            source_columns = _view_columns(connection, source_view)
+            if spec.name == "product-master" and "商品编码" in source_columns:
+                # 一个商品编码只能作为一条维表记录参与订单 JOIN。源文件维度
+                # (_source_path/_source_mtime_ns) 会让 SELECT DISTINCT 无法跨文件去重，
+                # 从而把聚水潭订单行放大；这里沿用其他快照模型的最新文件优先规则。
+                connection.execute(
+                    f"""
+                    CREATE VIEW {_quote_identifier(model_view)} AS
+                    SELECT * EXCLUDE (_product_master_rank)
+                    FROM (
+                      SELECT *, row_number() OVER (
+                        PARTITION BY cast("商品编码" AS VARCHAR)
+                        ORDER BY "_source_mtime_ns" DESC NULLS LAST, "_source_path" DESC NULLS LAST
+                      ) AS _product_master_rank
+                      FROM {_quote_identifier(source_view)}
+                      WHERE "商品编码" IS NOT NULL AND trim(cast("商品编码" AS VARCHAR)) <> ''
+                    )
+                    WHERE _product_master_rank = 1
+                    """
+                )
+            elif spec.name == "15-聚水潭商品数据" and {"_source_path", "_source_mtime_ns"}.issubset(source_columns):
+                # PBIX query 15 ends with Table.Distinct.  Source metadata is not
+                # part of that query, so exclude it before deduplicating snapshots.
+                # The transformer retains order identifiers, preventing distinct
+                # from collapsing separate order lines with similar SKU metrics.
+                connection.execute(
+                    f"""
+                    CREATE VIEW {_quote_identifier(model_view)} AS
+                    SELECT DISTINCT * EXCLUDE (_source_path, _source_mtime_ns)
+                    FROM {_quote_identifier(source_view)}
+                    """
+                )
+            else:
+                connection.execute(f"CREATE VIEW {_quote_identifier(model_view)} AS SELECT DISTINCT * FROM {_quote_identifier(source_view)}")
         else:
             connection.execute(f"CREATE VIEW {_quote_identifier(source_view)} AS SELECT NULL::VARCHAR AS _empty WHERE FALSE")
             connection.execute(f"CREATE VIEW {_quote_identifier(model_view)} AS SELECT * FROM {_quote_identifier(source_view)}")
@@ -346,6 +379,37 @@ def _records(
     return [dict(zip(columns, row, strict=True)) for row in cursor.fetchall()]
 
 
+def _matrix(
+    connection: duckdb.DuckDBPyConnection,
+    sql: str,
+    row_field: str,
+) -> dict[str, Any]:
+    """把 PIVOT 查询结果转为前端矩阵 {columns:[...], rows:[{rowKey, values, total}]}。
+
+    列按总计降序排列。每个 PIVOT 查询须把行维度别名为 {row_field}，列维度作为 PIVOT ON 目标。
+    """
+    rows = _records(connection, sql)
+    if not rows:
+        return {"columns": [], "rows": []}
+    col_keys = [k for k in rows[0].keys() if k != row_field]
+    result_rows = []
+    for record in rows:
+        values = {k: (record.get(k) or 0) for k in col_keys}
+        result_rows.append(
+            {"rowKey": str(record[row_field]) if record[row_field] is not None else "(空)", "values": values, "total": sum(values.values())}
+        )
+    col_totals = {k: sum((rr["values"].get(k, 0) or 0) for rr in result_rows) for k in col_keys}
+    col_keys_sorted = sorted(col_keys, key=lambda k: col_totals[k], reverse=True)
+    return {"columns": col_keys_sorted, "rows": result_rows}
+
+
+def _safe_product_image(value: Any) -> str | None:
+    """Allow only the catalog image CDN in the public PowerBI snapshot."""
+
+    text = str(value or "").strip()
+    return text if text.lower().startswith("https://img.alicdn.com/") else None
+
+
 def _model_view(connection: duckdb.DuckDBPyConnection, query_name: str) -> str:
     row = connection.execute(
         "SELECT model_view FROM warehouse_query_catalog WHERE query_name = ?",
@@ -353,6 +417,18 @@ def _model_view(connection: duckdb.DuckDBPyConnection, query_name: str) -> str:
     ).fetchone()
     if not row:
         raise ValueError(f"未找到 PowerBI 查询模型：{query_name}")
+    return _quote_identifier(row[0])
+
+
+def _source_view(connection: duckdb.DuckDBPyConnection, query_name: str) -> str:
+    """返回 source 视图名（未去重全量行）。聚水潭订单行粒度需用 source 聚合，model 视图
+    的 SELECT DISTINCT 会因丢弃订单唯一键而错误折叠同商品同日同金额的不同订单行。"""
+    row = connection.execute(
+        "SELECT source_view FROM warehouse_query_catalog WHERE query_name = ?",
+        [query_name],
+    ).fetchone()
+    if not row:
+        raise ValueError(f"未找到 PowerBI 查询源视图：{query_name}")
     return _quote_identifier(row[0])
 
 
@@ -416,6 +492,7 @@ def _build_powerbi_pages(connection: duckdb.DuckDBPyConnection) -> dict[str, Any
           sum(coalesce(try_cast("全站推广花费" AS DOUBLE), 0)) AS fullSiteSpend,
           sum(coalesce(try_cast("关键词推广花费" AS DOUBLE), 0)) AS keywordSpend,
           sum(coalesce(try_cast("精准人群推广花费" AS DOUBLE), 0)) AS audienceSpend,
+          sum(coalesce(try_cast("淘宝客佣金" AS DOUBLE), 0)) AS taokeSpend,
           sum(coalesce(try_cast("新访客数" AS DOUBLE), 0)) AS newVisitors,
           sum(coalesce(try_cast("老访客数" AS DOUBLE), 0)) AS returningVisitors,
           avg(try_cast("平均停留时长" AS DOUBLE)) AS avgStaySeconds,
@@ -550,6 +627,7 @@ def _build_powerbi_pages(connection: duckdb.DuckDBPyConnection) -> dict[str, Any
             SELECT cast("商品ID" AS VARCHAR) AS productId,
                    any_value(cast("商品名称" AS VARCHAR)) AS productName,
                    any_value(cast("商家编码" AS VARCHAR)) AS merchantCode,
+                   any_value(nullif(trim(cast("商品图片" AS VARCHAR)), '')) AS imageUrl,
                    max(coalesce(try_cast("30日销量" AS DOUBLE), 0)) AS sales30d,
                    max(coalesce(try_cast("累计销量" AS DOUBLE), 0)) AS cumulativeSales
             FROM {catalog_view}
@@ -558,6 +636,10 @@ def _build_powerbi_pages(connection: duckdb.DuckDBPyConnection) -> dict[str, Any
             """,
             product_ids,
         )
+        products = [
+            {**item, "imageUrl": _safe_product_image(item.get("imageUrl"))}
+            for item in products
+        ]
 
     return {
         "source": "powerbi_local_logic",
@@ -567,7 +649,677 @@ def _build_powerbi_pages(connection: duckdb.DuckDBPyConnection) -> dict[str, Any
         "promotionSceneDaily": promotion_scene_daily,
         "promotionProductDaily": promotion_product_daily,
         "products": products,
-        "privacy": {"rawRowsExposed": False, "sourcePathsExposed": False, "remoteImagesExposed": False},
+        "privacy": {"rawRowsExposed": False, "sourcePathsExposed": False, "remoteImagesExposed": True},
+    }
+
+
+def _build_product_management_pages(
+    connection: duckdb.DuckDBPyConnection,
+    start: str | None = None,
+    end: str | None = None,
+    statuses: list[str] | None = None,
+    channels: list[str] | None = None,
+    store_short_names: list[str] | None = None,
+) -> dict[str, Any]:
+    """聚水潭商品数据看板聚合：商品级销量/毛利/退货 + 床垫类别/渠道交叉矩阵 + 趋势 + 月环比。
+
+    用复刻 PBIX ``Table.Distinct`` 的 model 视图聚合。转换层保留订单唯一键，模型层再移除
+    快照元数据后去重，既与 PBIX 的最终订单行集合一致，也不会折叠不同订单。
+    start/end（YYYY-MM-DD）为切片器日期范围；statuses、channels、store_short_names 为
+    订单状态、渠道平台、店铺简称的多选切片器值（IN 过滤）。传入任一后创建临时过滤视图，
+    所有聚合自动联动；可选项始终取自未过滤 base_view。
+    """
+    try:
+        base_view = _model_view(connection, "15-聚水潭商品数据")
+    except ValueError:
+        return {
+            "source": "jushuitan_local_logic",
+            "period": None,
+            "kpis": {},
+            "productOverview": [],
+            "productNameOverview": [],
+            "dailyTrend": [],
+            "monthlyTrend": [],
+            "storeBreakdown": [],
+            "channelBreakdown": [],
+            "darenBreakdown": [],
+            "categoryBreakdown": [],
+            "mattressCategoryBreakdown": [],
+            "returnRanking": [],
+            "fulfillmentByProduct": [],
+            "monthlyComparison": None,
+            "categoryChannelMatrix": {"columns": [], "rows": []},
+            "warehouseStatusMatrix": {"columns": [], "rows": []},
+            "dailyChannelMatrix": {"columns": [], "rows": []},
+            "dailyStatusMatrix": {"columns": [], "rows": []},
+            "productChannelMatrix": {"columns": [], "rows": []},
+            "productStatusMatrix": {"columns": [], "rows": []},
+            "availableStatuses": [],
+            "availableChannels": [],
+            "availableStoreShortNames": [],
+            "privacy": {"rawRowsExposed": False, "sourcePathsExposed": False},
+        }
+
+    # 可选切片器值始终取自未过滤 base_view，避免联动后把其余可选项隐藏。
+    import re as _re
+
+    source_columns = {row[0] for row in connection.execute(f"DESCRIBE {base_view}").fetchall()}
+    store_short_column = "店铺简称" if "店铺简称" in source_columns else "店铺" if "店铺" in source_columns else None
+
+    def _dimension_expression(column: str) -> str:
+        return f"coalesce(nullif(trim(cast(\"{column}\" AS VARCHAR)), ''), '(未设定)')"
+
+    def _available_dimension_values(column: str | None) -> list[str]:
+        if not column:
+            return []
+        return [
+            str(row[0])
+            for row in connection.execute(
+                f"SELECT DISTINCT {_dimension_expression(column)} FROM {base_view} ORDER BY 1"
+            ).fetchall()
+            if row[0]
+        ]
+
+    def _in_filter(column: str, values: list[str]) -> str | None:
+        escaped = ",".join("'" + value.replace("'", "''") + "'" for value in values if value)
+        return f"{_dimension_expression(column)} IN ({escaped})" if escaped else None
+
+    available_statuses = [
+        row[0]
+        for row in connection.execute(
+            f'SELECT DISTINCT "订单状态明细" FROM {base_view} WHERE "订单状态明细" IS NOT NULL ORDER BY 1'
+        ).fetchall()
+        if row[0]
+    ]
+    available_channels = _available_dimension_values("渠道平台" if "渠道平台" in source_columns else None)
+    available_store_short_names = _available_dimension_values(store_short_column)
+
+    # 切片器过滤：日期范围 + 订单状态 + 渠道平台 + 店铺简称，创建临时视图替换 base_view。
+    date_filter = None
+    conds: list[str] = []
+    if start and end and _re.fullmatch(r"\d{4}-\d{2}-\d{2}", start) and _re.fullmatch(r"\d{4}-\d{2}-\d{2}", end):
+        conds.append(f'"订单日期" >= DATE \'{start}\' AND "订单日期" <= DATE \'{end}\'')
+        date_filter = (start, end)
+    if statuses:
+        escaped = ",".join("'" + s.replace("'", "''") + "'" for s in statuses if s)
+        if escaped:
+            conds.append(f'"订单状态明细" IN ({escaped})')
+    if channels and "渠道平台" in source_columns:
+        channel_filter = _in_filter("渠道平台", channels)
+        if channel_filter:
+            conds.append(channel_filter)
+    if store_short_names and store_short_column:
+        store_filter = _in_filter(store_short_column, store_short_names)
+        if store_filter:
+            conds.append(store_filter)
+    if conds:
+        connection.execute(
+            f'CREATE OR REPLACE TEMP VIEW _jt_filtered AS SELECT * FROM {base_view} WHERE {" AND ".join(conds)}'
+        )
+        view = "_jt_filtered"
+    else:
+        view = base_view
+
+    if date_filter:
+        period = (start, end)
+    else:
+        period = connection.execute(
+            f'SELECT min("订单日期"), max("订单日期") FROM {view} WHERE "订单日期" IS NOT NULL'
+        ).fetchone()
+
+    # 产品主表（提供产品名称、成本、床垫类别），join 聚水潭计算毛利率与各产品分析。
+    try:
+        pm_view = _model_view(connection, "product-master")
+        has_master = True
+    except ValueError:
+        pm_view = None
+        has_master = False
+
+    master_columns = (
+        {row[0] for row in connection.execute(f"DESCRIBE {pm_view}").fetchall()}
+        if has_master and pm_view
+        else set()
+    )
+    jd_master_view = _source_view(connection, "product-master") if has_master else None
+    jd_master_columns = (
+        {row[0] for row in connection.execute(f"DESCRIBE {jd_master_view}").fetchall()}
+        if jd_master_view
+        else set()
+    )
+    pm_join = f"LEFT JOIN {pm_view} pm ON s.\"商品编码\" = pm.\"商品编码\"" if has_master else ""
+    # PBIX 对京东自营先以“店铺商品编码 → 商品ID”找回商家规编，再关联产品主数据。
+    # 用未按商品编码去重的自营源映射保留全部 商品ID，直接补一条唯一产品名称映射，避免订单行放大。
+    has_jd_self_mapping = (
+        has_master
+        and {"商品ID", "产品名称"}.issubset(jd_master_columns)
+        and {"店铺", "店铺商品编码"}.issubset(source_columns)
+    )
+    if has_jd_self_mapping:
+        jd_source_filter = (
+            "AND cast(\"_source_path\" AS VARCHAR) LIKE '%自营商品表.xlsx'"
+            if "_source_path" in jd_master_columns
+            else ""
+        )
+        pm_join += f"""
+        LEFT JOIN (
+          SELECT cast("商品ID" AS VARCHAR) AS product_id,
+                 any_value(nullif(trim(cast("产品名称" AS VARCHAR)), '')) AS product_name
+          FROM {jd_master_view}
+          WHERE "商品ID" IS NOT NULL AND trim(cast("商品ID" AS VARCHAR)) <> ''
+            {jd_source_filter}
+          GROUP BY 1
+        ) jd_pm
+          ON s."店铺" = '麻大师床垫京东自营旗舰店-龚敢-京5'
+         AND cast(s."店铺商品编码" AS VARCHAR) = jd_pm.product_id
+        """
+
+    def _nonempty_text(alias: str, column: str) -> str:
+        return f"nullif(trim(cast({alias}.\"{column}\" AS VARCHAR)), '')"
+
+    source_product_name_parts = [
+        _nonempty_text("s", column)
+        for column in ("产品名称", "商品简称", "线上商品名")
+        if column in source_columns
+    ]
+    source_product_name = (
+        f"coalesce({', '.join(source_product_name_parts)}, '(未命名)')"
+        if source_product_name_parts
+        else "'(未命名)'"
+    )
+    master_product_name_parts = (
+        [_nonempty_text("pm", "产品名称")]
+        if "产品名称" in master_columns
+        else []
+    )
+    if has_jd_self_mapping:
+        master_product_name_parts.append("jd_pm.product_name")
+    product_name_expr = (
+        f"coalesce({', '.join(master_product_name_parts)}, {source_product_name})"
+        if master_product_name_parts
+        else source_product_name
+    )
+    order_id_parts = [
+        _nonempty_text("s", column)
+        for column in ("线上订单号", "内部订单号", "线上子订单编号")
+        if column in source_columns
+    ]
+    order_id_expr = (
+        order_id_parts[0]
+        if len(order_id_parts) == 1
+        else f"coalesce({', '.join(order_id_parts)})"
+        if order_id_parts
+        else "NULL"
+    )
+    order_date_expr = 'try_cast(s."订单日期" AS DATE)' if "订单日期" in source_columns else "CAST(NULL AS DATE)"
+    ship_date_expr = 'try_cast(s."发货日期" AS DATE)' if "发货日期" in source_columns else "CAST(NULL AS DATE)"
+    channel_expr = (
+        f"coalesce({_nonempty_text('s', '渠道平台')}, '(未设定)')"
+        if "渠道平台" in source_columns
+        else "'(未设定)'"
+    )
+    store_short_expr = (
+        f"coalesce({_nonempty_text('s', '店铺简称')}, '(未设定)')"
+        if "店铺简称" in source_columns
+        else (
+            f"coalesce({_nonempty_text('s', '店铺')}, '(未设定)')"
+            if "店铺" in source_columns
+            else "'(未设定)'"
+        )
+    )
+
+    # 毛利：毛利额 = 商家实收 - 成本 × 销售数量（与 PBIX 15 查询口径一致）。
+    gross_profit = 0.0
+    matched_received = 0.0
+    matched_codes = 0
+    if has_master:
+        margin = connection.execute(
+            f"""
+            SELECT
+              sum(CASE WHEN pm."成本" IS NOT NULL
+                       THEN coalesce(try_cast(s."商家实收" AS DOUBLE),0)
+                            - coalesce(try_cast(pm."成本" AS DOUBLE),0) * coalesce(try_cast(s."销售数量" AS DOUBLE),0)
+                       ELSE 0 END) AS gross_profit,
+              sum(CASE WHEN pm."成本" IS NOT NULL THEN coalesce(try_cast(s."商家实收" AS DOUBLE),0) ELSE 0 END) AS matched_received,
+              count(DISTINCT CASE WHEN pm."成本" IS NOT NULL THEN s."商品编码" END) AS matched_codes
+            FROM {view} s LEFT JOIN {pm_view} pm ON s."商品编码" = pm."商品编码"
+            """
+        ).fetchone()
+        gross_profit = float(margin[0] or 0)
+        matched_received = float(margin[1] or 0)
+        matched_codes = int(margin[2] or 0)
+
+    def _total(column: str) -> float:
+        return float(
+            connection.execute(
+                f'SELECT sum(coalesce(try_cast("{column}" AS DOUBLE), 0)) FROM {view}'
+            ).fetchone()[0]
+            or 0
+        )
+
+    total_sales = _total("销售金额")
+    total_refund = _total("退货金额")
+    total_received = _total("商家实收")
+    total_sales_units = _total("销售数量")
+    product_count = connection.execute(
+        f'SELECT count(DISTINCT "商品编码") FROM {view} WHERE "商品编码" IS NOT NULL'
+    ).fetchone()[0] or 0
+    order_lines = connection.execute(f"SELECT count(*) FROM {view}").fetchone()[0] or 0
+    # 商品管理统一使用商家实收作为金额口径；回款率 = 商家实收 / 销售金额。
+    # 0.01 链接、礼品袋等已在转换层按 PBIX M 规则置零并过滤，销售数量可安全用于销量口径。
+    kpis = {
+        "productCount": int(product_count),
+        "orderLines": int(order_lines),
+        "totalSalesAmount": total_sales,
+        "totalNetSales": total_sales - total_refund,  # 销售减退金额（参考看板口径，≈商家实收）
+        "collectionRate": round(total_received / total_sales, 4) if total_sales else None,
+        "totalRefundAmount": total_refund,
+        "refundRate": round(total_refund / total_received, 4) if total_received else None,
+        "totalSalesUnits": total_sales_units,
+        "avgUnitPrice": round(total_received / total_sales_units, 2) if total_sales_units else None,  # 件单价 = 商家实收/销售数量
+        "totalPaidAmount": _total("买家实付"),
+        "totalReceivedAmount": total_received,
+        "totalSubsidyAmount": _total("平台补贴金额"),
+        "totalGrossProfit": gross_profit if has_master else None,
+        "grossMargin": round(gross_profit / matched_received, 4) if has_master and matched_received else None,
+        "matchedProductCount": matched_codes if has_master else None,
+    }
+
+    product_overview = _records(
+        connection,
+        f"""
+        SELECT s."商品编码" AS productCode,
+               any_value({product_name_expr}) AS productName,
+               any_value(s."产品分类") AS category,
+               any_value(s."品牌") AS brand,
+               sum(coalesce(try_cast(s."销售数量" AS DOUBLE),0)) AS salesUnits,
+               sum(coalesce(try_cast(s."商家实收" AS DOUBLE),0)) AS receivedAmount,
+               sum(coalesce(try_cast(s."销售金额" AS DOUBLE),0)) AS salesAmount,
+               sum(coalesce(try_cast(s."退货金额" AS DOUBLE),0)) AS refundAmount,
+               count(*) AS orderLines
+        FROM {view} s {pm_join}
+        WHERE s."商品编码" IS NOT NULL
+        GROUP BY 1 ORDER BY receivedAmount DESC NULLS LAST LIMIT 200
+        """,
+    )
+    for row in product_overview:
+        sales = row.get("salesAmount") or 0
+        received = row.get("receivedAmount") or 0
+        row["collectionRate"] = round(received / sales, 4) if sales else None
+        row["refundRate"] = round(row["refundAmount"] / received, 4) if received else None
+
+    daily_trend = _records(
+        connection,
+        f"""
+        SELECT "订单日期" AS date,
+               sum(coalesce(try_cast("商家实收" AS DOUBLE),0)) AS receivedAmount,
+               sum(coalesce(try_cast("销售金额" AS DOUBLE),0)) AS salesAmount,
+               sum(coalesce(try_cast("退货金额" AS DOUBLE),0)) AS refundAmount,
+               count(*) AS orderLines
+        FROM {view}
+        WHERE "订单日期" IS NOT NULL
+          AND "订单日期" >= (SELECT max("订单日期") - INTERVAL 400 DAY FROM {view})
+        GROUP BY 1 ORDER BY 1
+        """,
+    )
+
+    store_breakdown = _records(
+        connection,
+        f"""
+        SELECT {store_short_expr} AS store,
+               sum(coalesce(try_cast("商家实收" AS DOUBLE),0)) AS receivedAmount,
+               sum(coalesce(try_cast("销售金额" AS DOUBLE),0)) AS salesAmount,
+               sum(coalesce(try_cast("退货金额" AS DOUBLE),0)) AS refundAmount,
+               count(*) AS orderLines
+        FROM {view} s
+        GROUP BY 1 ORDER BY receivedAmount DESC NULLS LAST LIMIT 50
+        """,
+    )
+
+    daren_breakdown = _records(
+        connection,
+        f"""
+        SELECT "达人名称" AS daren,
+               sum(coalesce(try_cast("商家实收" AS DOUBLE),0)) AS receivedAmount,
+               sum(coalesce(try_cast("销售金额" AS DOUBLE),0)) AS salesAmount,
+               count(*) AS orderLines
+        FROM {view}
+        WHERE "达人名称" IS NOT NULL AND trim(cast("达人名称" AS VARCHAR)) <> ''
+        GROUP BY 1 ORDER BY receivedAmount DESC NULLS LAST LIMIT 50
+        """,
+    )
+
+    category_breakdown = _records(
+        connection,
+        f"""
+        SELECT "产品分类" AS category,
+               sum(coalesce(try_cast("商家实收" AS DOUBLE),0)) AS receivedAmount,
+               sum(coalesce(try_cast("销售金额" AS DOUBLE),0)) AS salesAmount,
+               sum(coalesce(try_cast("退货金额" AS DOUBLE),0)) AS refundAmount,
+               count(*) AS orderLines
+        FROM {view}
+        WHERE "产品分类" IS NOT NULL AND trim(cast("产品分类" AS VARCHAR)) <> ''
+        GROUP BY 1 ORDER BY receivedAmount DESC NULLS LAST LIMIT 50
+        """,
+    )
+
+    return_ranking = _records(
+        connection,
+        f"""
+        SELECT s."商品编码" AS productCode,
+               any_value({product_name_expr}) AS productName,
+               sum(coalesce(try_cast(s."退货数量" AS DOUBLE),0)) AS refundUnits,
+               sum(coalesce(try_cast(s."退货金额" AS DOUBLE),0)) AS refundAmount,
+               sum(coalesce(try_cast(s."商家实收" AS DOUBLE),0)) AS receivedAmount,
+               count(*) AS orderLines
+        FROM {view} s {pm_join}
+        WHERE s."商品编码" IS NOT NULL
+        GROUP BY 1 ORDER BY refundAmount DESC NULLS LAST LIMIT 100
+        """,
+    )
+    for row in return_ranking:
+        received = row.get("receivedAmount") or 0
+        row["refundRate"] = round(row["refundAmount"] / received, 4) if received else None
+
+    # 仓配履约：同一产品名称内按订单去重，时效为发货日期 - 订单日期的自然日差。
+    # 第 N 天为日期差恰好 N 天；15 天内为 0～15 天累计。订单量为全部订单分母，
+    # 平均时效仅计算有有效发货日期的订单，未发货订单不会被误记为 0 天。
+    fulfillment_by_product = _records(
+        connection,
+        f"""
+        WITH product_orders AS (
+          SELECT
+            {product_name_expr} AS productName,
+            {order_id_expr} AS orderId,
+            min({order_date_expr}) AS orderDate,
+            min({ship_date_expr}) AS shipDate
+          FROM {view} s {pm_join}
+          WHERE {product_name_expr} <> '(未命名)'
+            AND {order_id_expr} IS NOT NULL
+          GROUP BY 1, 2
+        ), shipping_durations AS (
+          SELECT
+            productName,
+            CASE WHEN shipDate >= orderDate THEN datediff('day', orderDate, shipDate) END AS shippingDays
+          FROM product_orders
+        )
+        SELECT
+          productName,
+          count(*) AS orderCount,
+          count(shippingDays) AS shippedOrderCount,
+          round(avg(shippingDays), 2) AS avgShippingDays,
+          cast(sum(CASE WHEN shippingDays = 3 THEN 1 ELSE 0 END) AS DOUBLE) / count(*) AS day3Share,
+          cast(sum(CASE WHEN shippingDays = 5 THEN 1 ELSE 0 END) AS DOUBLE) / count(*) AS day5Share,
+          cast(sum(CASE WHEN shippingDays = 7 THEN 1 ELSE 0 END) AS DOUBLE) / count(*) AS day7Share,
+          cast(sum(CASE WHEN shippingDays = 10 THEN 1 ELSE 0 END) AS DOUBLE) / count(*) AS day10Share,
+          cast(sum(CASE WHEN shippingDays BETWEEN 0 AND 15 THEN 1 ELSE 0 END) AS DOUBLE) / count(*) AS within15DayShare
+        FROM shipping_durations
+        GROUP BY 1
+        ORDER BY orderCount DESC, avgShippingDays DESC NULLS LAST, productName
+        LIMIT 200
+        """,
+    )
+
+    # 单品明细分析表按产品主数据的产品名称聚合；未匹配时才回退到订单商品简称。
+    margin_select = (
+        "sum(CASE WHEN pm.\"成本\" IS NOT NULL THEN coalesce(try_cast(s.\"商家实收\" AS DOUBLE),0) "
+        "- coalesce(try_cast(pm.\"成本\" AS DOUBLE),0)*coalesce(try_cast(s.\"销售数量\" AS DOUBLE),0) ELSE 0 END) AS grossProfit, "
+        "sum(CASE WHEN pm.\"成本\" IS NOT NULL THEN coalesce(try_cast(s.\"商家实收\" AS DOUBLE),0) ELSE 0 END) AS matchedReceived, "
+        if has_master else "0 AS grossProfit, 0 AS matchedReceived, "
+    )
+    product_name_overview = _records(
+        connection,
+        f"""
+        SELECT {product_name_expr} AS productName,
+               any_value(s."产品分类") AS category,
+               sum(coalesce(try_cast(s."销售数量" AS DOUBLE),0)) AS salesUnits,
+               sum(coalesce(try_cast(s."销售金额" AS DOUBLE),0)) AS salesAmount,
+               sum(coalesce(try_cast(s."退货金额" AS DOUBLE),0)) AS refundAmount,
+               sum(coalesce(try_cast(s."商家实收" AS DOUBLE),0)) AS receivedAmount,
+               {margin_select}
+               count(*) AS orderLines
+        FROM {view} s {pm_join}
+        WHERE {product_name_expr} <> '(未命名)'
+        GROUP BY 1 ORDER BY receivedAmount DESC NULLS LAST LIMIT 200
+        """,
+    )
+    name_total = sum((row.get("receivedAmount") or 0) for row in product_name_overview) or 1
+    for row in product_name_overview:
+        units = row.get("salesUnits") or 0
+        received = row.get("receivedAmount") or 0
+        matched = row.get("matchedReceived") or 0
+        row["amountShare"] = round(received / name_total, 4)
+        row["avgUnitPrice"] = round(row["receivedAmount"] / units, 2) if units else None  # 件单件
+        row["refundRate"] = round(row["refundAmount"] / received, 4) if received else None
+        row["grossMargin"] = round(row["grossProfit"] / matched, 4) if matched else None  # 毛利率
+
+    # 渠道销售明细表直接使用 PBIX 从商店站点标准化后的渠道平台。
+    channel_breakdown = _records(
+        connection,
+        f"""
+        SELECT
+          {channel_expr} AS channel,
+          sum(coalesce(try_cast(s."销售数量" AS DOUBLE),0)) AS salesUnits,
+          sum(coalesce(try_cast(s."商家实收" AS DOUBLE),0)) AS receivedAmount,
+          sum(coalesce(try_cast(s."退货金额" AS DOUBLE),0)) AS refundAmount,
+          {margin_select}
+          count(*) AS orderLines
+        FROM {view} s {pm_join}
+        GROUP BY 1 ORDER BY receivedAmount DESC NULLS LAST
+        """,
+    )
+    channel_total = sum((row.get("receivedAmount") or 0) for row in channel_breakdown) or 1
+    for row in channel_breakdown:
+        units = row.get("salesUnits") or 0
+        matched = row.get("matchedReceived") or 0
+        row["amountShare"] = round(row["receivedAmount"] / channel_total, 4)
+        row["avgUnitPrice"] = round(row["receivedAmount"] / units, 2) if units else None
+        row["refundRate"] = round(row["refundAmount"] / (row.get("receivedAmount") or 0), 4) if row.get("receivedAmount") else None
+        row["grossMargin"] = round(row["grossProfit"] / matched, 4) if matched else None
+
+    # 月度趋势（对齐参考看板「月度销售额趋势」）
+    monthly_trend = _records(
+        connection,
+        f"""
+        SELECT strftime('%Y-%m', "订单日期") AS month,
+               sum(coalesce(try_cast("商家实收" AS DOUBLE),0)) AS receivedAmount,
+               sum(coalesce(try_cast("销售金额" AS DOUBLE),0)) AS salesAmount,
+               sum(coalesce(try_cast("退货金额" AS DOUBLE),0)) AS refundAmount,
+               count(*) AS orderLines
+        FROM {view} WHERE "订单日期" IS NOT NULL
+        GROUP BY 1 ORDER BY 1
+        """,
+    )
+
+    # 床垫类别销售分析表（join 产品主表，对齐参考看板「床垫类别销售分析表」）
+    if has_master:
+        mattress_category_breakdown = _records(
+            connection,
+            f"""
+            SELECT pm."床垫类别" AS category,
+                   sum(coalesce(try_cast(s."商家实收" AS DOUBLE),0)) AS receivedAmount,
+                   sum(coalesce(try_cast(s."销售金额" AS DOUBLE),0)) AS salesAmount,
+                   sum(coalesce(try_cast(s."退货金额" AS DOUBLE),0)) AS refundAmount,
+                   {margin_select}
+                   count(*) AS orderLines
+            FROM {view} s {pm_join}
+            WHERE pm."床垫类别" IS NOT NULL AND trim(cast(pm."床垫类别" AS VARCHAR)) <> ''
+            GROUP BY 1 ORDER BY receivedAmount DESC NULLS LAST
+            """,
+        )
+        cat_total = sum((row.get("receivedAmount") or 0) for row in mattress_category_breakdown) or 1
+        for row in mattress_category_breakdown:
+            matched = row.get("matchedReceived") or 0
+            received = row.get("receivedAmount") or 0
+            row["amountShare"] = round(received / cat_total, 4)
+            row["refundRate"] = round(row["refundAmount"] / received, 4) if received else None
+            row["grossMargin"] = round(row["grossProfit"] / matched, 4) if matched else None
+    else:
+        mattress_category_breakdown = []
+
+    # 月环比（对齐参考看板「整体经营总览」：本月 vs 上月）
+    months = connection.execute(
+        f"""SELECT strftime('%Y-%m', "订单日期") AS month FROM {view}
+           WHERE "订单日期" IS NOT NULL GROUP BY 1 ORDER BY 1 DESC LIMIT 2"""
+    ).fetchall()
+    monthly_comparison = None
+    if len(months) >= 1:
+        cur_m, prev_m = months[0][0], (months[1][0] if len(months) >= 2 else None)
+
+        def _month_totals(month: str | None) -> dict[str, Any]:
+            if not month:
+                return {}
+            row = connection.execute(
+                f"""
+                SELECT
+                  sum(coalesce(try_cast(s."商家实收" AS DOUBLE),0)) AS receivedAmount,
+                  sum(coalesce(try_cast(s."销售金额" AS DOUBLE),0)) AS salesAmount,
+                  sum(coalesce(try_cast(s."退货金额" AS DOUBLE),0)) AS refundAmount,
+                  count(*) AS orderLines
+                FROM {view} s WHERE strftime('%Y-%m', s."订单日期") = ?
+                """,
+                [month],
+            ).fetchone()
+            return {"receivedAmount": float(row[0] or 0), "salesAmount": float(row[1] or 0),
+                    "refundAmount": float(row[2] or 0), "orderLines": int(row[3] or 0)}
+
+        cur = _month_totals(cur_m)
+        prev = _month_totals(prev_m)
+        if cur:
+            def _delta(key: str) -> float | None:
+                if not prev or not prev.get(key) or prev[key] == 0:
+                    return None
+                return round((cur[key] - prev[key]) / prev[key], 4)
+            monthly_comparison = {
+                "currentMonth": cur_m, "previousMonth": prev_m,
+                "current": cur, "previous": prev,
+                "deltas": {k: _delta(k) for k in cur},
+            }
+
+    # 交叉矩阵统一使用已清洗的销售数量。
+    if has_master:
+        category_channel_matrix = _matrix(
+            connection,
+            f"""
+            PIVOT (
+              SELECT pm."床垫类别" AS row, {channel_expr} AS channel,
+                     coalesce(try_cast(s."销售数量" AS DOUBLE),0) AS units
+              FROM {view} s {pm_join}
+              WHERE pm."床垫类别" IS NOT NULL AND trim(cast(pm."床垫类别" AS VARCHAR)) <> ''
+            ) ON channel USING sum(units) ORDER BY row
+            """,
+            "row",
+        )
+    else:
+        category_channel_matrix = {"columns": [], "rows": []}
+
+    warehouse_status_matrix = _matrix(
+        connection,
+        f"""
+        PIVOT (
+          SELECT coalesce(cast(s."发货仓" AS VARCHAR), '(未设定)') AS row,
+                 coalesce(cast(s."订单状态明细" AS VARCHAR), '(未知)') AS status,
+                 coalesce(try_cast(s."销售数量" AS DOUBLE),0) AS units
+          FROM {view} s
+          WHERE s."发货仓" IS NOT NULL OR s."订单状态" IS NOT NULL
+        ) ON status USING sum(units) ORDER BY row
+        """,
+        "row",
+    )
+
+    daily_window = "" if date_filter else f"AND s.\"订单日期\" >= (SELECT max(\"订单日期\") - INTERVAL 30 DAY FROM {view})"
+    daily_channel_matrix = _matrix(
+        connection,
+        f"""
+        PIVOT (
+          SELECT cast(s."订单日期" AS VARCHAR) AS row, {channel_expr} AS channel,
+                 coalesce(try_cast(s."销售数量" AS DOUBLE),0) AS units
+          FROM {view} s
+          WHERE s."订单日期" IS NOT NULL
+            {daily_window}
+        ) ON channel USING sum(units) ORDER BY row
+        """,
+        "row",
+    )
+
+    # 每日订单状态分布（对齐参考看板「每天订单状态分布」）
+    daily_status_matrix = _matrix(
+        connection,
+        f"""
+        PIVOT (
+          SELECT cast(s."订单日期" AS VARCHAR) AS row,
+                 coalesce(cast(s."订单状态明细" AS VARCHAR), '(未知)') AS status,
+                 coalesce(try_cast(s."销售数量" AS DOUBLE),0) AS units
+          FROM {view} s
+          WHERE s."订单日期" IS NOT NULL
+            {daily_window}
+        ) ON status USING sum(units) ORDER BY row
+        """,
+        "row",
+    )
+
+    # 产品名称 × 渠道销量（产品主数据口径，Top 30）
+    product_channel_matrix = _matrix(
+        connection,
+        f"""
+        PIVOT (
+          SELECT {product_name_expr} AS row, {channel_expr} AS channel,
+                 coalesce(try_cast(s."销售数量" AS DOUBLE),0) AS units
+          FROM {view} s {pm_join}
+          WHERE {product_name_expr} IN (
+            SELECT {product_name_expr} FROM {view} s {pm_join}
+            WHERE {product_name_expr} <> '(未命名)'
+            GROUP BY 1 ORDER BY sum(coalesce(try_cast("销售数量" AS DOUBLE),0)) DESC LIMIT 30
+          )
+        ) ON channel USING sum(units) ORDER BY row
+        """,
+        "row",
+    )
+
+    # 产品名称 × 订单状态（产品主数据口径，Top 30）
+    product_status_matrix = _matrix(
+        connection,
+        f"""
+        PIVOT (
+          SELECT {product_name_expr} AS row,
+                 coalesce(cast(s."订单状态明细" AS VARCHAR), '(未知)') AS status,
+                 coalesce(try_cast(s."销售数量" AS DOUBLE),0) AS units
+          FROM {view} s {pm_join}
+          WHERE {product_name_expr} IN (
+            SELECT {product_name_expr} FROM {view} s {pm_join}
+            WHERE {product_name_expr} <> '(未命名)'
+            GROUP BY 1 ORDER BY sum(coalesce(try_cast("销售数量" AS DOUBLE),0)) DESC LIMIT 30
+          )
+        ) ON status USING sum(units) ORDER BY row
+        """,
+        "row",
+    )
+
+    return {
+        "source": "jushuitan_local_logic",
+        "period": {"start": period[0], "end": period[1]} if period and period[0] else None,
+        "kpis": kpis,
+        "productOverview": product_overview,
+        "productNameOverview": product_name_overview,
+        "dailyTrend": daily_trend,
+        "monthlyTrend": monthly_trend,
+        "storeBreakdown": store_breakdown,
+        "channelBreakdown": channel_breakdown,
+        "darenBreakdown": daren_breakdown,
+        "categoryBreakdown": category_breakdown,
+        "mattressCategoryBreakdown": mattress_category_breakdown,
+        "returnRanking": return_ranking,
+        "fulfillmentByProduct": fulfillment_by_product,
+        "monthlyComparison": monthly_comparison,
+        "categoryChannelMatrix": category_channel_matrix,
+        "warehouseStatusMatrix": warehouse_status_matrix,
+        "dailyChannelMatrix": daily_channel_matrix,
+        "dailyStatusMatrix": daily_status_matrix,
+        "productChannelMatrix": product_channel_matrix,
+        "productStatusMatrix": product_status_matrix,
+        "availableStatuses": available_statuses,
+        "availableChannels": available_channels,
+        "availableStoreShortNames": available_store_short_names,
+        "privacy": {"rawRowsExposed": False, "sourcePathsExposed": False},
     }
 
 
@@ -580,6 +1332,7 @@ def _build_unique_snapshot(
     rows = sum(int(item.get("rows", 0)) for item in query_results)
     result_by_query = {item["query"]: item for item in query_results}
     powerbi_pages = _build_powerbi_pages(connection)
+    product_management_pages = _build_product_management_pages(connection)
     snapshot = {
         "source": "local_warehouse",
         "scope": "powerbi_unique_only",
@@ -592,6 +1345,7 @@ def _build_unique_snapshot(
         "stores": [],
         "uniqueDomains": unique_domain_catalog(result_by_query),
         "powerbiPages": powerbi_pages,
+        "productManagement": product_management_pages,
         "recordCount": rows,
         "overlapPolicy": {
             "authority": "dingtalk",

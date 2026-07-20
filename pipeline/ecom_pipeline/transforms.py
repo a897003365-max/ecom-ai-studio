@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import re
+import warnings
 from datetime import date, datetime
+from functools import lru_cache
 from pathlib import Path
 
+import pandas as pd
 import polars as pl
 
 from .catalog import QuerySpec
@@ -75,6 +78,111 @@ FILENAME_DATE_QUERIES = {
     "10-3京东客服绩效数据",
     "考勤数据",
 }
+
+JUSHUITAN_EXCLUDED_STORES = {
+    "伊凯琳家具旗舰店-周飞-猫1",
+    "伊凯琳家居特卖旗舰店-周飞-唯1",
+    "艾美悦旗舰店-周飞-猫8",
+}
+
+JUSHUITAN_MANUAL_ZERO_EXACT_NAMES = {
+    "0.01入会专拍链接",
+    "1",
+    "【3支-紫杆（黑）】【禾硕新5度+东米605刷题能量笔+知心k181】",
+    "【3支-蓝杆（黑）】【禾硕新5度+东米605刷题能量笔+知心k181】",
+    "入会专拍链接",
+    "【优惠价】麻大师乳胶枕头泰国进口正品成人呵护颈椎家用睡眠宿舍橡胶枕芯",
+    "【优惠价】麻大师瑜伽茶道黄麻坐垫蒲团坐垫客厅阳台飘窗榻榻米日式坐垫",
+    "【特权定金】麻大师乳胶枕头泰国进口正品成人呵护颈椎家用睡眠宿舍橡胶枕芯",
+    "麻大师乳胶枕头泰国进口正品成人呵护颈椎家用睡眠宿舍橡胶枕芯",
+    "麻大师瑜伽茶道黄麻坐垫蒲团坐垫客厅阳台飘窗榻榻米日式坐垫",
+    "麻大师瑜伽茶道黄麻坐垫蒲团坐垫客厅阳台飘窗榻榻米日式坐垫 麻大师坐垫:6CM厚 34cm*40cm",
+    "麻大师瑜伽茶道黄麻坐垫蒲团坐垫客厅阳台飘窗榻榻米日式坐垫40cm*40cm 麻大师坐垫:6CM厚 40cm*40cm",
+}
+
+
+def _normalize_order_id(value: object) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, float) and value.is_integer():
+        return str(int(value))
+    text = str(value).strip()
+    return text if text and text.lower() not in {"nan", "none"} else None
+
+
+@lru_cache(maxsize=8)
+def _read_offline_suborder_ids(offline_directory: str) -> frozenset[str]:
+    """Load the PBIX 线下 helper table without persisting order identifiers."""
+
+    folder = Path(offline_directory)
+    if not folder.is_dir():
+        return frozenset()
+
+    suborder_ids: set[str] = set()
+    for source in sorted(folder.glob("*.xls*")):
+        if source.name.startswith("~$"):
+            continue
+        try:
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", message="Workbook contains no default style")
+                frame = pd.read_excel(
+                    source,
+                    usecols=lambda column: str(column).strip() == "子订单编号",
+                    dtype=object,
+                )
+        except Exception as error:
+            raise ValueError(f"无法读取线下子订单来源文件: {source.name}") from error
+        if "子订单编号" not in frame.columns:
+            continue
+        suborder_ids.update(
+            value
+            for value in (_normalize_order_id(item) for item in frame["子订单编号"].tolist())
+            if value is not None
+        )
+    return frozenset(suborder_ids)
+
+
+def _offline_suborder_ids(jushuitan_source: Path) -> frozenset[str]:
+    """Resolve the PBIX sibling 线下 folder relative to a 聚水潭 source file."""
+
+    offline_directory = jushuitan_source.parent.parent / "02-商品明细库存表" / "线下"
+    return _read_offline_suborder_ids(str(offline_directory.resolve()))
+
+
+@lru_cache(maxsize=8)
+def _read_store_short_name_mapping(mapping_file: str) -> dict[str, str]:
+    """Load the same ERP store-name mapping used by the PBIX product report."""
+
+    source = Path(mapping_file)
+    if not source.is_file():
+        return {}
+    try:
+        frame = pd.read_excel(source, dtype=object)
+    except Exception as error:
+        raise ValueError(f"无法读取 ERP 店铺对照表: {source.name}") from error
+
+    source_column = next((column for column in ("ERP店铺名称", "店铺") if column in frame.columns), None)
+    short_name_column = next(
+        (column for column in ("共享表店铺名称", "店铺简称", "简称") if column in frame.columns),
+        None,
+    )
+    if not source_column or not short_name_column:
+        raise ValueError(f"ERP 店铺对照表缺少店铺映射列: {source.name}")
+    return {
+        store: short_name
+        for store, short_name in (
+            (_normalize_order_id(store), _normalize_order_id(short_name))
+            for store, short_name in zip(frame[source_column], frame[short_name_column], strict=False)
+        )
+        if store and short_name
+    }
+
+
+def _store_short_name_mapping(jushuitan_source: Path) -> dict[str, str]:
+    """Resolve the PBIX 店铺名称对应表 source next to 聚水潭 data files."""
+
+    mapping_file = jushuitan_source.parent.parent / "商品信息文件" / "ERP店铺对照表.xlsx"
+    return _read_store_short_name_mapping(str(mapping_file.resolve()))
 
 
 def canonical_column(value: str) -> str:
@@ -243,9 +351,332 @@ def _drop_empty_rows(frame: pl.DataFrame) -> pl.DataFrame:
     return frame.filter(pl.any_horizontal(populated))
 
 
+def _transform_jushuitan(frame: pl.DataFrame, path: Path) -> pl.DataFrame:
+    """Reproduce the business rules of PBIX query ``15-聚水潭商品数据``.
+
+    The source export has more than 100 columns.  We use the raw helper fields only
+    long enough to reproduce the PBIX filters and status priority, then drop them so
+    customer messages and after-sales annotations never enter the local warehouse.
+    """
+
+    required = {
+        "订单类型",
+        "买家实付",
+        "线上商品名",
+        "店铺",
+        "买家留言",
+        "售后分类",
+        "发货日期",
+        "确认收货日期",
+        "小旗",
+        "订单状态",
+        "付款日期",
+        "销售数量",
+    }
+    missing = sorted(required - set(frame.columns))
+    if missing:
+        raise ValueError(f"聚水潭源文件缺少 PBIX 状态规则必需列: {', '.join(missing)}")
+
+    # The catalog uses text types for date columns.  Support both the original
+    # slash-delimited datetime and a normalized ISO value for deterministic tests.
+    def _jushuitan_date(column: str) -> pl.Expr:
+        text = pl.col(column).cast(pl.String, strict=False).str.strip_chars()
+        return pl.coalesce(
+            text.str.strptime(pl.Date, "%Y/%m/%d %H:%M:%S", strict=False),
+            text.str.strptime(pl.Date, "%Y/%m/%d", strict=False),
+            text.str.strptime(pl.Date, "%Y-%m-%d %H:%M:%S", strict=False),
+            text.str.strptime(pl.Date, "%Y-%m-%d", strict=False),
+        ).alias(column)
+
+    numeric_columns = [
+        "买家实付", "销售数量", "实发数量", "实发金额", "销售金额", "成本价", "基本售价",
+        "销售成本", "销售毛利", "退货数量", "退货金额", "实退金额", "商家实收",
+        "平台补贴金额", "优惠金额", "运费收入", "运费支出",
+    ]
+    expressions = [_numeric_expression(column) for column in numeric_columns if column in frame.columns]
+    expressions.extend(
+        _jushuitan_date(column)
+        for column in ("订单日期", "发货日期", "确认收货日期", "付款日期")
+        if column in frame.columns
+    )
+    if expressions:
+        frame = frame.with_columns(expressions)
+
+    # PBIX 聚水潭商品数据_全量处理：渠道平台来自订单的商店站点，而不是店铺名推断。
+    # 保留 PBIX 中的三项站点标准化，避免网站把淘宝天猫、京东 POP/自营等口径折叠。
+    if "商店站点" in frame.columns:
+        channel_platform = (
+            pl.col("商店站点")
+            .cast(pl.String, strict=False)
+            .str.strip_chars()
+            .str.replace_all("头条放心购", "抖音", literal=True)
+            .str.replace_all("京东厂家直送", "京东自营", literal=True)
+            .str.replace_all("京东商城", "京东POP", literal=True)
+        )
+    elif "渠道平台" in frame.columns:
+        channel_platform = pl.col("渠道平台").cast(pl.String, strict=False).str.strip_chars()
+    else:
+        channel_platform = pl.lit(None, dtype=pl.String)
+
+    # PBIX 的店铺名称对应表来自 ERP店铺对照表.xlsx。先映射原始店铺，再按抖音达人和
+    # 新零售规则覆盖，确保网站筛选项与 PBIX 最终 [店铺简称] 同口径。
+    store_mapping = _store_short_name_mapping(path)
+    if store_mapping:
+        mapping_frame = pl.DataFrame(
+            {
+                "_store_name_key": list(store_mapping),
+                "_mapped_store_short_name": list(store_mapping.values()),
+            },
+            schema={"_store_name_key": pl.String, "_mapped_store_short_name": pl.String},
+        )
+        frame = (
+            frame.with_columns(
+                pl.col("店铺").cast(pl.String, strict=False).str.strip_chars().alias("_store_name_key")
+            )
+            .join(mapping_frame, on="_store_name_key", how="left")
+        )
+    else:
+        frame = frame.with_columns(pl.lit(None, dtype=pl.String).alias("_mapped_store_short_name"))
+
+    source_store_short_name = (
+        pl.col("店铺简称").cast(pl.String, strict=False).str.strip_chars()
+        if "店铺简称" in frame.columns
+        else pl.lit(None, dtype=pl.String)
+    )
+    mapped_store_short_name = pl.col("_mapped_store_short_name").cast(pl.String, strict=False).str.strip_chars()
+    base_store_short_name = pl.coalesce(
+        [
+            pl.when(mapped_store_short_name == "").then(None).otherwise(mapped_store_short_name),
+            pl.when(source_store_short_name == "").then(None).otherwise(source_store_short_name),
+            pl.lit("未映射"),
+        ]
+    )
+
+    # PBIX 最终渠道还有“新零售”覆盖：线上子订单命中线下表，或卖家备注含 M0 时，
+    # 都优先归入新零售。辅助订单号和备注原文仅在此处参与判断，不会进入最终数据集。
+    new_retail = pl.lit(False)
+    if "线上子订单编号" in frame.columns:
+        offline_ids = _offline_suborder_ids(path)
+        if offline_ids:
+            new_retail = (
+                pl.col("线上子订单编号")
+                .cast(pl.String, strict=False)
+                .str.strip_chars()
+                .is_in(offline_ids)
+                .fill_null(False)
+            )
+    if "卖家备注" in frame.columns:
+        seller_m0 = (
+            pl.col("卖家备注")
+            .cast(pl.String, strict=False)
+            .str.contains("M0", literal=True)
+            .fill_null(False)
+        )
+        new_retail = new_retail | seller_m0
+
+    daren_name = (
+        pl.col("达人名称").cast(pl.String, strict=False).str.strip_chars()
+        if "达人名称" in frame.columns
+        else pl.lit(None, dtype=pl.String)
+    )
+    douyin_store_short_name = (
+        pl.when(channel_platform == "抖音")
+        .then(
+            pl.when(
+                daren_name.is_null()
+                | daren_name.is_in(["", "null", "麻大师床垫旗舰店", "麻大师官方旗舰店"])
+            )
+            .then(pl.lit("抖1"))
+            .when(daren_name == "麻大师床垫官方直播间")
+            .then(pl.lit("抖2"))
+            .when(daren_name == "麻大师官方旗舰店直播间")
+            .then(pl.lit("抖3"))
+            .when(
+                daren_name.is_in(
+                    ["与辉同行", "「神机榜」床垫严选", "「神机榜」家居严选", "东方甄选家居馆", "兰知春序", "东方甄选美丽生活"]
+                )
+            )
+            .then(daren_name)
+            .otherwise(pl.lit("抖音达人"))
+        )
+        .otherwise(base_store_short_name)
+    )
+    store_short_name = pl.when(new_retail).then(pl.lit("新零售")).otherwise(douyin_store_short_name)
+    final_channel_platform = pl.when(store_short_name == "新零售").then(pl.lit("新零售")).otherwise(channel_platform)
+    frame = frame.with_columns(
+        douyin_store_short_name.alias("店铺简称（结算店铺）"),
+        store_short_name.alias("店铺简称"),
+        final_channel_platform.alias("渠道平台"),
+    )
+
+    product_name = pl.col("线上商品名").cast(pl.String, strict=False)
+    store = pl.col("店铺").cast(pl.String, strict=False)
+    buyer_memo = pl.col("买家留言").cast(pl.String, strict=False)
+    payment = pl.col("买家实付").cast(pl.Float64, strict=False)
+
+    # 聚水潭商品数据_全量处理: 普通订单、有效实付、排除三家店铺与返修单。
+    valid_business_row = (
+        (pl.col("订单类型").cast(pl.String, strict=False) == "普通订单")
+        & ((payment >= 50).fill_null(False) | product_name.str.contains("0.01", literal=True).fill_null(False))
+        & (~store.is_in(JUSHUITAN_EXCLUDED_STORES)).fill_null(True)
+        & (~buyer_memo.str.contains("返修", literal=True)).fill_null(True)
+    )
+    frame = frame.filter(valid_business_row)
+
+    # PBIX marks these as 销售数量 = 0 in the upstream query; query 15 removes
+    # those rows with [销售数量] <> 0.  Filtering here preserves that final query's
+    # grain without exposing the manual-zero detail table to the web app.
+    manual_zero = (
+        product_name.is_null()
+        | product_name.str.contains("礼品袋", literal=True).fill_null(False)
+        | product_name.str.contains("差", literal=True).fill_null(False)
+        | product_name.is_in(JUSHUITAN_MANUAL_ZERO_EXACT_NAMES).fill_null(False)
+        | product_name.str.contains("皮革", literal=True).fill_null(False)
+        | product_name.str.contains("单拍不发货", literal=True).fill_null(False)
+        | product_name.str.contains("0.01", literal=True).fill_null(False)
+        | product_name.str.contains("链接", literal=True).fill_null(False)
+        | product_name.str.contains("入会", literal=True).fill_null(False)
+        | product_name.str.contains("袋子", literal=True).fill_null(False)
+        | product_name.str.contains("小额收款", literal=True).fill_null(False)
+        | product_name.str.contains("麻大师环保黄麻手提袋", literal=True).fill_null(False)
+    )
+    frame = frame.filter((~manual_zero) & (pl.col("销售数量") != 0).fill_null(False))
+
+    after_sale = pl.col("售后分类").cast(pl.String, strict=False)
+    flag = pl.col("小旗").cast(pl.String, strict=False)
+    raw_status = pl.col("订单状态").cast(pl.String, strict=False)
+    pending_raw_status = (
+        (raw_status == "异常")
+        | raw_status.str.contains("等供销", literal=True).fill_null(False)
+        | raw_status.str.contains("发货中", literal=True).fill_null(False)
+        | (raw_status == "已付款待审核")
+    )
+    status_before_cancel = (
+        pl.when(after_sale == "仅退款")
+        .then(pl.lit("交易关闭（仅退款）"))
+        .when(after_sale == "普通退货")
+        .then(pl.lit("交易关闭（退货退款）"))
+        .when(pl.col("发货日期").is_not_null())
+        .then(pl.lit("已发货"))
+        .when(pl.col("确认收货日期").is_not_null())
+        .then(pl.lit("已收货"))
+        .when(flag.str.contains("紫", literal=True).fill_null(False))
+        .then(pl.lit("等通知"))
+        .when(flag.str.contains("黄", literal=True).fill_null(False))
+        .then(pl.lit("指定日"))
+        .when(pending_raw_status)
+        .then(pl.lit("待发货"))
+        .when(pl.col("付款日期").is_null())
+        .then(pl.lit("未付款"))
+        .otherwise(raw_status)
+    )
+    status_detail = (
+        pl.when(status_before_cancel == "已取消")
+        .then(pl.lit("交易关闭（仅退款）"))
+        .otherwise(status_before_cancel)
+    )
+    status_summary = (
+        pl.when(status_detail.is_in(["待发货", "等通知", "指定日"]))
+        .then(pl.lit("待发"))
+        .when(status_detail.is_in(["已发货", "已收货"]))
+        .then(pl.lit("已发"))
+        .otherwise(pl.lit("未付款或交易关闭"))
+    )
+    frame = frame.with_columns(
+        status_detail.alias("订单状态明细"),
+        status_summary.alias("订单状态汇总"),
+    )
+
+    # Keep line identifiers so the warehouse can apply the PBIX Table.Distinct
+    # semantics without collapsing legitimate orders for the same SKU and day.
+    keep = [
+        "线上订单号", "线上子订单编号", "内部订单号", "线上商品名", "店铺商品编码", "商品编码", "商品简称", "产品名称",
+        "SPU产品商编", "子名称", "颜色规格", "商品id", "产品分类", "床垫类别", "品牌", "供应商",
+        "店铺", "店铺简称", "店铺简称（结算店铺）", "渠道平台", "订单来源", "订单状态", "订单状态明细",
+        "订单状态汇总", "达人名称", "业务员", "省", "发货仓", "是否定制", "定制备注标签", "厚度", "尺寸",
+        "订单日期", "付款日期", "发货日期", "确认收货日期", "年月", "销售数量", "实发数量", "实发金额",
+        "销售金额", "成本价", "基本售价", "销售成本", "销售毛利", "退货数量", "退货金额", "实退金额",
+        "买家实付", "商家实收", "平台补贴金额", "优惠金额", "运费收入", "运费支出",
+    ]
+    return frame.select([column for column in keep if column in frame.columns])
+
+
+def _transform_product_master(frame: pl.DataFrame) -> pl.DataFrame:
+    """产品主表（复刻 pbix 辅10-产品编码 的 union 逻辑）：5 个产品主表按文件列映射到统一列。
+
+    各文件原始列名不同，用 coalesce 合并：
+      商品编码 = coalesce(商家规编（后台）, 商家编码, sku产品编码)
+      产品名称 = coalesce(产品名称, SKU产品名, 商品名称, 名称, SPU产品名, 商品标题)
+      床垫类别 = coalesce(床垫类别, 三级类目)  家纺行无此列 -> "家纺"
+      成本 = coalesce(成本, 成本价, 成本（不含运费）)
+      尺寸 = coalesce(尺寸, 规格)
+    按 商品编码 去重，提供给聚水潭 join 计算毛利率与床垫类别分析。
+    """
+    def _coalesce_str(cols: list[str]) -> pl.Expr | None:
+        present = [c for c in cols if c in frame.columns]
+        if not present:
+            return None
+        return pl.coalesce(
+            [
+                pl.when(pl.col(c).cast(pl.String, strict=False).str.strip_chars() == "")
+                .then(None)
+                .otherwise(pl.col(c).cast(pl.String, strict=False).str.strip_chars())
+                for c in present
+            ]
+        )
+
+    code_expr = _coalesce_str(["商家规编（后台）", "商家编码", "sku产品编码"])
+    product_id_expr = _coalesce_str(["商品ID", "SKUid", "SKUID"])
+    product_name_expr = _coalesce_str(
+        ["产品名称", "SKU产品名", "商品名称", "名称", "SPU产品名", "商品标题"]
+    )
+    cat_expr = _coalesce_str(["床垫类别", "三级类目"])
+    if cat_expr is not None and "Source.Name" in frame.columns:
+        # 家纺商品表无 床垫类别/三级类目，按 pbix M 派生为 "家纺"
+        cat_expr = (
+            pl.when(cat_expr.is_null() | (cat_expr == ""))
+            .then(pl.when(pl.col("Source.Name").str.contains("家纺")).then(pl.lit("家纺")).otherwise(None))
+            .otherwise(cat_expr)
+        )
+    cost_present = [c for c in ["成本", "成本价", "成本（不含运费）"] if c in frame.columns]
+    cost_expr = (
+        pl.coalesce([pl.col(c).cast(pl.Float64, strict=False) for c in cost_present]) if cost_present else None
+    )
+    size_expr = _coalesce_str(["尺寸", "规格"])
+
+    exprs = []
+    if code_expr is not None:
+        exprs.append(code_expr.alias("商品编码"))
+    if product_id_expr is not None:
+        exprs.append(product_id_expr.alias("商品ID"))
+    if product_name_expr is not None:
+        exprs.append(product_name_expr.alias("产品名称"))
+    if cat_expr is not None:
+        exprs.append(cat_expr.alias("床垫类别"))
+    if cost_expr is not None:
+        exprs.append(cost_expr.alias("成本"))
+    if size_expr is not None:
+        exprs.append(size_expr.alias("尺寸"))
+    if exprs:
+        frame = frame.with_columns(exprs)
+
+    keep = [c for c in ["商品编码", "商品ID", "产品名称", "床垫类别", "成本", "尺寸"] if c in frame.columns]
+    frame = frame.select(keep)
+    if "商品编码" in frame.columns:
+        frame = frame.filter(pl.col("商品编码").is_not_null() & (pl.col("商品编码") != ""))
+        frame = frame.unique(subset=["商品编码"], keep="first", maintain_order=True)
+    return frame
+
+
 def _apply_query_rules(frame: pl.DataFrame, spec: QuerySpec, path: Path) -> pl.DataFrame:
     if spec.name == "03-1-各渠道目标金额":
         return _transform_targets(frame, path)
+
+    if spec.name == "15-聚水潭商品数据":
+        return _transform_jushuitan(frame, path)
+
+    if spec.name == "product-master":
+        return _transform_product_master(frame)
 
     if spec.name == "07-旗舰店商品销售数据":
         frame = frame.drop([column for column in ("Column4", "Column37", "Column38") if column in frame.columns])

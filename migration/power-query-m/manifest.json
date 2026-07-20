@@ -2,7 +2,7 @@
   "generatedAt": "2026-07-11T10:59:51.549Z",
   "sourcePbix": "D:/麻大师/BI文件/麻大师店铺推广数据报表.pbix",
   "tmdlRoot": "migration/powerbi-tmdl",
-  "queryCount": 25,
+  "queryCount": 27,
   "queries": [
     {
       "name": "00-月表汇总",
@@ -4578,6 +4578,259 @@
         }
       ],
       "migrationStatus": "catalogued"
+    },
+    {
+      "name": "15-聚水潭商品数据",
+      "tmdlFile": null,
+      "mFile": null,
+      "sourcePbix": "D:/麻大师/BI文件/麻大师商品数据报表.pbix",
+      "sourceKind": "folder",
+      "sourcePaths": [
+        "D:\\麻大师\\日更数据\\天猫旗舰店\\15-聚水潭商品数据"
+      ],
+      "operations": [
+        "Folder.Files",
+        "Excel.Workbook",
+        "Table.PromoteHeaders",
+        "Table.TransformColumnTypes",
+        "Table.SelectColumns"
+      ],
+      "references": [],
+      "sheetName": null,
+      "promoteHeaders": true,
+      "typedColumnCount": 34,
+      "typedColumns": [
+        "商品编码",
+        "商品简称",
+        "颜色规格",
+        "产品分类",
+        "品牌",
+        "供应商",
+        "店铺",
+        "订单来源",
+        "订单状态",
+        "订单状态明细",
+        "达人名称",
+        "业务员",
+        "省",
+        "发货仓",
+        "订单日期",
+        "发货日期",
+        "付款日期",
+        "销售数量",
+        "实发数量",
+        "实发金额",
+        "销售金额",
+        "成本价",
+        "基本售价",
+        "销售成本",
+        "销售毛利",
+        "退货数量",
+        "退货金额",
+        "实退金额",
+        "买家实付",
+        "商家实收",
+        "平台补贴金额",
+        "优惠金额",
+        "运费收入",
+        "运费支出"
+      ],
+      "schema": [
+        {
+          "column": "商品编码",
+          "mType": "type text"
+        },
+        {
+          "column": "商品简称",
+          "mType": "type text"
+        },
+        {
+          "column": "颜色规格",
+          "mType": "type text"
+        },
+        {
+          "column": "产品分类",
+          "mType": "type text"
+        },
+        {
+          "column": "品牌",
+          "mType": "type text"
+        },
+        {
+          "column": "供应商",
+          "mType": "type text"
+        },
+        {
+          "column": "店铺",
+          "mType": "type text"
+        },
+        {
+          "column": "订单来源",
+          "mType": "type text"
+        },
+        {
+          "column": "订单状态",
+          "mType": "type text"
+        },
+        {
+          "column": "订单状态明细",
+          "mType": "type text"
+        },
+        {
+          "column": "达人名称",
+          "mType": "type text"
+        },
+        {
+          "column": "业务员",
+          "mType": "type text"
+        },
+        {
+          "column": "省",
+          "mType": "type text"
+        },
+        {
+          "column": "发货仓",
+          "mType": "type text"
+        },
+        {
+          "column": "订单日期",
+          "mType": "type text"
+        },
+        {
+          "column": "发货日期",
+          "mType": "type text"
+        },
+        {
+          "column": "付款日期",
+          "mType": "type text"
+        },
+        {
+          "column": "销售数量",
+          "mType": "type number"
+        },
+        {
+          "column": "实发数量",
+          "mType": "type number"
+        },
+        {
+          "column": "实发金额",
+          "mType": "type number"
+        },
+        {
+          "column": "销售金额",
+          "mType": "type number"
+        },
+        {
+          "column": "成本价",
+          "mType": "type number"
+        },
+        {
+          "column": "基本售价",
+          "mType": "type number"
+        },
+        {
+          "column": "销售成本",
+          "mType": "type number"
+        },
+        {
+          "column": "销售毛利",
+          "mType": "type number"
+        },
+        {
+          "column": "退货数量",
+          "mType": "type number"
+        },
+        {
+          "column": "退货金额",
+          "mType": "type number"
+        },
+        {
+          "column": "实退金额",
+          "mType": "type number"
+        },
+        {
+          "column": "买家实付",
+          "mType": "type number"
+        },
+        {
+          "column": "商家实收",
+          "mType": "type number"
+        },
+        {
+          "column": "平台补贴金额",
+          "mType": "type number"
+        },
+        {
+          "column": "优惠金额",
+          "mType": "type number"
+        },
+        {
+          "column": "运费收入",
+          "mType": "type number"
+        },
+        {
+          "column": "运费支出",
+          "mType": "type number"
+        }
+      ],
+      "migrationStatus": "catalogued",
+      "note": "手写条目（无 TMDL）。源 pbix 为麻大师商品数据报表.pbix，与顶层 sourcePbix 不同。源文件 105 列，仅保留 32 个聚合所需列，丢弃 PII 与未用列。日期列由 transforms 查询规则用 %Y/%m/%d %H:%M:%S 解析。"
+    },
+    {
+      "name": "product-master",
+      "tmdlFile": null,
+      "mFile": null,
+      "sourcePbix": "D:/麻大师/BI文件/麻大师商品数据报表.pbix",
+      "sourceKind": "excel_file",
+      "sourcePaths": [
+        "D:\\麻大师\\日更数据\\天猫旗舰店\\商品信息文件\\产品明细.xlsx",
+        "D:\\麻大师\\日更数据\\天猫旗舰店\\商品信息文件\\拼多多店铺麻大师床垫产品信息表合集.xlsx",
+        "D:\\麻大师\\日更数据\\天猫旗舰店\\商品信息文件\\家纺商品表.xlsx",
+        "D:\\麻大师\\日更数据\\天猫旗舰店\\商品信息文件\\自营商品表.xlsx",
+        "D:\\麻大师\\日更数据\\天猫旗舰店\\商品信息文件\\pop商品表.xlsx"
+      ],
+      "operations": [
+        "Excel.Workbook",
+        "Table.PromoteHeaders",
+        "Table.Combine",
+        "Table.Distinct"
+      ],
+      "references": [
+        "辅4-床垫编码",
+        "拼多多商品",
+        "家纺商品表",
+        "京东自营商品表",
+        "京东POP商品表"
+      ],
+      "sheetName": null,
+      "promoteHeaders": true,
+      "typedColumnCount": 4,
+      "typedColumns": [
+        "商品编码",
+        "床垫类别",
+        "成本",
+        "尺寸"
+      ],
+      "schema": [
+        {
+          "column": "商品编码",
+          "mType": "type text"
+        },
+        {
+          "column": "床垫类别",
+          "mType": "type text"
+        },
+        {
+          "column": "成本",
+          "mType": "type number"
+        },
+        {
+          "column": "尺寸",
+          "mType": "type text"
+        }
+      ],
+      "migrationStatus": "catalogued",
+      "note": "手写条目。复刻 pbix 辅10-产品编码 的 union 逻辑：5 个产品主表按文件列映射到 商品编码/床垫类别/成本/尺寸，去重。提供床垫类别与成本给聚水潭 join 计算毛利率。床类编码.xlsx 跳过（其床垫类别/成本由 join 辅4 派生，原始文件不含）。"
     }
   ],
   "sources": [
