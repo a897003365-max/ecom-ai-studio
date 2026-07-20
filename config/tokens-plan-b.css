@@ -1,0 +1,163 @@
+/* ============================================================
+   方案 B：数据密集专业型深色主题 Token 表
+   参考：Grafana + Linear + PostHog
+   基准：oklch 色彩空间，所有数值可计算
+   ============================================================ */
+
+:root {
+  /* ─────────────────────────────────────────────────────
+     1. 色彩系统（核心 3 层深度 + 语义色）
+     层级关系：
+       页面底色（最暗）→ 侧边栏/次级卡片（+3%）→ 主卡片（+6%）
+     ───────────────────────────────────────────────────── */
+
+  /* 背景层级（从深到浅） */
+  --color-bg-page:      oklch(12% 0.005 260);   /* 页面最底层底色（比你现在的再深一点） */
+  --color-bg-sidebar:   oklch(15% 0.005 260);   /* 侧边栏背景（+3% 亮度） */
+  --color-bg-card:      oklch(18% 0.005 260);   /* 主卡片背景（+6% 亮度） */
+  --color-bg-hover:     oklch(21% 0.005 260);   /* 卡片 hover 态（+9%） */
+  --color-bg-active:    oklch(24% 0.005 260);   /* 选中/激活态（+12%） */
+
+  /* 边框层级 */
+  --color-border-subtle:   oklch(24% 0.005 260);  /* 极淡分隔线（表格内部） */
+  --color-border-card:     oklch(28% 0.005 260);  /* 卡片边框 */
+  --color-border-focus:    oklch(65% 0.16 260);   /* focus-visible 轮廓 */
+
+  /* 文字层级（从亮到暗） */
+  --color-text-primary:    oklch(96% 0 0);        /* 标题、KPI 数字 */
+  --color-text-secondary:  oklch(78% 0 0);        /* 正文、说明文字 */
+  --color-text-tertiary:   oklch(60% 0 0);        /* 辅助文字、时间戳、placeholder */
+  --color-text-disabled:   oklch(45% 0 0);        /* 禁用态 */
+
+  /* 语义色（方案 B 核心：正常全灰阶，异常才用彩色） */
+  --color-success:         oklch(72% 0.16 145);   /* 绿：正常、完成、100%、已同步 */
+  --color-warning:         oklch(78% 0.16 75);    /* 琥珀：等待中、待确认 */
+  --color-progress:        oklch(68% 0.16 260);   /* 蓝：进行中（就是你现在的 IKB 蓝） */
+  --color-error:           oklch(68% 0.18 25);    /* 红：失败、异常 */
+  --color-info:            oklch(65% 0.12 200);   /* 青：信息、提示 */
+
+  /* 语义色淡版（用于背景、进度条） */
+  --color-success-bg:      oklch(28% 0.06 145);
+  --color-warning-bg:      oklch(30% 0.06 75);
+  --color-progress-bg:     oklch(26% 0.06 260);
+  --color-error-bg:        oklch(26% 0.07 25);
+
+  /* ─────────────────────────────────────────────────────
+     2. 字号阶（信息密度型，偏小但清晰）
+     基准：13px = 0.8125rem
+     ───────────────────────────────────────────────────── */
+
+  --font-size-aux:         0.6875rem;  /* 11px - 辅助文字、时间戳、表格小字 */
+  --font-size-body:        0.8125rem;  /* 13px - 正文、列表、表格内容 */
+  --font-size-section:     0.875rem;   /* 14px - section 标题、按钮文字 */
+  --font-size-subtitle:    1rem;       /* 16px - 卡片大标题 */
+  --font-size-kpi:         2rem;       /* 32px - KPI 大数字（今日运营概览） */
+  --font-size-kpi-small:   1.5rem;     /* 24px - 实时监控区数字 */
+
+  /* 字重 */
+  --font-weight-regular:   400;
+  --font-weight-medium:    500;
+  --font-weight-semibold:  600;
+
+  /* 行高 */
+  --line-height-tight:     1.2;   /* KPI 数字 */
+  --line-height-normal:    1.5;   /* 正文 */
+  --line-height-relaxed:   1.6;   /* 长文本 */
+
+  /* 数字等宽（关键！扫视速度提升 30%） */
+  --font-numeric:          tabular-nums;
+
+  /* ─────────────────────────────────────────────────────
+     3. 间距阶（4px 基准，倍数递增）
+     所有 padding/margin 必须从这里取，不许写零散数字
+     ───────────────────────────────────────────────────── */
+
+  --space-1:               0.25rem;   /* 4px - 元素内部微调 */
+  --space-2:               0.5rem;    /* 8px - 紧凑间距 */
+  --space-3:               0.75rem;   /* 12px - 标准内边距 */
+  --space-4:               1rem;      /* 16px - 卡片内边距 */
+  --space-5:               1.25rem;   /* 20px - 卡片之间距 */
+  --space-6:               1.5rem;    /* 24px - Section 间距 */
+  --space-8:               2rem;      /* 32px - 页面边距 */
+
+  /* ─────────────────────────────────────────────────────
+     4. 圆角、阴影、边框
+     ───────────────────────────────────────────────────── */
+
+  /* 圆角（方案 B：克制，不要太大） */
+  --radius-sm:             4px;    /* 按钮、badge */
+  --radius-md:             6px;    /* 卡片、输入框 */
+  --radius-lg:             8px;    /* 顶层弹窗 */
+
+  /* 阴影（极淡，只有层级区分，没有装饰性） */
+  --shadow-subtle:         0 1px 2px oklch(0% 0 0 / 0.2);
+  --shadow-card:           0 2px 8px oklch(0% 0 0 / 0.15);
+  --shadow-float:          0 4px 16px oklch(0% 0 0 / 0.2);
+
+  /* 边框宽度 */
+  --border-width:          1px;
+  --border-width-focus:    2px;
+
+  /* ─────────────────────────────────────────────────────
+     5. 微动画（克制，只在状态变化时）
+     ───────────────────────────────────────────────────── */
+
+  --transition-fast:       100ms ease;
+  --transition-normal:     150ms ease;
+  --transition-slow:       250ms ease;
+}
+
+/* ─────────────────────────────────────────────────────
+   6. 背景噪点纹理（降低视觉疲劳，Supabase 同款）
+   使用方式：background-image: var(--noise-texture);
+   ───────────────────────────────────────────────────── */
+
+:root {
+  --noise-texture: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.02'/%3E%3C/svg%3E");
+}
+
+/* ─────────────────────────────────────────────────────
+   7. 表格专用 Token（你的页面 60% 是表格）
+   ───────────────────────────────────────────────────── */
+
+:root {
+  --table-row-height:      calc(var(--font-size-body) * var(--line-height-normal) + var(--space-3) * 2);
+  --table-header-bg:       var(--color-bg-sidebar);
+  --table-row-hover:       var(--color-bg-hover);
+  --table-border:          var(--color-border-subtle);
+}
+
+/* ============================================================
+   迁移指南（从你现在的样式 → 方案 B）
+   ============================================================
+
+   第 1 步：页面底色替换
+     现在的 body background → var(--color-bg-page)
+     加背景噪点：background-image: var(--noise-texture)
+
+   第 2 步：所有卡片
+     去掉现在的 border，改用 background: var(--color-bg-card)
+     圆角改成 var(--radius-md)
+
+   第 3 步：KPI 数字区
+     字号 → var(--font-size-kpi)
+     字重 → var(--font-weight-semibold)
+     font-variant-numeric: var(--font-numeric)
+     说明文字 → var(--font-size-aux) / var(--color-text-tertiary)
+
+   第 4 步：状态语义化
+     "正常 / 100% / 已同步" → var(--color-success)
+     "进行中 / 运行中" → var(--color-progress)
+     "等待中 / 待确认" → var(--color-warning)
+     "失败 / 异常" → var(--color-error)
+
+   第 5 步：表格
+     行高 → var(--table-row-height)
+     分隔线 → border-bottom: 1px solid var(--table-border)
+     hover 态 → background: var(--table-row-hover)
+
+   第 6 步：按钮
+     主按钮：背景 var(--color-progress)，文字 white
+     次按钮：背景透明，边框 var(--color-border-card)，文字 var(--color-text-secondary)
+     hover 时背景亮度 +3%
+ */

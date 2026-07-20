@@ -17,11 +17,15 @@ npm run dev
 
 默认地址为 `http://127.0.0.1:5173/`。端口被占用时服务自动选择后续端口；网页和 `/api/*` 始终共用实际输出的地址。
 
+登录与权限功能已完整保留，但本地开发默认采用免登录模式，不拦截页面和业务 API。正式上线前设置 `AUTH_ENFORCEMENT_ENABLED=1` 后，首次打开会进入“创建首位管理员”页面；之后登录必须同时匹配邮箱、手机号和密码。账号、密码哈希和服务端会话保存在已忽略的 `local-data/auth/auth-store.json`，浏览器只接收 HttpOnly 会话 Cookie。
+
 构建与验证：
 
 ```bash
 npm run build
+npm run test:auth
 npm run test:dingtalk-api
+npm run test:public-surface
 python -m unittest discover -s pipeline/tests -v
 npm run test:smoke
 ```
@@ -35,7 +39,9 @@ npm run test:smoke
 5. 运营数据看板：本地数仓、钉钉、飞书的聚合经营指标、趋势、素材表现与再生成建议。
 6. 竞品情报 / TOP100：行业榜单、竞品店铺与价格监控 mock。
 7. 任务队列：跨模块异步任务、重试、人工确认、日志和产物入口。
-8. 系统设置：本机环境、数据源状态、同步配置和 AI / 人工分工。
+8. 商品管理：按商品查看经营、投放与转化数据。
+9. 系统设置：本机环境、数据源状态、同步配置和 AI / 人工分工。
+10. 用户与权限：管理员创建、停用账号，并逐项配置页面查看与操作权限。
 
 ## 数据架构
 
@@ -82,6 +88,9 @@ DINGTALK_WORKBOOK_ID
 DINGTALK_OPERATOR_ID
 DINGTALK_OPERATOR_USER_ID
 DINGTALK_SYNC_TIMES=10:00,12:30,17:30
+# 可选：无人值守重试与单请求超时
+DINGTALK_SYNC_ATTEMPTS=3
+DINGTALK_API_TIMEOUT_MS=45000
 ```
 
 手动同步、试运行和注册计划任务：
@@ -92,7 +101,7 @@ npm run sync:dingtalk:dry
 npm run schedule:dingtalk
 ```
 
-计划任务名为 `EcomAIStudio-DingTalk-Sync`。它只读取工作表并保存脱敏聚合，不回写钉钉。
+计划任务名为 `EcomAIStudio-DingTalk-Sync`。它只读取工作表并保存脱敏聚合，不回写钉钉；注册后使用 S4U 身份运行，不依赖用户交互登录，网络恢复后自动补跑，失败最多自动重启 3 次。每次运行的状态会写入 `local-data/runtime/dingtalk-sync-health.json`，并可从 `/api/health` 查看。
 
 ### 飞书只读聚合
 
@@ -103,6 +112,12 @@ npm run schedule:dingtalk
 | 方法 | 路径 | 用途 |
 |---|---|---|
 | GET | `/api/health` | 服务健康状态 |
+| GET | `/api/auth/status` | 登录状态与首次初始化状态 |
+| POST | `/api/auth/bootstrap` | 仅首次创建管理员并签发会话 |
+| POST | `/api/auth/login` | 使用邮箱、手机号和密码登录 |
+| POST | `/api/auth/logout` | 注销当前服务端会话 |
+| GET/POST | `/api/admin/users` | 管理员查询或创建用户 |
+| PATCH | `/api/admin/users/:id` | 管理员更新账号状态与权限 |
 | GET | `/api/data-sources` | 本地数仓、钉钉、飞书和工作流状态 |
 | GET | `/api/analytics` | 三类来源的聚合快照与同步历史 |
 | POST | `/api/sync/warehouse` | 增量读取本地源文件并刷新 DuckDB / Parquet |
@@ -114,6 +129,8 @@ npm run schedule:dingtalk
 | POST | `/api/workflows/douyin-ecom-copy/run` | 写入文案、分镜或质检本地队列 |
 | POST | `/api/uploads` | 导入 CSV / XLSX / JSON 作为本地兜底数据源 |
 
+当 `AUTH_ENFORCEMENT_ENABLED=1` 时，除 `/api/health` 和登录初始化接口外，业务 API 均要求有效会话，并在服务端按权限再次校验；默认值 `0` 用于本地开发和 Agent 调试，可直接访问页面与业务 API。管理员始终拥有全部权限；普通用户的导航和接口访问范围由“用户与权限”页面配置。连续登录失败会触发 15 分钟窗口限流。
+
 ## 工程结构
 
 ```text
@@ -121,6 +138,7 @@ server/
   index.mjs             # 单端口 UI / API 服务
   warehouse.mjs         # Python 数仓同步与聚合快照读取
   dingtalk-api.mjs      # 钉钉 Sheet API 只读连接
+  dingtalk-lock.mjs     # 钉钉同步跨进程互斥锁
   dingtalk.mjs          # 钉钉本地导出文件兜底解析
   feishu.mjs            # 飞书只读脱敏聚合
   workflow.mjs          # Claude Code 内容任务入口
@@ -154,3 +172,7 @@ src/
 - [运营数据本地化方案](docs/OPERATIONS_DATA_INTEGRATION_PLAN.md)
 - [内容工作流本地编排方案](docs/CONTENT_WORKFLOW_LOCAL_ORCHESTRATION_PLAN.md)
 - [缺失数据需求清单](docs/DATA_REQUIREMENTS.md)
+- [交接文档](docs/HANDOFF.md)
+- [运行与验证日志](docs/OPERATIONS-LOG.md)
+- [钉钉安全说明](docs/DINGTALK-SECURITY.md)
+- [PowerBI 独有数据呈现方案](docs/POWERBI-UNIQUE-DATA-PRESENTATION-PLAN.md)

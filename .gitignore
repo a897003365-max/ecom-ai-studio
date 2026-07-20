@@ -6,6 +6,16 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 *.log
+*.bak
+*.bak-*
 .vite/
 .env*
 !.env.example
+
+# Local DingTalk operating guide may contain credentials; never publish it.
+钉钉表格读写指南.md
+
+# Local verification artifacts and licensed/raw reference workbooks stay outside Git.
+.playwright-cli/
+output/
+参考文件/
