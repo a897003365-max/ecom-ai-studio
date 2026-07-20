@@ -1224,8 +1224,8 @@
 
     <!-- 05 运营数据看板 -->
     <section class="screen global-screen" id="analytics">
-      <header class="page-head"><div><div class="page-title">运营数据看板 · 增长诊断</div><div class="page-sub">主问题：目标缺口由哪些因素造成，下一步怎样缩小缺口？</div></div><div class="context"><div class="box"><div class="eyebrow">视图</div><div class="value">增长诊断</div></div><div class="box"><div class="eyebrow">统计周期</div><div class="value">07-01 ~ 07-15</div></div><div class="box"><div class="eyebrow">共同完整日</div><div class="value">07-14</div></div><div class="box wide"><div class="eyebrow">范围</div><div class="value">全渠道 · 全店铺</div></div></div></header>
-      <div class="toolbar"><span class="btn">经营概览</span><span class="btn dark">增长诊断</span><span class="annot push">钉钉截至 07-15；跨源诊断使用共同完整日 07-14</span></div>
+      <header class="page-head"><div><div class="page-title">运营数据看板 · 增长诊断 <span style="display:inline-block;margin-left:10px;padding:2px 10px;font-size:10px;font-weight:600;letter-spacing:.06em;background:var(--accent-soft);color:var(--accent-deep);border-radius:10px;vertical-align:middle;">scope = powerbi_unique_only</span></div><div class="page-sub">主问题：目标缺口由哪些因素造成，下一步怎样缩小缺口？<span style="margin-left:12px;color:var(--muted);font-size:11px;">结果指标（GMV/回款/退款/费用/目标）来自钉钉；本视图只补充过程与驱动因素。</span></div></div><div class="context"><div class="box"><div class="eyebrow">视图</div><div class="value">增长诊断</div></div><div class="box"><div class="eyebrow">统计周期</div><div class="value">07-01 ~ 07-15</div></div><div class="box"><div class="eyebrow">共同完整日</div><div class="value">07-14</div></div><div class="box wide"><div class="eyebrow">范围</div><div class="value">全渠道 · 全店铺</div></div></div></header>
+      <div class="toolbar"><span class="btn">经营概览</span><span class="btn dark">增长诊断</span><a class="btn" href="#diag-funnel">流量与转化 ›</a><a class="btn" href="#diag-media">投放效率 ›</a><span class="annot push">钉钉截至 07-15；跨源诊断使用共同完整日 07-14</span></div>
       <div class="section-title"><span class="step">1</span>结果与目标差距：缺口有多大？</div>
       <div class="grid g4"><div class="panel span2"><div class="small">净回款目标缺口</div><div class="big">-¥13.22M</div><div class="small">按当前节奏预计达成 82.4%</div><div class="chart"><svg viewBox="0 0 600 110" preserveAspectRatio="none"><polyline points="0,92 70,80 140,76 210,60 280,67 350,48 420,43 490,31 560,22 600,18" fill="none" stroke="#262c29" stroke-width="3"/></svg></div></div><div class="panel"><div class="panel-title">缺口拆解</div><table class="table"><tr><td>退款增加</td><td>-¥4.20M</td></tr><tr><td>转化下降</td><td>-¥3.65M</td></tr><tr><td>投放低效</td><td>-¥2.08M</td></tr><tr><td>客单下降</td><td>-¥1.17M</td></tr><tr><td>其他</td><td>-¥2.12M</td></tr></table></div><div class="panel"><div class="panel-title">Top 3 异常</div><div class="rank"><span class="rank-n">1</span><div><b>退款率 +6.3pp</b><p>影响最大 · 7 商品</p></div></div><div class="rank" style="margin-top:7px"><span class="rank-n">2</span><div><b>支付转化 -0.6pp</b><p>集中在抖音</p></div></div><div class="rank" style="margin-top:7px"><span class="rank-n">3</span><div><b>3 计划低于盈亏线</b><p>预计浪费 ¥86k</p></div></div></div></div>
       <div class="section-title"><span class="step">2</span>为什么变化：从流量到利润逐层定位</div>
@@ -1233,6 +1233,360 @@
       <div class="section-title"><span class="step">3</span>建议动作：用影响、负责人和证据形成闭环</div>
       <div class="panel"><table class="table"><tr><th>优先级</th><th>经营动作</th><th>预计影响</th><th>证据</th><th>负责人 / 截止</th><th>状态</th><th>操作</th></tr><tr><td><span class="tag dark">P0</span></td><td>核查 7 个高退款商品</td><td>挽回 ¥420k</td><td>退款原因 + 商品明细</td><td>售后运营 / 今日</td><td>未分配</td><td><span class="btn dark">创建任务</span></td></tr><tr><td><span class="tag">P1</span></td><td>暂停 3 个低效计划</td><td>节省 ¥86k</td><td>费用 + 净回款增量</td><td>投放运营 / 今日</td><td>待确认</td><td><span class="btn">查看任务</span></td></tr><tr><td><span class="tag">P1</span></td><td>优化 A7 主图与首屏价格</td><td>增收 ¥82k</td><td>流量高 / 转化低</td><td>商品运营 / 明日</td><td>未开始</td><td><span class="btn dark">创建任务</span></td></tr></table></div>
       <div class="footnote">05 / 10 · 完整渠道与门店比较进入抽屉，不打断主叙事</div>
+    </section>
+
+    <!-- 05.1 增长诊断 · 流量与转化（PowerBI 独有） -->
+    <section class="screen global-screen" id="diag-funnel">
+      <header class="page-head">
+        <div>
+          <div class="breadcrumb"><a href="#analytics">运营数据看板</a><span>›</span><span>增长诊断 · 流量与转化</span></div>
+          <div class="page-title">流量与转化 <span style="display:inline-block;margin-left:10px;padding:2px 10px;font-size:10px;font-weight:600;letter-spacing:.06em;background:var(--accent-soft);color:var(--accent-deep);border-radius:10px;vertical-align:middle;">scope = powerbi_unique_only</span></div>
+          <div class="page-sub">主问题：损失发生在漏斗的哪一层？流量量级、流量质量还是转化环节？</div>
+        </div>
+        <div class="context">
+          <div class="box"><div class="eyebrow">数据截止日</div><div class="value">07-15</div></div>
+          <div class="box"><div class="eyebrow">比较窗口</div><div class="value">近 7 完整日中位数</div></div>
+          <div class="box"><div class="eyebrow">数据覆盖</div><div class="value">4 店铺 · 无线+PC</div></div>
+          <div class="box wide"><div class="eyebrow">来源</div><div class="value">mart_funnel_daily · mart_traffic_source_daily</div></div>
+        </div>
+      </header>
+      <div class="toolbar"><span class="btn dark">全部</span><span class="btn">无线</span><span class="btn">PC</span><span class="btn">按店铺</span><span class="annot push">销售金额不出现在本页；转化率、跳失率、UV 价值为主指标</span></div>
+
+      <div class="section-title"><span class="step">1</span>阶段漏斗：访客到支付的每层留存</div>
+      <div class="grid g4">
+        <article class="panel span2">
+          <div class="panel-title">支付转化漏斗（近 7 日中位）</div>
+          <div class="chart" style="height:220px">
+            <svg viewBox="0 0 600 220" preserveAspectRatio="none" style="width:100%;height:100%;">
+              <!-- 5 段阶段条形 -->
+              <g font-family="Microsoft YaHei" font-size="10" fill="#172019">
+                <rect x="20" y="20" width="540" height="26" fill="#9fcf33" fill-opacity="0.85"/>
+                <text x="30" y="37">访客 1,420,000</text><text x="540" y="37" text-anchor="end" fill="#fff">100%</text>
+
+                <rect x="20" y="60" width="486" height="26" fill="#9fcf33" fill-opacity="0.65"/>
+                <text x="30" y="77">商品访客 1,278,000</text><text x="506" y="77" text-anchor="end" fill="#fff">90.0%</text>
+
+                <rect x="20" y="100" width="245" height="26" fill="#9fcf33" fill-opacity="0.45"/>
+                <text x="30" y="117">加购 86,000 <tspan fill="#9f443e" font-weight="700">↓ -2.1pp vs 基线</tspan></text><text x="265" y="117" text-anchor="end">6.7%</text>
+
+                <rect x="20" y="140" width="99" height="26" fill="#9f443e" fill-opacity="0.55"/>
+                <text x="30" y="157">下单 45,300 <tspan fill="#9f443e" font-weight="700">↓ -0.9pp</tspan></text><text x="129" y="157" text-anchor="end" fill="#fff">3.2%</text>
+
+                <rect x="20" y="180" width="88" height="26" fill="#62890f" fill-opacity="0.85"/>
+                <text x="30" y="197" fill="#fff">支付 39,200</text><text x="118" y="197" text-anchor="end" fill="#fff">2.76%</text>
+              </g>
+            </svg>
+          </div>
+          <div class="small" style="margin-top:8px;color:var(--muted);">粒度：日 · 店铺 · 端别 | 分子/分母：下阶段人数 / 上阶段人数 | 基线：近7完整日同粒度中位数 | 样本：n=7</div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-title">支付转化率 · 日趋势</div>
+          <div class="chart" style="height:120px">
+            <svg viewBox="0 0 300 120" preserveAspectRatio="none" style="width:100%;height:100%;">
+              <line x1="10" y1="70" x2="290" y2="70" stroke="#c8cec9" stroke-dasharray="3,3"/>
+              <text x="290" y="66" text-anchor="end" font-size="9" fill="#626c65">基线 2.85%</text>
+              <polyline points="10,50 40,55 70,60 100,72 130,68 160,80 190,78 220,82 250,88 280,90"
+                        fill="none" stroke="#9f443e" stroke-width="2.5"/>
+              <g fill="#9f443e">
+                <circle cx="10" cy="50" r="3"/><circle cx="70" cy="60" r="3"/>
+                <circle cx="130" cy="68" r="3"/><circle cx="190" cy="78" r="3"/>
+                <circle cx="250" cy="88" r="3"/><circle cx="280" cy="90" r="3"/>
+              </g>
+              <g font-size="8" fill="#626c65">
+                <text x="10" y="112">07-09</text><text x="130" y="112">07-12</text><text x="270" y="112" text-anchor="end">07-15</text>
+              </g>
+            </svg>
+          </div>
+          <div class="rank" style="margin-top:8px"><span class="rank-n" style="background:var(--danger);color:#fff;">!</span><div><b>连续下滑 5 日</b><p>07-11 起偏离 -0.62pp</p></div></div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-title">跳失率 · 商品页</div>
+          <div class="big" style="color:var(--danger);">63.4%</div>
+          <div class="small">基线 58.1% · <b style="color:var(--danger);">↑ +5.3pp</b></div>
+          <div class="bar" style="margin-top:10px;background:var(--danger-soft)"><span style="width:63%;background:var(--danger)"></span></div>
+          <div class="small" style="margin-top:8px;color:var(--muted);">分子：跳失次数 / 分母：商品访客</div>
+        </article>
+      </div>
+
+      <div class="section-title"><span class="step">2</span>一级来源：损失集中在哪个入口</div>
+      <div class="grid g2">
+        <article class="panel">
+          <div class="panel-title">一级来源 · 访客与转化率</div>
+          <div class="chart" style="height:190px">
+            <svg viewBox="0 0 480 190" preserveAspectRatio="none" style="width:100%;height:100%;">
+              <g font-family="Microsoft YaHei" font-size="10" fill="#172019">
+                <text x="10" y="18" font-weight="700">来源</text><text x="200" y="18" font-weight="700" text-anchor="end">访客占比</text><text x="470" y="18" font-weight="700" text-anchor="end">支付转化率</text>
+
+                <text x="10" y="42">直播</text>
+                <rect x="60" y="30" width="140" height="14" fill="#9fcf33" fill-opacity="0.7"/>
+                <text x="205" y="42">38.2%</text>
+                <rect x="245" y="30" width="60" height="14" fill="#62890f"/>
+                <text x="470" y="42" text-anchor="end" fill="#62890f" font-weight="700">3.42%</text>
+
+                <text x="10" y="68">短视频</text>
+                <rect x="60" y="56" width="100" height="14" fill="#9fcf33" fill-opacity="0.55"/>
+                <text x="205" y="68">27.5%</text>
+                <rect x="245" y="56" width="35" height="14" fill="#9f443e" fill-opacity="0.7"/>
+                <text x="470" y="68" text-anchor="end" fill="#9f443e" font-weight="700">1.98% ↓</text>
+
+                <text x="10" y="94">图文</text>
+                <rect x="60" y="82" width="72" height="14" fill="#9fcf33" fill-opacity="0.4"/>
+                <text x="205" y="94">19.7%</text>
+                <rect x="245" y="82" width="52" height="14" fill="#9fcf33"/>
+                <text x="470" y="94" text-anchor="end">2.94%</text>
+
+                <text x="10" y="120">店铺页</text>
+                <rect x="60" y="108" width="42" height="14" fill="#9fcf33" fill-opacity="0.35"/>
+                <text x="205" y="120">11.4%</text>
+                <rect x="245" y="108" width="68" height="14" fill="#62890f"/>
+                <text x="470" y="120" text-anchor="end" fill="#62890f" font-weight="700">3.71%</text>
+
+                <text x="10" y="146">其他</text>
+                <rect x="60" y="134" width="12" height="14" fill="#9fcf33" fill-opacity="0.25"/>
+                <text x="205" y="146">3.2%</text>
+                <rect x="245" y="134" width="48" height="14" fill="#9fcf33" fill-opacity="0.7"/>
+                <text x="470" y="146" text-anchor="end">2.71%</text>
+
+                <line x1="60" y1="168" x2="480" y2="168" stroke="#c8cec9"/>
+                <text x="60" y="182" font-size="9" fill="#626c65">短视频转化率 -0.87pp 是本期主要损失点，占 42% 的净回款缺口过程解释</text>
+              </g>
+            </svg>
+          </div>
+          <div class="small" style="margin-top:6px;color:var(--muted);">粒度：日 × 一级来源 · 至少 8 日样本 | 单位：% | 分子：支付人数 / 分母：入口访客</div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-title">来源质量矩阵：UV 价值 × 支付转化</div>
+          <div class="chart" style="height:190px">
+            <svg viewBox="0 0 380 190" preserveAspectRatio="none" style="width:100%;height:100%;">
+              <!-- 坐标轴 -->
+              <line x1="40" y1="160" x2="360" y2="160" stroke="#7f8982"/>
+              <line x1="40" y1="10" x2="40" y2="160" stroke="#7f8982"/>
+              <text x="200" y="180" text-anchor="middle" font-size="9" fill="#626c65">UV 价值 (¥/访客)</text>
+              <text x="12" y="85" font-size="9" fill="#626c65" transform="rotate(-90 12 85)">支付转化率</text>
+              <!-- 象限分割 -->
+              <line x1="200" y1="10" x2="200" y2="160" stroke="#c8cec9" stroke-dasharray="3,3"/>
+              <line x1="40" y1="85" x2="360" y2="85" stroke="#c8cec9" stroke-dasharray="3,3"/>
+              <text x="205" y="24" font-size="8" fill="#626c65">高价值·高转化（保持）</text>
+              <text x="205" y="155" font-size="8" fill="#626c65">高价值·低转化（优化）</text>
+              <text x="45" y="24" font-size="8" fill="#626c65">低价值·高转化</text>
+              <text x="45" y="155" font-size="8" fill="#626c65">低价值·低转化（关停候选）</text>
+              <!-- 散点 -->
+              <g>
+                <circle cx="280" cy="50" r="14" fill="#62890f" fill-opacity="0.65"/><text x="280" y="53" text-anchor="middle" font-size="9" fill="#fff" font-weight="700">直播</text>
+                <circle cx="120" cy="130" r="12" fill="#9f443e" fill-opacity="0.65"/><text x="120" y="133" text-anchor="middle" font-size="8" fill="#fff" font-weight="700">短视频</text>
+                <circle cx="220" cy="80" r="9" fill="#9fcf33" fill-opacity="0.75"/><text x="220" y="83" text-anchor="middle" font-size="8" fill="#172019">图文</text>
+                <circle cx="310" cy="42" r="8" fill="#62890f" fill-opacity="0.75"/><text x="310" y="45" text-anchor="middle" font-size="8" fill="#fff">店铺</text>
+                <circle cx="90" cy="98" r="6" fill="#9fcf33" fill-opacity="0.6"/><text x="90" y="101" text-anchor="middle" font-size="8" fill="#172019">其他</text>
+              </g>
+            </svg>
+          </div>
+          <div class="small" style="margin-top:6px;color:var(--muted);">点大小：访客量级 | 至少 20 日 × 5 来源 = 100 样本；数据稀疏改回条形图</div>
+        </article>
+      </div>
+
+      <div class="section-title"><span class="step">3</span>下钻入口</div>
+      <div class="grid g4">
+        <a class="panel" href="#diag-media" style="display:block;text-decoration:none;color:inherit;">
+          <div class="eyebrow">继续诊断</div><div class="med">投放效率 ›</div><div class="small">谁在消耗资源但没有产生效率？</div>
+        </a>
+        <div class="panel"><div class="eyebrow">还差什么数据</div><div class="med">商品机会</div><div class="small">P0 · mart_product_daily 未建</div></div>
+        <div class="panel"><div class="eyebrow">还差什么数据</div><div class="med">客服与人力</div><div class="small">P1 · mart_service_team_daily 未建</div></div>
+        <div class="panel"><div class="eyebrow">还差什么数据</div><div class="med">竞品观测</div><div class="small">P1 · mart_competitor_period 未建</div></div>
+      </div>
+      <div class="footnote">05.1 / 增长诊断 · 本页所有指标不与钉钉结果表求和；跨来源派生需显式标注两侧截止日</div>
+    </section>
+
+    <!-- 05.2 增长诊断 · 投放效率（PowerBI 独有） -->
+    <section class="screen global-screen" id="diag-media">
+      <header class="page-head">
+        <div>
+          <div class="breadcrumb"><a href="#analytics">运营数据看板</a><span>›</span><a href="#diag-funnel">增长诊断</a><span>›</span><span>投放效率</span></div>
+          <div class="page-title">投放效率 <span style="display:inline-block;margin-left:10px;padding:2px 10px;font-size:10px;font-weight:600;letter-spacing:.06em;background:var(--accent-soft);color:var(--accent-deep);border-radius:10px;vertical-align:middle;">scope = powerbi_unique_only</span></div>
+          <div class="page-sub">主问题：谁在消耗资源但没有产生效率？以计划、关键词或人群的粒度定位浪费。</div>
+        </div>
+        <div class="context">
+          <div class="box"><div class="eyebrow">数据截止日</div><div class="value">07-15</div></div>
+          <div class="box"><div class="eyebrow">比较窗口</div><div class="value">近 7 完整日中位数</div></div>
+          <div class="box"><div class="eyebrow">数据覆盖</div><div class="value">4 店铺 · 站内</div></div>
+          <div class="box wide"><div class="eyebrow">来源</div><div class="value">mart_ad_plan_daily · mart_ad_keyword_daily · mart_ad_audience_daily</div></div>
+        </div>
+      </header>
+      <div class="toolbar">
+        <span class="btn dark" data-view="plan">计划视图</span>
+        <span class="btn" data-view="keyword">关键词视图</span>
+        <span class="btn" data-view="audience">人群视图</span>
+        <span class="annot push">"站内总费用"由钉钉承担，本页只看细粒度效率与浪费机会</span>
+      </div>
+
+      <div class="section-title"><span class="step">1</span>花费 × ROI 散点：一眼定位低效计划</div>
+      <div class="grid g2">
+        <article class="panel span2">
+          <div class="panel-title">当前视图：<b>计划</b>（点=1 个计划，点大小=点击量，颜色=状态）</div>
+          <div class="chart" style="height:340px">
+            <svg viewBox="0 0 900 340" preserveAspectRatio="xMidYMid meet" style="width:100%;height:100%;">
+              <!-- 网格 -->
+              <g stroke="#eef1ee">
+                <line x1="60" y1="60" x2="860" y2="60"/>
+                <line x1="60" y1="120" x2="860" y2="120"/>
+                <line x1="60" y1="180" x2="860" y2="180"/>
+                <line x1="60" y1="240" x2="860" y2="240"/>
+                <line x1="60" y1="300" x2="860" y2="300"/>
+              </g>
+              <!-- 坐标轴 -->
+              <line x1="60" y1="300" x2="860" y2="300" stroke="#7f8982" stroke-width="1.5"/>
+              <line x1="60" y1="20" x2="60" y2="300" stroke="#7f8982" stroke-width="1.5"/>
+              <!-- 盈亏线（ROI=2.0）-->
+              <line x1="60" y1="200" x2="860" y2="200" stroke="#a96328" stroke-width="1.5" stroke-dasharray="6,3"/>
+              <text x="860" y="196" text-anchor="end" font-size="10" fill="#a96328" font-weight="700">盈亏线 ROI=2.0</text>
+              <!-- 轴标签 -->
+              <text x="460" y="325" text-anchor="middle" font-size="11" fill="#172019" font-weight="600">7 日花费（万元） →</text>
+              <text x="30" y="160" text-anchor="middle" font-size="11" fill="#172019" font-weight="600" transform="rotate(-90 30 160)">↑ 净回款 ROI</text>
+              <!-- X 轴刻度 -->
+              <g font-size="9" fill="#626c65">
+                <text x="60" y="315" text-anchor="middle">0</text>
+                <text x="220" y="315" text-anchor="middle">5</text>
+                <text x="380" y="315" text-anchor="middle">10</text>
+                <text x="540" y="315" text-anchor="middle">15</text>
+                <text x="700" y="315" text-anchor="middle">20</text>
+                <text x="860" y="315" text-anchor="middle">25 万</text>
+              </g>
+              <!-- Y 轴刻度 -->
+              <g font-size="9" fill="#626c65">
+                <text x="52" y="304" text-anchor="end">0</text>
+                <text x="52" y="244" text-anchor="end">1.0</text>
+                <text x="52" y="204" text-anchor="end">2.0</text>
+                <text x="52" y="184" text-anchor="end">2.5</text>
+                <text x="52" y="124" text-anchor="end">4.0</text>
+                <text x="52" y="64" text-anchor="end">6.0</text>
+              </g>
+
+              <!-- 散点：30 个假计划点 -->
+              <g>
+                <!-- 红色区（低 ROI）-->
+                <circle cx="180" cy="255" r="8" fill="#9f443e" fill-opacity="0.75"/>
+                <circle cx="230" cy="240" r="12" fill="#9f443e" fill-opacity="0.75"/>
+                <circle cx="290" cy="250" r="7" fill="#9f443e" fill-opacity="0.75"/>
+                <circle cx="360" cy="245" r="18" fill="#9f443e" fill-opacity="0.85"/>
+                <text x="360" y="248" text-anchor="middle" font-size="9" fill="#fff" font-weight="700">P-023</text>
+                <circle cx="450" cy="235" r="14" fill="#9f443e" fill-opacity="0.8"/>
+                <text x="450" y="239" text-anchor="middle" font-size="8" fill="#fff" font-weight="700">P-041</text>
+                <circle cx="520" cy="230" r="22" fill="#9f443e" fill-opacity="0.85"/>
+                <text x="520" y="234" text-anchor="middle" font-size="10" fill="#fff" font-weight="700">P-007</text>
+                <circle cx="620" cy="240" r="10" fill="#9f443e" fill-opacity="0.75"/>
+                <circle cx="700" cy="225" r="16" fill="#9f443e" fill-opacity="0.8"/>
+
+                <!-- 橙色（观察区）-->
+                <circle cx="120" cy="210" r="9" fill="#a96328" fill-opacity="0.75"/>
+                <circle cx="160" cy="215" r="6" fill="#a96328" fill-opacity="0.7"/>
+                <circle cx="240" cy="205" r="11" fill="#a96328" fill-opacity="0.75"/>
+                <circle cx="320" cy="210" r="8" fill="#a96328" fill-opacity="0.75"/>
+                <circle cx="400" cy="212" r="10" fill="#a96328" fill-opacity="0.75"/>
+
+                <!-- 绿色（健康）-->
+                <circle cx="90" cy="170" r="8" fill="#62890f" fill-opacity="0.75"/>
+                <circle cx="130" cy="150" r="14" fill="#62890f" fill-opacity="0.85"/>
+                <circle cx="200" cy="140" r="11" fill="#62890f" fill-opacity="0.8"/>
+                <circle cx="270" cy="155" r="10" fill="#62890f" fill-opacity="0.75"/>
+                <circle cx="340" cy="130" r="18" fill="#62890f" fill-opacity="0.85"/>
+                <text x="340" y="134" text-anchor="middle" font-size="9" fill="#fff" font-weight="700">P-002</text>
+                <circle cx="420" cy="145" r="13" fill="#62890f" fill-opacity="0.8"/>
+                <circle cx="480" cy="120" r="9" fill="#62890f" fill-opacity="0.75"/>
+                <circle cx="560" cy="135" r="16" fill="#62890f" fill-opacity="0.85"/>
+                <text x="560" y="139" text-anchor="middle" font-size="9" fill="#fff" font-weight="700">P-015</text>
+                <circle cx="640" cy="160" r="11" fill="#62890f" fill-opacity="0.8"/>
+                <circle cx="720" cy="150" r="8" fill="#62890f" fill-opacity="0.75"/>
+                <circle cx="780" cy="140" r="10" fill="#62890f" fill-opacity="0.75"/>
+                <circle cx="820" cy="130" r="7" fill="#62890f" fill-opacity="0.7"/>
+
+                <!-- 高绩（极优）-->
+                <circle cx="170" cy="85" r="8" fill="#62890f" fill-opacity="0.9"/>
+                <circle cx="250" cy="70" r="6" fill="#62890f" fill-opacity="0.9"/>
+              </g>
+
+              <!-- 图例 -->
+              <g transform="translate(680,20)" font-size="10">
+                <rect x="0" y="0" width="180" height="30" fill="#fff" stroke="#c8cec9" rx="4"/>
+                <circle cx="12" cy="15" r="4" fill="#62890f"/><text x="22" y="18">高效</text>
+                <circle cx="62" cy="15" r="4" fill="#a96328"/><text x="72" y="18">观察</text>
+                <circle cx="112" cy="15" r="4" fill="#9f443e"/><text x="122" y="18">低效</text>
+              </g>
+            </svg>
+          </div>
+          <div class="small" style="margin-top:8px;color:var(--muted);">粒度：计划 × 7 日汇总 | X：花费(元) | Y：净回款 ÷ 花费 | 点大小：点击量 | 至少 25 个样本；样本不足时降级到排序表</div>
+        </article>
+      </div>
+
+      <div class="section-title"><span class="step">2</span>高消耗低 ROI 排名 & 效率诊断</div>
+      <div class="grid g2">
+        <article class="panel">
+          <div class="panel-title">高消耗 · 低 ROI Top 6（浪费机会）</div>
+          <table class="table">
+            <thead><tr><th>计划</th><th>7日花费</th><th>ROI</th><th>基线偏差</th><th>建议</th></tr></thead>
+            <tbody>
+              <tr><td><b>P-007 · 抖音信息流A</b></td><td>¥18.5万</td><td><span class="tag danger">1.42</span></td><td style="color:var(--danger)">-31%</td><td><span class="btn dark">暂停候选</span></td></tr>
+              <tr><td><b>P-023 · 天猫直通车</b></td><td>¥12.1万</td><td><span class="tag danger">1.58</span></td><td style="color:var(--danger)">-24%</td><td><span class="btn dark">暂停候选</span></td></tr>
+              <tr><td><b>P-041 · 京东品专</b></td><td>¥9.8万</td><td><span class="tag warn">1.72</span></td><td style="color:var(--warn)">-18%</td><td><span class="btn">补样本</span></td></tr>
+              <tr><td>P-018 · 抖音超投</td><td>¥7.6万</td><td><span class="tag warn">1.85</span></td><td style="color:var(--warn)">-11%</td><td><span class="btn">补样本</span></td></tr>
+              <tr><td>P-032 · 快手信息流</td><td>¥6.2万</td><td><span class="tag warn">1.91</span></td><td style="color:var(--warn)">-7%</td><td><span class="btn">继续观察</span></td></tr>
+              <tr><td>P-056 · 天猫万相台</td><td>¥5.1万</td><td><span class="tag warn">1.94</span></td><td style="color:var(--warn)">-5%</td><td><span class="btn">继续观察</span></td></tr>
+            </tbody>
+          </table>
+          <div class="small" style="margin-top:6px;color:var(--muted);">分母：7 日花费 ≥ ¥5 万 且 ROI < 盈亏线 2.0 | 建议依据：花费×(盈亏线-ROI)</div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-title">效率诊断：CTR / CPC / 加购率 / 转化率</div>
+          <table class="table">
+            <thead><tr><th>指标</th><th>当前</th><th>基线</th><th>偏差</th><th>状态</th></tr></thead>
+            <tbody>
+              <tr><td>CTR</td><td>2.14%</td><td>2.32%</td><td>-0.18pp</td><td><span class="tag warn">↓ 观察</span></td></tr>
+              <tr><td>CPC</td><td>¥1.87</td><td>¥1.62</td><td>+15.4%</td><td><span class="tag danger">↑ 恶化</span></td></tr>
+              <tr><td>展示→点击加购率</td><td>3.8%</td><td>4.1%</td><td>-0.3pp</td><td><span class="tag warn">↓ 观察</span></td></tr>
+              <tr><td>点击转化率</td><td>1.42%</td><td>1.68%</td><td>-0.26pp</td><td><span class="tag danger">↓ 恶化</span></td></tr>
+              <tr><td>新客占比</td><td>34.2%</td><td>31.8%</td><td>+2.4pp</td><td><span class="tag accent">↑ 改善</span></td></tr>
+              <tr><td>平均展现排名</td><td>4.7</td><td>4.2</td><td>+0.5</td><td><span class="tag warn">↓ 观察</span></td></tr>
+            </tbody>
+          </table>
+          <div class="small" style="margin-top:6px;color:var(--muted);">异常判定：当前 vs 前 7 完整日中位；样本 n=7；偏差 |x| > 10% 记恶化</div>
+        </article>
+      </div>
+
+      <div class="section-title"><span class="step">3</span>切换视图 · 关键词与人群</div>
+      <div class="grid g2">
+        <article class="panel">
+          <div class="panel-title">关键词视图（预览 · 未启用）</div>
+          <div class="small" style="color:var(--muted);">点=1 个关键词；额外维度：平均展现排名 · 匹配类型 · 计划归属</div>
+          <div class="chart" style="height:120px;display:grid;place-items:center;color:var(--muted);background:var(--soft-2);border:1px dashed var(--line-soft);">
+            <div style="text-align:center">
+              <div style="font-size:20px;font-weight:700;color:var(--ink);">切换到「关键词视图」</div>
+              <div class="small">依赖 mart_ad_keyword_daily · 未落地</div>
+            </div>
+          </div>
+        </article>
+        <article class="panel">
+          <div class="panel-title">人群视图（预览 · 未启用）</div>
+          <div class="small" style="color:var(--muted);">点=1 个人群包；额外维度：新客占比 · 入会率</div>
+          <div class="chart" style="height:120px;display:grid;place-items:center;color:var(--muted);background:var(--soft-2);border:1px dashed var(--line-soft);">
+            <div style="text-align:center">
+              <div style="font-size:20px;font-weight:700;color:var(--ink);">切换到「人群视图」</div>
+              <div class="small">依赖 mart_ad_audience_daily · 未落地</div>
+            </div>
+          </div>
+        </article>
+      </div>
+
+      <div class="section-title"><span class="step">4</span>与既有"下钻投放效率"页的关系</div>
+      <div class="notice-line">
+        <div>
+          <b>本页与工作台首页 → 投放效率的区别</b>
+          <p><a href="#media">工作台首页 › 投放效率</a> 是钉钉+PowerBI 融合视角，回答"具体计划做什么动作"；本页是 PowerBI 独有作用域，回答"过程效率整体在哪里恶化"，是<b>诊断层</b>而非<b>决策层</b>。</p>
+        </div>
+        <a class="btn" href="#media">前往决策层</a>
+      </div>
+      <div class="footnote">05.2 / 增长诊断 · 站内总花费不出现在本页；决策动作请前往下钻投放效率</div>
     </section>
 
     <!-- 06 竞品情报 -->
@@ -1321,7 +1675,8 @@
   <script>
     (() => {
       const workbenchPages = ["home","gap","structure","conversion","refund","media","priority","action","review","data"];
-      const validPages = [...workbenchPages,"assets","content","images","analytics","intelligence","tasks","products","settings","access"];
+      const analyticsPages = ["analytics","diag-funnel","diag-media"];
+      const validPages = [...workbenchPages,"assets","content","images",...analyticsPages,"intelligence","tasks","products","settings","access"];
       const evidence = {
         forecast: {
           title:"月末预测依据",
@@ -1410,6 +1765,9 @@
       const workbenchMenu = document.getElementById("workbenchMenu");
       const drilldownToggle = document.getElementById("drilldownToggle");
       const drilldownNav = document.getElementById("drilldownNav");
+      const analyticsMenu = document.getElementById("analyticsMenu");
+      const analyticsToggle = document.getElementById("analyticsToggle");
+      const analyticsNav = document.getElementById("analyticsNav");
       const drawer = document.getElementById("drawer");
       const overlay = document.getElementById("overlay");
       const drawerClose = document.getElementById("drawerClose");
@@ -1430,12 +1788,21 @@
         drilldownToggle.querySelector(".sr-only").textContent = open ? "收起工作台首页下钻页面" : "展开工作台首页下钻页面";
       }
 
+      function setAnalyticsDrilldownOpen(open) {
+        analyticsNav.hidden = !open;
+        analyticsToggle.setAttribute("aria-expanded", String(open));
+        analyticsToggle.setAttribute("aria-label", open ? "收起运营数据看板下钻页面" : "展开运营数据看板下钻页面");
+        analyticsToggle.querySelector(".sr-only").textContent = open ? "收起运营数据看板下钻页面" : "展开运营数据看板下钻页面";
+      }
+
       function activatePage() {
         const page = currentPage();
         screens.forEach((screen) => screen.classList.toggle("active", screen.id === page));
         navLinks.forEach((link) => link.classList.toggle("active", link.dataset.page === page));
         workbenchMenu.classList.toggle("section-active", workbenchPages.includes(page));
         setDrilldownOpen(workbenchPages.includes(page) && page !== "home");
+        analyticsMenu.classList.toggle("section-active", analyticsPages.includes(page));
+        setAnalyticsDrilldownOpen(analyticsPages.includes(page) && page !== "analytics");
         document.title = `ecom AI Studio · ${document.querySelector(`#${page} .page-title`)?.textContent || "工作台首页"}`;
         closeDrawer();
         window.scrollTo({ top:0, behavior:"auto" });
