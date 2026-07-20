@@ -10,15 +10,31 @@ export function MetricCard({ metric }: MetricCardProps) {
   const trendClass =
     metric.trend === "up" ? "text-[var(--green)]" : metric.trend === "down" ? "text-[var(--red)]" : "text-[var(--muted)]";
 
+  const trendIcon = metric.trend === "up" ? "↑" : metric.trend === "down" ? "↓" : "→";
+
   return (
-    <Card className="metric-card">
-      <div className="mb-1.5 text-[11.5px] text-[var(--muted)]">{metric.label}</div>
-      <div className="text-[21px] font-bold leading-tight" style={{ color: metric.tone ? `var(--${metric.tone})` : undefined }}>
-        {metric.value}
+    <Card className="metric-card card-glow">
+      <div className="relative">
+        <div className="mb-2 text-[11.5px] font-medium text-[var(--muted)]">{metric.label}</div>
+        <div
+          className="metric-value text-[26px] font-bold leading-tight"
+          style={{ color: metric.tone ? `var(--${metric.tone})` : undefined }}
+        >
+          {metric.value}
+        </div>
+        {metric.progress !== undefined && (
+          <div className="mt-3">
+            <ProgressBar value={metric.progress} tone={metric.tone ?? "blue"} striped={metric.progress < 100} />
+          </div>
+        )}
+        {metric.delta && (
+          <div className={`metric-trend mt-2 text-[11.5px] ${trendClass}`}>
+            <span>{trendIcon}</span>
+            <span>{metric.delta}</span>
+          </div>
+        )}
+        {metric.detail && <div className="mt-2 text-[11px] text-[var(--muted-2)]">{metric.detail}</div>}
       </div>
-      {metric.progress !== undefined && <ProgressBar value={metric.progress} tone={metric.tone ?? "blue"} />}
-      {metric.delta && <div className={`mt-1.5 text-[11.5px] ${trendClass}`}>{metric.delta}</div>}
-      {metric.detail && <div className="mt-1.5 text-[11.5px] text-[var(--muted)]">{metric.detail}</div>}
     </Card>
   );
 }

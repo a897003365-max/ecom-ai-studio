@@ -3,6 +3,7 @@ import { Filter } from "lucide-react";
 import { AnalyticsDateFilter } from "../components/AnalyticsDateFilter";
 import { Card } from "../components/Card";
 import { ComparisonTicker } from "../components/ComparisonTicker";
+import { ExecutiveCommerceOverview } from "../components/ExecutiveCommerceOverview";
 import { MetricCard } from "../components/MetricCard";
 import { MonthlyOverview } from "../components/MonthlyOverview";
 import { PageHeader } from "../components/PageHeader";
@@ -10,6 +11,7 @@ import { PlatformBadge } from "../components/PlatformBadge";
 import { PowerBiReplica } from "../components/PowerBiReplica";
 import { StatusTag } from "../components/StatusTag";
 import { TableShell } from "../components/TableShell";
+import { useAnalyticsViewMode, ViewModeToggle } from "../components/ViewModeToggle";
 import { getAnalyticsData, syncAnalyticsData } from "../services/localApi";
 import type { KpiMetric, Platform, RegenerationSuggestion } from "../types";
 import type { AnalyticsIntegrationPayload, DingTalkMetricTotals, DingTalkSnapshot } from "../types/integration";
@@ -17,6 +19,7 @@ import type { AnalyticsIntegrationPayload, DingTalkMetricTotals, DingTalkSnapsho
 interface AnalyticsPageProps {
   onAction: (title: string, detail?: string) => void;
   onCreateTask: (suggestion: RegenerationSuggestion) => void;
+  canManage: boolean;
 }
 
 const compactNumber = new Intl.NumberFormat("zh-CN", { notation: "compact", maximumFractionDigits: 1 });
@@ -64,12 +67,27 @@ function dateTime(value?: string | null) {
   }).format(new Date(value)).replaceAll("/", "-");
 }
 
-export function AnalyticsPage({ onAction }: AnalyticsPageProps) {
+function isProductPeriodAligned(
+  productPeriod: { start: string; end: string } | null | undefined,
+  globalPeriod: { start: string; end: string } | null,
+) {
+  return Boolean(
+    productPeriod?.start
+    && productPeriod?.end
+    && globalPeriod?.start
+    && globalPeriod?.end
+    && productPeriod.start === globalPeriod.start
+    && productPeriod.end === globalPeriod.end,
+  );
+}
+
+export function AnalyticsPage({ onAction, canManage }: AnalyticsPageProps) {
   const [integration, setIntegration] = useState<AnalyticsIntegrationPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState<"analytics" | "warehouse" | "feishu" | "dingtalk" | null>(null);
   const [error, setError] = useState("");
   const [selectedChannel, setSelectedChannel] = useState("all");
+  const [viewMode, setViewMode] = useAnalyticsViewMode("layered");
 
   async function loadAnalytics(period?: { start: string; end: string }) {
     setLoading(true);
@@ -92,6 +110,10 @@ export function AnalyticsPage({ onAction }: AnalyticsPageProps) {
   const globalPeriod = dingtalk?.period.start && dingtalk.period.end
     ? { start: dingtalk.period.start, end: dingtalk.period.end }
     : null;
+  const productManagement = integration?.warehouse?.productManagement ?? null;
+  const alignedProductManagement = isProductPeriodAligned(productManagement?.period, globalPeriod)
+    ? productManagement
+    : null;
   const dataStatus = integration?.dataStatus;
   const metrics = dingtalk ? liveKpis(dingtalk) : [];
   const platforms = useMemo(() => (dingtalk?.platforms ?? []).map(withBusinessRates), [dingtalk]);
@@ -109,6 +131,10 @@ export function AnalyticsPage({ onAction }: AnalyticsPageProps) {
   const leadingChannel = [...platforms].sort((left, right) => (right.channelShare || 0) - (left.channelShare || 0))[0];
 
   async function syncDashboard() {
+    if (!canManage) {
+      onAction("当前账号无同步权限", "请联系管理员开通“同步运营数据”权限");
+      return;
+    }
     setSyncing("analytics");
     onAction("开始同步", "正在同步钉钉经营数据与本地数仓（含 PowerBI 独有模块）");
     try {
@@ -131,11 +157,12 @@ export function AnalyticsPage({ onAction }: AnalyticsPageProps) {
   return (
     <div>
       <PageHeader
-        title="运营数据看板"
-        subtitle={`每日同步计划 ${dingtalk?.schedule?.join(" / ") || "10:00 / 12:30 / 17:30"} · 最近同步 ${dateTime(latestSync)}`}
+        title="全渠道经营总览"
+        subtitle={`成交、回款、投放与渠道质量一屏决策 · 最近同步 ${dateTime(latestSync)} · 每日同步计划 ${dingtalk?.schedule?.join(" / ") || "10:00 / 12:30 / 17:30"}`}
         actions={
           <>
-            <button className="btn" disabled={syncing !== null} onClick={() => void syncDashboard()} type="button">
+            <ViewModeToggle mode={viewMode} onChange={setViewMode} />
+            <button className="btn" disabled={syncing !== null || !canManage} onClick={() => void syncDashboard()} title={canManage ? "同步钉钉经营数据与本地数仓" : "当前账号仅可查看，不能同步数据"} type="button">
               {syncing === "analytics" ? "同步中..." : "同步数据"}
             </button>
             {dingtalk && reporting && (
@@ -167,72 +194,81 @@ export function AnalyticsPage({ onAction }: AnalyticsPageProps) {
       {loading && !dingtalk ? (
         <Card><div className="py-16 text-center text-sm text-[var(--muted)]">正在读取钉钉经营数据...</div></Card>
       ) : dingtalk ? (
-        <PowerBiReplica dingtalk={dingtalk} period={globalPeriod} warehouse={integration?.warehouse ?? null} overview={<>
-          {reporting?.latestComparison && (
-            <div className="mb-5" data-testid="comparison-ticker"><ComparisonTicker comparison={reporting.latestComparison} /></div>
-          )}
+        <PowerBiReplica dingtalk={dingtalk} period={globalPeriod} warehouse={integration?.warehouse ?? null} overview={
+          viewMode === "layered" ? (
+            <ExecutiveCommerceOverview
+              dingtalk={dingtalk}
+              productManagement={alignedProductManagement}
+            />
+          ) : (
+            <>
+              {reporting?.latestComparison && (
+                <div className="mb-5" data-testid="comparison-ticker"><ComparisonTicker comparison={reporting.latestComparison} /></div>
+              )}
 
-          {reporting?.monthlyOverview && (
-            <section className="monthly-overview mb-5" data-testid="monthly-overview">
-              <div className="monthly-overview-heading">
-                <div><span>月度经营概览</span><small>{reporting.monthlyOverview.period.start} 至 {reporting.monthlyOverview.period.end}</small></div>
-                <label className="channel-filter">
-                  <Filter aria-hidden="true" size={13} />
-                  <span>渠道</span>
-                  <select aria-label="筛选图表渠道" onChange={(event) => setSelectedChannel(event.target.value)} value={activeChartChannel}>
-                    <option value="all">全部渠道</option>
-                    {chartChannels.map((channel) => <option key={channel} value={channel}>{channel}</option>)}
-                  </select>
-                </label>
+              {reporting?.monthlyOverview && (
+                <section className="monthly-overview mb-5" data-testid="monthly-overview">
+                  <div className="monthly-overview-heading">
+                    <div><span>月度经营概览</span><small>{reporting.monthlyOverview.period.start} 至 {reporting.monthlyOverview.period.end}</small></div>
+                    <label className="channel-filter">
+                      <Filter aria-hidden="true" size={13} />
+                      <span>渠道</span>
+                      <select aria-label="筛选图表渠道" onChange={(event) => setSelectedChannel(event.target.value)} value={activeChartChannel}>
+                        <option value="all">全部渠道</option>
+                        {chartChannels.map((channel) => <option key={channel} value={channel}>{channel}</option>)}
+                      </select>
+                    </label>
+                  </div>
+                  <div><MonthlyOverview overview={reporting.monthlyOverview} selectedChannel={activeChartChannel} /></div>
+                </section>
+              )}
+
+              <div className="metric-grid mb-5" data-testid="analytics-kpis">
+                {metrics.map((metric) => <MetricCard key={metric.label} metric={metric} />)}
               </div>
-              <div><MonthlyOverview overview={reporting.monthlyOverview} selectedChannel={activeChartChannel} /></div>
-            </section>
-          )}
 
-          <div className="metric-grid mb-5" data-testid="analytics-kpis">
-            {metrics.map((metric) => <MetricCard key={metric.label} metric={metric} />)}
-          </div>
+              <Card title="渠道经营汇总" className="mb-5" action={<StatusTag label={`${platforms.length} 个渠道`} tone="green" dot />}>
+                <TableShell minWidth={1120}>
+                  <thead><tr><th>渠道</th><th>GMV</th><th>回款额</th><th>站内费额</th><th>费比</th><th>加购人数</th><th>回款率</th><th>退款金额</th><th>退款率</th><th>渠道占比</th></tr></thead>
+                  <tbody>
+                    {platforms.map((item) => (
+                      <tr key={item.platform}>
+                        <td><PlatformBadge platform={item.platform as Platform} /></td><td>{money(item.gmv)}</td><td>{money(item.netRevenue)}</td><td>{money(item.spend)}</td>
+                        <td>{percent(item.feeRate)}</td><td>{count(item.addToCart)}</td><td>{percent(item.recoveryRate)}</td><td>{money(item.refund)}</td>
+                        <td className={item.refundRate >= 0.4 ? "font-bold text-[var(--red)]" : ""}>{percent(item.refundRate)}</td><td>{percent(item.channelShare)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot><tr className="font-bold"><td>总计</td><td>{money(dingtalk.totals.gmv)}</td><td>{money(dingtalk.totals.netRevenue)}</td><td>{money(dingtalk.totals.spend)}</td><td>{percent(dingtalk.totals.feeRate)}</td><td>{count(dingtalk.totals.addToCart)}</td><td>{percent(dingtalk.totals.recoveryRate)}</td><td>{money(dingtalk.totals.refund)}</td><td>{percent(dingtalk.totals.refundRate)}</td><td>100.00%</td></tr></tfoot>
+                </TableShell>
+              </Card>
 
-          <Card title="渠道经营汇总" className="mb-5" action={<StatusTag label={`${platforms.length} 个渠道`} tone="green" dot />}>
-            <TableShell minWidth={1120}>
-              <thead><tr><th>渠道</th><th>GMV</th><th>回款额</th><th>站内费额</th><th>费比</th><th>加购人数</th><th>回款率</th><th>退款金额</th><th>退款率</th><th>渠道占比</th></tr></thead>
-              <tbody>
-                {platforms.map((item) => (
-                  <tr key={item.platform}>
-                    <td><PlatformBadge platform={item.platform as Platform} /></td><td>{money(item.gmv)}</td><td>{money(item.netRevenue)}</td><td>{money(item.spend)}</td>
-                    <td>{percent(item.feeRate)}</td><td>{count(item.addToCart)}</td><td>{percent(item.recoveryRate)}</td><td>{money(item.refund)}</td>
-                    <td className={item.refundRate >= 0.4 ? "font-bold text-[var(--red)]" : ""}>{percent(item.refundRate)}</td><td>{percent(item.channelShare)}</td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot><tr className="font-bold"><td>总计</td><td>{money(dingtalk.totals.gmv)}</td><td>{money(dingtalk.totals.netRevenue)}</td><td>{money(dingtalk.totals.spend)}</td><td>{percent(dingtalk.totals.feeRate)}</td><td>{count(dingtalk.totals.addToCart)}</td><td>{percent(dingtalk.totals.recoveryRate)}</td><td>{money(dingtalk.totals.refund)}</td><td>{percent(dingtalk.totals.refundRate)}</td><td>100.00%</td></tr></tfoot>
-            </TableShell>
-          </Card>
+              <Card title="店铺经营明细" className="mb-5" action={<StatusTag label={`${stores.length} 个店铺`} tone="blue" dot />}>
+                <TableShell minWidth={1260}>
+                  <thead><tr><th>排名</th><th>渠道</th><th>店铺</th><th>GMV</th><th>回款额</th><th>站内费额</th><th>费比</th><th>加购人数</th><th>回款率</th><th>退款金额</th><th>退款率</th><th>小红书推广费</th></tr></thead>
+                  <tbody>
+                    {stores.map((item, index) => (
+                      <tr key={`${item.platform}-${item.store}`}>
+                        <td>{index + 1}</td><td><PlatformBadge platform={item.platform as Platform} /></td><td className="font-semibold">{item.store}</td>
+                        <td>{money(item.gmv)}</td><td>{money(item.netRevenue)}</td><td>{money(item.spend)}</td><td className={item.feeRate >= 0.5 ? "font-bold text-[var(--red)]" : ""}>{percent(item.feeRate)}</td>
+                        <td>{count(item.addToCart)}</td><td>{percent(item.recoveryRate)}</td><td>{money(item.refund)}</td><td>{percent(item.refundRate)}</td><td>{item.offsiteSpend ? money(item.offsiteSpend) : "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </TableShell>
+              </Card>
 
-          <Card title="店铺经营明细" className="mb-5" action={<StatusTag label={`${stores.length} 个店铺`} tone="blue" dot />}>
-            <TableShell minWidth={1260}>
-              <thead><tr><th>排名</th><th>渠道</th><th>店铺</th><th>GMV</th><th>回款额</th><th>站内费额</th><th>费比</th><th>加购人数</th><th>回款率</th><th>退款金额</th><th>退款率</th><th>小红书推广费</th></tr></thead>
-              <tbody>
-                {stores.map((item, index) => (
-                  <tr key={`${item.platform}-${item.store}`}>
-                    <td>{index + 1}</td><td><PlatformBadge platform={item.platform as Platform} /></td><td className="font-semibold">{item.store}</td>
-                    <td>{money(item.gmv)}</td><td>{money(item.netRevenue)}</td><td>{money(item.spend)}</td><td className={item.feeRate >= 0.5 ? "font-bold text-[var(--red)]" : ""}>{percent(item.feeRate)}</td>
-                    <td>{count(item.addToCart)}</td><td>{percent(item.recoveryRate)}</td><td>{money(item.refund)}</td><td>{percent(item.refundRate)}</td><td>{item.offsiteSpend ? money(item.offsiteSpend) : "—"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </TableShell>
-          </Card>
-
-          <Card title="当前经营提示">
-              <div className="insight-grid">
-                <div className="insight-row"><span>回款贡献最高</span><b>{leadingChannel?.platform ?? "—"} · {percent(leadingChannel?.channelShare)}</b></div>
-                <div className="insight-row"><span>退款率最高渠道</span><b className="text-[var(--red)]">{highestRefund?.platform ?? "—"} · {percent(highestRefund?.refundRate)}</b></div>
-                <div className="insight-row"><span>费比最高店铺</span><b className="text-[var(--orange)]">{highestFeeStore?.store ?? "—"} · {percent(highestFeeStore?.feeRate)}</b></div>
-                <div className="insight-note">提示跟随日期筛选；月度概览按筛选结束日所在月计算 MTD，滚动播报固定使用最新完整日期。</div>
-              </div>
-          </Card>
-        </>} />
+              <Card title="当前经营提示">
+                  <div className="insight-grid">
+                    <div className="insight-row"><span>回款贡献最高</span><b>{leadingChannel?.platform ?? "—"} · {percent(leadingChannel?.channelShare)}</b></div>
+                    <div className="insight-row"><span>退款率最高渠道</span><b className="text-[var(--red)]">{highestRefund?.platform ?? "—"} · {percent(highestRefund?.refundRate)}</b></div>
+                    <div className="insight-row"><span>费比最高店铺</span><b className="text-[var(--orange)]">{highestFeeStore?.store ?? "—"} · {percent(highestFeeStore?.feeRate)}</b></div>
+                    <div className="insight-note">月度概览按所选结束日累计；最新播报使用最近完整日期。</div>
+                  </div>
+              </Card>
+            </>
+          )
+        } />
       ) : (
         <Card><div className="py-16 text-center text-sm text-[var(--muted)]">钉钉经营数据尚未同步，请先点击“同步数据”。</div></Card>
       )}

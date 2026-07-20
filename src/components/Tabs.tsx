@@ -8,15 +8,17 @@ interface TabsProps<T extends string> {
 
 export function Tabs<T extends string>({ value, tabs, onChange }: TabsProps<T>) {
   return (
-    <div className="mb-[18px] flex gap-1.5 border-b border-[var(--border)]">
+    <div aria-label="切换数据视图" className="mb-[18px] flex gap-1.5 border-b border-[var(--border)]" role="tablist">
       {tabs.map((tab) => (
         <button
           className={clsx(
-            "relative top-px mr-4 border-b-2 border-transparent px-1 py-2.5 text-[13.5px] text-[var(--muted)]",
-            value === tab.id && "border-[var(--brand)] font-bold text-[var(--text)]",
+            "tab-trigger",
+            value === tab.id && "is-active",
           )}
           key={tab.id}
           onClick={() => onChange(tab.id)}
+          aria-selected={value === tab.id}
+          role="tab"
           type="button"
         >
           {tab.label}

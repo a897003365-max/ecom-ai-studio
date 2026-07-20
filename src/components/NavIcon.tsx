@@ -6,6 +6,8 @@ import {
   PackageSearch,
   Radar,
   Settings,
+  Tags,
+  UsersRound,
   WandSparkles,
 } from "lucide-react";
 import type { PageId } from "../types";
@@ -18,7 +20,9 @@ const icons = {
   analytics: ChartNoAxesCombined,
   intelligence: Radar,
   tasks: ListChecks,
+  products: Tags,
   settings: Settings,
+  access: UsersRound,
 } satisfies Record<PageId, typeof LayoutDashboard>;
 
 export function NavIcon({ page, size = 16 }: { page: PageId; size?: number }) {

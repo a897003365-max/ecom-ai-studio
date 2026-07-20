@@ -1,16 +1,21 @@
 import type { QueueTask } from "../types";
-import type { AnalyticsIntegrationPayload, DataSourcesPayload, UploadRecord } from "../types/integration";
+import type { AnalyticsIntegrationPayload, DataSourcesPayload, ProductsPayload, UploadRecord } from "../types/integration";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, {
     ...init,
+    credentials: "same-origin",
     headers: {
       "Content-Type": "application/json",
       ...init?.headers,
     },
   });
-  const payload = await response.json() as T & { error?: string };
-  if (!response.ok) throw new Error(payload.error || `本地服务请求失败：${response.status}`);
+  const payload = await response.json() as T & { error?: string | { message?: string } };
+  if (!response.ok) {
+    if (response.status === 401) window.dispatchEvent(new Event("ecom:session-expired"));
+    const message = typeof payload.error === "string" ? payload.error : payload.error?.message;
+    throw new Error(message || `本地服务请求失败：${response.status}`);
+  }
   return payload;
 }
 
@@ -21,6 +26,24 @@ export function getDataSources() {
 export function getAnalyticsData(filters?: { start: string; end: string }) {
   const query = filters ? `?${new URLSearchParams(filters).toString()}` : "";
   return request<AnalyticsIntegrationPayload>(`/api/analytics${query}`);
+}
+
+export function getProductData(filters?: {
+  start?: string;
+  end?: string;
+  statuses?: string[];
+  channels?: string[];
+  storeShortNames?: string[];
+}) {
+  if (!filters) return request<ProductsPayload>("/api/products");
+  const params = new URLSearchParams();
+  if (filters.start) params.set("start", filters.start);
+  if (filters.end) params.set("end", filters.end);
+  for (const s of filters.statuses ?? []) params.append("status", s);
+  for (const channel of filters.channels ?? []) params.append("channel", channel);
+  for (const storeShortName of filters.storeShortNames ?? []) params.append("storeShortName", storeShortName);
+  const query = params.toString();
+  return request<ProductsPayload>(`/api/products${query ? `?${query}` : ""}`);
 }
 
 export function syncDataSource(source: "warehouse" | "feishu" | "dingtalk") {

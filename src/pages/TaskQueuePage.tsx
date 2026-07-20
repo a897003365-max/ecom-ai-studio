@@ -21,12 +21,12 @@ export function TaskQueuePage({ tasks, onAction, onTaskAction }: TaskQueuePagePr
     <div>
       <PageHeader
         title="任务队列"
-        subtitle="统一管理 content_generate、script_generate、image_process、competitor_crawl、top100_crawl、data_sync、quality_check、export_package 等异步任务。"
+        subtitle="集中查看任务进度、异常、产物与人工确认状态。"
         actions={
           <>
             <button className="btn-select" type="button">全部状态 ▾</button>
             <button className="btn-select" type="button">全部模块 ▾</button>
-            <button className="btn-primary" onClick={() => onAction("刷新任务队列", "已重新读取 mock 任务状态")} type="button">刷新队列</button>
+            <button className="btn-primary" onClick={() => onAction("刷新任务队列", "任务进度与异常状态已更新")} type="button">刷新队列</button>
           </>
         }
       />

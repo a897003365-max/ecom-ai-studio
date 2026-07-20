@@ -8,10 +8,10 @@ interface PageHeaderProps {
 
 export function PageHeader({ title, subtitle, actions }: PageHeaderProps) {
   return (
-    <header className="mb-4 flex flex-wrap items-start justify-between gap-4">
-      <div>
-        <h1 className="text-[20px] font-bold">{title}</h1>
-        <p className="mt-1 max-w-4xl text-[12.5px] leading-5 text-[var(--muted)]">{subtitle}</p>
+    <header className="mb-5 flex flex-wrap items-start justify-between gap-4">
+      <div className="min-w-0">
+        <h1 className="font-display text-[26px] font-bold leading-tight tracking-[-0.02em]">{title}</h1>
+        <p className="mt-1.5 max-w-4xl text-[13px] leading-[1.6] text-[var(--muted)]">{subtitle}</p>
       </div>
       {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
     </header>

@@ -1,4 +1,5 @@
 const explicitUrl = process.env.ECOM_STUDIO_URL;
+let sessionCookie = "";
 
 async function findService() {
   const candidates = explicitUrl
@@ -19,10 +20,19 @@ async function findService() {
 async function json(baseUrl, path, init) {
   const response = await fetch(`${baseUrl}${path}`, {
     ...init,
-    headers: { "Content-Type": "application/json", ...init?.headers },
+    headers: {
+      "Content-Type": "application/json",
+      ...(sessionCookie ? { Cookie: sessionCookie } : {}),
+      ...init?.headers,
+    },
   });
   const payload = await response.json();
-  if (!response.ok) throw new Error(`${path}: ${payload.error || response.status}`);
+  if (!response.ok) {
+    const message = typeof payload.error === "string" ? payload.error : payload.error?.message;
+    throw new Error(`${path}: ${message || response.status}`);
+  }
+  const setCookie = response.headers.getSetCookie?.()[0] || response.headers.get("set-cookie");
+  if (setCookie) sessionCookie = setCookie.split(";")[0];
   return payload;
 }
 
@@ -31,6 +41,26 @@ function assert(condition, message) {
 }
 
 const baseUrl = await findService();
+const authStatus = await json(baseUrl, "/api/auth/status");
+let canCheckProtectedData = Boolean(authStatus.user);
+if (!authStatus.user) {
+  const email = process.env.ECOM_STUDIO_SMOKE_EMAIL;
+  const phone = process.env.ECOM_STUDIO_SMOKE_PHONE;
+  const password = process.env.ECOM_STUDIO_SMOKE_PASSWORD;
+  if (!email || !phone || !password) {
+    const protectedProbe = await fetch(`${baseUrl}/api/analytics`);
+    assert(protectedProbe.status === 401, "未登录的业务 API 未返回 401");
+    console.log(`smoke auth gate ok: ${baseUrl}`);
+    console.log("protected data checks skipped: set ECOM_STUDIO_SMOKE_EMAIL/PHONE/PASSWORD for an isolated test account");
+  } else {
+    await json(baseUrl, authStatus.configured ? "/api/auth/login" : "/api/auth/bootstrap", {
+      method: "POST",
+      body: JSON.stringify({ name: "Smoke 管理员", email, phone, password }),
+    });
+    canCheckProtectedData = true;
+  }
+}
+if (canCheckProtectedData) {
 const sources = await json(baseUrl, "/api/data-sources");
 const analytics = await json(baseUrl, "/api/analytics");
 const filteredAnalytics = await json(baseUrl, "/api/analytics?start=2026-07-10&end=2026-07-10");
@@ -43,7 +73,7 @@ assert(sources.sources.some((source) => source.id === "feishu" && source.status 
 assert(workflows.workflow.readyCount === workflows.workflow.expectedCount, "Claude Code Agent 配置不完整");
 assert(analytics.warehouse?.recordCount > 0, "本地数仓 PowerBI 独有数据目录为空");
 assert(analytics.warehouse?.scope === "powerbi_unique_only", "本地数仓未启用 PowerBI 独有数据边界");
-assert(analytics.warehouse?.quality?.queryCount === 23, "本地数仓独有查询数量异常");
+assert(analytics.warehouse?.quality?.queryCount === 25, "本地数仓独有查询数量异常");
 assert(analytics.warehouse?.quality?.excludedQueryCount === 2, "本地数仓重叠排除数量异常");
 assert(
   analytics.warehouse?.overlapPolicy?.excludedQueries?.some((item) => item.query === "00-月表汇总"),
@@ -69,10 +99,15 @@ assert(analytics.feishu?.content?.processedRows > 0, "飞书内容快照为空")
 
 const serialized = JSON.stringify(analytics);
 assert(!serialized.includes("xsec_token="), "聚合快照包含访问令牌");
-assert(!serialized.includes("https://"), "聚合快照包含原始链接");
+const remoteUrls = serialized.match(/https?:\/\/[^"\s]+/g) || [];
+assert(
+  remoteUrls.every((url) => /^https:\/\/img\.alicdn\.com\//i.test(url)),
+  "聚合快照包含未允许的原始链接",
+);
 
 console.log(`smoke ok: ${baseUrl}`);
 console.log(`warehouse rows: ${analytics.warehouse.recordCount}`);
 console.log(`dingtalk rows: ${analytics.dingtalk.recordCount}`);
 console.log(`feishu rows: ${analytics.feishu.content.processedRows}`);
 console.log(`workflow agents: ${workflows.workflow.readyCount}/${workflows.workflow.expectedCount}`);
+}

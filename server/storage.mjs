@@ -2,7 +2,7 @@ import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
-const dataDir = join(process.cwd(), "local-data");
+const dataDir = process.env.DATA_DIR || join(process.cwd(), "local-data");
 mkdirSync(dataDir, { recursive: true });
 
 const db = new DatabaseSync(join(dataDir, "ecom-ai-studio.sqlite"));
@@ -146,10 +146,23 @@ export function listTasks(limit = 100) {
   }));
 }
 
-export function updateTaskAction(taskId, action) {
-  const row = db.prepare("SELECT payload_json FROM task_runs WHERE id = ?").get(taskId);
+export function getTask(taskId) {
+  const row = db.prepare(`
+    SELECT payload_json, created_at, updated_at
+    FROM task_runs
+    WHERE id = ?
+  `).get(taskId);
   if (!row) return null;
-  const task = parseJson(row.payload_json, {});
+  return {
+    ...parseJson(row.payload_json, {}),
+    persistedCreatedAt: row.created_at,
+    persistedUpdatedAt: row.updated_at,
+  };
+}
+
+export function updateTaskAction(taskId, action) {
+  const task = getTask(taskId);
+  if (!task) return null;
   const statusByAction = {
     retry: "retrying",
     confirm: "success",

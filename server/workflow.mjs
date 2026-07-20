@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
-import { mkdir, readdir, writeFile } from "node:fs/promises";
-import { basename, join } from "node:path";
+import { mkdir, readdir, rename, rm, writeFile } from "node:fs/promises";
+import { basename, isAbsolute, join, relative, resolve } from "node:path";
 import { dataDir } from "./storage.mjs";
 
 const projectRoot = "E:\\Github";
@@ -23,6 +23,28 @@ const expectedAgents = [
   "compliance-rewrite-producer",
   "douyin-storyboard-script-writer",
 ];
+
+const taskIdPattern = /^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$/;
+
+function isWithin(root, candidate) {
+  const path = relative(root, candidate);
+  return path === "" || (!path.startsWith("..") && !isAbsolute(path));
+}
+
+export function workflowEnvelopePaths(taskId, root = dataDir) {
+  const normalizedTaskId = String(taskId ?? "").trim();
+  if (!taskIdPattern.test(normalizedTaskId)) {
+    throw new Error("任务 ID 不合法：仅支持 1-80 位字母、数字、下划线和连字符，且必须以字母或数字开头");
+  }
+  const dataRoot = resolve(root);
+  const inbox = resolve(dataRoot, "workflow-inbox");
+  const outputDirectory = resolve(dataRoot, "workflow-output", normalizedTaskId);
+  const queueFile = resolve(inbox, `${normalizedTaskId}.json`);
+  if (!isWithin(dataRoot, inbox) || !isWithin(dataRoot, outputDirectory) || !isWithin(inbox, queueFile)) {
+    throw new Error("任务 ID 不合法：工作流文件路径越出本地数据目录");
+  }
+  return { taskId: normalizedTaskId, inbox, outputDirectory, queueFile };
+}
 
 export async function getWorkflowStatus() {
   let files = [];
@@ -52,24 +74,30 @@ export async function getWorkflowStatus() {
 
 export async function queueWorkflowEnvelope(task) {
   if (!new Set(["content_generate", "script_generate", "quality_check"]).has(task.type)) return null;
-  const inbox = join(dataDir, "workflow-inbox");
+  const paths = workflowEnvelopePaths(task.id);
+  const { inbox, outputDirectory, queueFile } = paths;
   await mkdir(inbox, { recursive: true });
-  const filePath = join(inbox, `${task.id}.json`);
   const envelope = {
     schemaVersion: 1,
     workflowId: "douyin-ecom-copy",
-    taskId: task.id,
+    taskId: paths.taskId,
     taskType: task.type,
     batch: task.batch,
     createdAt: new Date().toISOString(),
     executionMode: "local_queue",
     sourceWorkflow: workflowFile,
     inputFiles: task.inputFiles ?? [],
-    outputDirectory: join(dataDir, "workflow-output", task.id),
+    outputDirectory,
     constraints: ["不操作真实店铺", "不发布内容", "不写入平台账号", "输出需人工确认"],
   };
-  await writeFile(filePath, JSON.stringify(envelope, null, 2), "utf8");
-  return { ...envelope, queueFile: filePath };
+  const temporaryFile = `${queueFile}.${process.pid}.${Math.random().toString(36).slice(2, 10)}.tmp`;
+  try {
+    await writeFile(temporaryFile, JSON.stringify(envelope, null, 2), "utf8");
+    await rename(temporaryFile, queueFile);
+  } finally {
+    await rm(temporaryFile, { force: true });
+  }
+  return { ...envelope, queueFile };
 }
 
 export { claudeRoot };

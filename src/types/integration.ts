@@ -12,6 +12,20 @@ export interface IntegrationSource {
   lastSync: string | null;
   records: number;
   location: string;
+  automation?: DingTalkAutomationStatus;
+}
+
+export interface DingTalkAutomationStatus {
+  enabled: boolean;
+  unattended: boolean;
+  state: "unknown" | "running" | "healthy" | "degraded" | "failed" | "stale";
+  statusLabel: string;
+  schedule: string[];
+  lastAttemptAt: string | null;
+  lastSuccessAt: string | null;
+  lastFailureAt: string | null;
+  lastFailure: string | null;
+  staleAfterMinutes: number;
 }
 
 export interface UploadPolicyGroup {
@@ -82,6 +96,41 @@ export interface WarehouseMetricTotals {
   roi: number;
 }
 
+export interface WarehouseDashboardMetricValues {
+  visitors: number;
+  payBuyers: number;
+  addToCart: number;
+  paymentConversion: number;
+  addToCartRate: number;
+  clientAvgPrice: number;
+  itemAvgPrice: number;
+  paidUnits: number;
+  promotionSpend: number;
+  promotionRevenue: number;
+  promotionRoi: number;
+}
+
+export interface WarehouseMetricTrend {
+  yoy: number | null;
+  mom: number | null;
+}
+
+export interface WarehouseDashboardMetrics {
+  source: "powerbi_local_warehouse";
+  available: boolean;
+  coverageComplete: boolean;
+  partial: boolean;
+  coverage: { start: string; end: string } | null;
+  period: { start: string; end: string } | null;
+  domains: { overall: boolean; product: boolean; promotion: boolean } | null;
+  metrics: WarehouseDashboardMetricValues | null;
+  trends: Record<keyof WarehouseDashboardMetricValues, WarehouseMetricTrend> | null;
+  comparisons?: {
+    previousPeriod: { start: string; end: string };
+    priorYearPeriod: { start: string; end: string };
+  };
+}
+
 export interface WarehouseUniqueDomain {
   id: string;
   label: string;
@@ -103,6 +152,7 @@ export interface PowerBiOverallDaily {
   fullSiteSpend: number;
   keywordSpend: number;
   audienceSpend: number;
+  taokeSpend: number;
   newVisitors: number;
   returningVisitors: number;
   avgStaySeconds: number;
@@ -125,6 +175,8 @@ export interface PowerBiPromotionDaily {
   date: string;
   productId?: string;
   scene?: string;
+  displayLabel?: string;
+  imageUrl?: string | null;
   impressions: number;
   clicks: number;
   spend: number;
@@ -145,6 +197,7 @@ export interface PowerBiPages {
     productId: string;
     productName: string;
     merchantCode: string;
+    imageUrl: string | null;
     sales30d: number;
     cumulativeSales: number;
   }>;
@@ -153,6 +206,189 @@ export interface PowerBiPages {
     sourcePathsExposed: boolean;
     remoteImagesExposed: boolean;
   };
+}
+
+export interface ProductManagementKpis {
+  productCount: number;
+  orderLines: number;
+  totalSalesAmount: number;
+  totalNetSales: number;
+  collectionRate: number | null;
+  totalRefundAmount: number;
+  refundRate: number | null;
+  totalSalesUnits: number;
+  avgUnitPrice: number | null;
+  totalPaidAmount: number;
+  totalReceivedAmount: number;
+  totalSubsidyAmount: number;
+  totalGrossProfit: number | null;
+  grossMargin: number | null;
+  matchedProductCount: number | null;
+}
+
+export interface ProductOverviewItem {
+  productCode: string;
+  productName: string;
+  category: string;
+  brand: string;
+  salesUnits: number;
+  receivedAmount: number;
+  salesAmount: number;
+  refundAmount: number;
+  orderLines: number;
+  collectionRate: number | null;
+  refundRate: number | null;
+}
+
+export interface ProductNameOverviewItem {
+  productName: string;
+  category: string;
+  salesUnits: number;
+  salesAmount: number;
+  refundAmount: number;
+  receivedAmount: number;
+  grossProfit: number;
+  matchedReceived: number;
+  orderLines: number;
+  amountShare: number;
+  avgUnitPrice: number | null;
+  refundRate: number | null;
+  grossMargin: number | null;
+}
+
+export interface ProductDailyTrendItem {
+  date: string;
+  receivedAmount: number;
+  salesAmount: number;
+  refundAmount: number;
+  orderLines: number;
+}
+
+export interface ProductMonthlyTrendItem {
+  month: string;
+  receivedAmount: number;
+  salesAmount: number;
+  refundAmount: number;
+  orderLines: number;
+}
+
+export interface ProductStoreBreakdownItem {
+  store: string;
+  receivedAmount: number;
+  salesAmount: number;
+  refundAmount: number;
+  orderLines: number;
+}
+
+export interface ProductChannelBreakdownItem {
+  channel: string;
+  salesUnits: number;
+  receivedAmount: number;
+  refundAmount: number;
+  grossProfit: number;
+  matchedReceived: number;
+  orderLines: number;
+  amountShare: number;
+  avgUnitPrice: number | null;
+  refundRate: number | null;
+  grossMargin: number | null;
+}
+
+export interface ProductMattressCategoryBreakdownItem {
+  category: string;
+  receivedAmount: number;
+  salesAmount: number;
+  refundAmount: number;
+  grossProfit: number;
+  matchedReceived: number;
+  orderLines: number;
+  amountShare: number;
+  refundRate: number | null;
+  grossMargin: number | null;
+}
+
+export interface ProductDarenBreakdownItem {
+  daren: string;
+  receivedAmount: number;
+  salesAmount: number;
+  orderLines: number;
+}
+
+export interface ProductCategoryBreakdownItem {
+  category: string;
+  receivedAmount: number;
+  salesAmount: number;
+  refundAmount: number;
+  orderLines: number;
+}
+
+export interface ProductReturnRankingItem {
+  productCode: string;
+  productName: string;
+  refundUnits: number;
+  refundAmount: number;
+  receivedAmount: number;
+  orderLines: number;
+  refundRate: number | null;
+}
+
+export interface ProductFulfillmentByProductItem {
+  productName: string;
+  orderCount: number;
+  shippedOrderCount: number;
+  avgShippingDays: number | null;
+  day3Share: number;
+  day5Share: number;
+  day7Share: number;
+  day10Share: number;
+  within15DayShare: number;
+}
+
+export interface ProductManagementPages {
+  source: "jushuitan_local_logic";
+  period: { start: string; end: string } | null;
+  kpis: ProductManagementKpis | Record<string, never>;
+  productOverview: ProductOverviewItem[];
+  productNameOverview: ProductNameOverviewItem[];
+  dailyTrend: ProductDailyTrendItem[];
+  monthlyTrend: ProductMonthlyTrendItem[];
+  storeBreakdown: ProductStoreBreakdownItem[];
+  channelBreakdown: ProductChannelBreakdownItem[];
+  darenBreakdown: ProductDarenBreakdownItem[];
+  categoryBreakdown: ProductCategoryBreakdownItem[];
+  mattressCategoryBreakdown: ProductMattressCategoryBreakdownItem[];
+  returnRanking: ProductReturnRankingItem[];
+  fulfillmentByProduct: ProductFulfillmentByProductItem[];
+  monthlyComparison: ProductMonthlyComparison | null;
+  categoryChannelMatrix: ProductMatrix;
+  warehouseStatusMatrix: ProductMatrix;
+  dailyChannelMatrix: ProductMatrix;
+  dailyStatusMatrix: ProductMatrix;
+  productChannelMatrix: ProductMatrix;
+  productStatusMatrix: ProductMatrix;
+  availableStatuses: string[];
+  availableChannels: string[];
+  availableStoreShortNames: string[];
+  privacy: { rawRowsExposed: boolean; sourcePathsExposed: boolean };
+}
+
+export interface ProductMonthlyComparison {
+  currentMonth: string;
+  previousMonth: string | null;
+  current: Record<string, number>;
+  previous: Record<string, number>;
+  deltas: Record<string, number | null>;
+}
+
+export interface ProductMatrix {
+  columns: string[];
+  rows: Array<{ rowKey: string; values: Record<string, number>; total: number }>;
+}
+
+export interface ProductsPayload {
+  productManagement: ProductManagementPages | null;
+  refreshedAt: string | null;
+  status: "ok" | "stale";
 }
 
 export interface WarehouseSnapshot {
@@ -175,6 +411,8 @@ export interface WarehouseSnapshot {
   }>;
   uniqueDomains: WarehouseUniqueDomain[];
   powerbiPages: PowerBiPages;
+  productManagement: ProductManagementPages;
+  dashboard?: WarehouseDashboardMetrics;
   overlapPolicy: {
     authority: "dingtalk";
     excludedQueries: Array<{
@@ -307,6 +545,11 @@ export interface DingTalkMonthlyOverview {
     totalNetRevenue: number;
     channels: Array<{ platform: string; netRevenue: number }>;
   }>;
+  priorYearDaily?: Array<{
+    date: string;
+    netRevenue: number;
+  }>;
+  priorYearFullMonthNetRevenue?: number;
   source: string;
 }
 
@@ -329,6 +572,18 @@ export interface DingTalkLatestComparison {
   previousDate: string;
   channels: DingTalkComparisonItem[];
   stores: DingTalkComparisonItem[];
+}
+
+export interface DingTalkMetricTrend {
+  yoy: number | null;
+  mom: number | null;
+}
+
+export interface DingTalkMonthlyAchievement {
+  month: string;
+  netRevenue: number;
+  target: number;
+  completionRate: number;
 }
 
 export interface DingTalkSnapshot {
@@ -359,7 +614,10 @@ export interface DingTalkSnapshot {
     dailyPlatforms?: Array<{ date: string; platform: string } & DingTalkMetricTotals>;
     dailyStores?: Array<{ date: string; platform: string; store: string } & DingTalkMetricTotals>;
     dailyOffsiteSpend?: Array<{ date: string; spend: number }>;
+    targetYears?: string[];
     monthlyOverview?: DingTalkMonthlyOverview;
+    monthlyAchievement?: DingTalkMonthlyAchievement[];
+    metricTrends?: Record<"gmv" | "netRevenue" | "recoveryRate" | "addToCart" | "spend" | "feeRate" | "refund" | "refundRate", DingTalkMetricTrend>;
     latestComparison?: DingTalkLatestComparison;
     formulaLineage?: { summary: string; monthlyRollup: string; target: string };
   };

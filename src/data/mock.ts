@@ -29,7 +29,9 @@ export const navItems: NavItem[] = [
   { id: "analytics", label: "运营数据看板", icon: "📊", group: "数据与监控" },
   { id: "intelligence", label: "竞品情报 / TOP100", icon: "🕸️", group: "数据与监控" },
   { id: "tasks", label: "任务队列", icon: "✅", group: "数据与监控" },
+  { id: "products", label: "商品管理", icon: "🏷️", group: "数据与监控" },
   { id: "settings", label: "系统设置", icon: "⚙️", group: "系统" },
+  { id: "access", label: "用户与权限", icon: "🛡️", group: "系统" },
 ];
 
 export const dashboardKpis: KpiMetric[] = [
@@ -166,12 +168,12 @@ export const systemStatus: SystemStatusItem[] = [
 ];
 
 export const dataSourceStatuses: DataSourceStatus[] = [
-  { name: "本地经营数仓", value: "Polars + Parquet + DuckDB", status: "已建仓", tone: "green" },
-  { name: "飞书表格", value: "媒介报表 / 种草笔记聚合", status: "只读同步", tone: "green" },
-  { name: "本地 Excel / CSV", value: "商品卖点表、监控池、导出结果", status: "已配置", tone: "green" },
-  { name: "本地素材文件夹", value: "E:/素材/电商素材", status: "可读取", tone: "green" },
-  { name: "本机模型 / Agent", value: "12 个内容 Agent + 本地任务入口", status: "已连接", tone: "green" },
-  { name: "本地任务数据库", value: "SQLite 同步、上传与任务历史", status: "已启用", tone: "green" },
+  { name: "本地经营数仓", value: "经营数据已准备", status: "可用", tone: "green" },
+  { name: "飞书表格", value: "媒介与种草数据已汇总", status: "已同步", tone: "green" },
+  { name: "商品数据文件", value: "商品卖点、监控池与导出结果", status: "已配置", tone: "green" },
+  { name: "图片素材", value: "主图、详情页和视频素材", status: "可读取", tone: "green" },
+  { name: "内容生产工作流", value: "12 个生产 Agent 可用", status: "已连接", tone: "green" },
+  { name: "任务记录", value: "同步、上传与任务历史", status: "已启用", tone: "green" },
 ];
 
 export const productAssetSummary: ProductAssetSummary[] = [
@@ -253,7 +255,7 @@ export const contentPipeline: PipelineStep[] = [
   {
     id: "transcribe",
     title: "短视频转录",
-    desc: "保留原型批量转录详情入口",
+    desc: "商品资料已完成批量读取",
     status: "完成",
     tone: "green",
     progress: 100,
@@ -733,7 +735,7 @@ export const queueTasks: QueueTask[] = [
     timeline: ["10:00 读取同步配置", "10:02 Token 未配置，任务停止"],
     inputFiles: ["config/feishu_placeholder.json"],
     outputFiles: [],
-    failureReason: "接口 Token 未配置，MVP 阶段仅展示占位状态",
+    failureReason: "模型服务尚未连接，请先在系统设置中完成配置",
   },
   {
     id: "t7",
@@ -805,9 +807,9 @@ export const configGroups: Record<string, ConfigItem[]> = {
     { name: "本地经营数仓", desc: "店铺推广、商品、客服与竞品历史数据", status: "25/25 查询", tone: "green", value: "/api/sync/warehouse" },
     { name: "飞书表格", desc: "媒介与内容数据脱敏聚合", status: "已授权", tone: "green", value: "/api/sync/feishu" },
     { name: "本地素材文件夹", desc: "主图、详情页、视频素材", status: "已配置", tone: "green", value: "E:/素材/电商素材" },
-    { name: "本地 JSON", desc: "mock 快照和配置草稿", status: "可配置", tone: "blue", value: "src/data/mock.ts" },
+    { name: "示例数据", desc: "演示快照和配置草稿", status: "可配置", tone: "blue", value: "src/data/mock.ts" },
     { name: "本地 SQLite / 后端数据库", desc: "任务、同步、上传和快照历史", status: "已启用", tone: "green", value: "local-data/ecom-ai-studio.sqlite" },
-    { name: "自动化抓取输出", desc: "TOP100 与价格快照", status: "mock", tone: "orange", value: "CSV / JSON 预留" },
+    { name: "自动化采集结果", desc: "TOP100 与价格快照", status: "示例", tone: "orange", value: "CSV / JSON 预留" },
   ],
   接口占位: [
     { name: "内容生成服务", desc: "文案、口播、详情页文案", status: "待接入", tone: "muted", value: "/api/content/generate" },
@@ -819,7 +821,7 @@ export const configGroups: Record<string, ConfigItem[]> = {
     { name: "运营数据 API", desc: "本地数仓、钉钉与飞书聚合快照", status: "已接入", tone: "green", value: "/api/analytics" },
   ],
   安全配置: [
-    { name: "Token 占位", desc: "仅展示字段，不录入真实密钥", status: "mock", tone: "orange", value: "password placeholder" },
+    { name: "密钥配置", desc: "仅展示配置状态，不在浏览器保存密钥", status: "待配置", tone: "orange", value: "password placeholder" },
     { name: "密钥不入库", desc: "真实接入时只从环境变量或加密配置读取", status: "策略确认", tone: "green", value: ".env.local / secret store" },
     { name: "环境变量", desc: "本地开发读取敏感配置", status: "可配置", tone: "blue", value: "VITE_* / SERVER_*" },
     { name: "权限控制", desc: "店铺、任务、导出包权限", status: "待接入", tone: "muted", value: "role based access" },

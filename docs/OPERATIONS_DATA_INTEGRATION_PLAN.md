@@ -1,6 +1,8 @@
 # 运营数据本地化方案
 
 日期：2026-07-12
+状态：✅ 已实施（本文档即当前架构说明）
+最后核验：2026-07-20 — `scripts/extract-power-query.mjs`、`pipeline/ecom_pipeline/{readers,transforms,warehouse}.py`、`local-data/warehouse/{analytics-snapshot.json,ecom.duckdb,marts/,staging/}`、`scripts/sync-dingtalk.mjs`、前端 `AnalyticsPage.tsx` 均已落地。
 
 ## 结论
 

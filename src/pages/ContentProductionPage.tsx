@@ -21,7 +21,7 @@ export function ContentProductionPage({ onAction, onCreateTask }: ContentProduct
 
   function updateSelectedStatus(status: ProductStatus, toast: string) {
     setProducts((current) => current.map((product) => (product.id === selectedProduct.id ? { ...product, status } : product)));
-    onAction(toast, `${selectedProduct.name} 已更新为 mock 状态：${productStatusText[status]}`);
+    onAction(toast, `${selectedProduct.name} 已更新为：${productStatusText[status]}`);
   }
 
   function createContentTask(type: TaskCreateInput["type"], name: string, batch: string) {
@@ -39,8 +39,8 @@ export function ContentProductionPage({ onAction, onCreateTask }: ContentProduct
   return (
     <div>
       <PageHeader
-        title="内容生产 / 短视频生产"
-        subtitle="从批量转录、文案生成到分镜脚本的内容工作台；任务经同一网页端口写入本机队列，并映射到 E:/Github/.claude 的 Agent 工作流。"
+        title="文案与分镜"
+        subtitle="批量完成素材转录、文案生成、质检与分镜编排，任务统一进入生产队列。"
         actions={
           <>
             <button className="btn-select" type="button">COPY-20260707-A ▾</button>

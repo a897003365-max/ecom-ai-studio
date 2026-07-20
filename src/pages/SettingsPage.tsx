@@ -9,10 +9,36 @@ import type { ConnectionStatus, DataSourcesPayload } from "../types/integration"
 
 interface SettingsPageProps {
   onAction: (title: string, detail?: string) => void;
+  canManage: boolean;
 }
 
-export function SettingsPage({ onAction }: SettingsPageProps) {
-  const [tokenMode, setTokenMode] = useState("仅本机占位，不保存真实密钥");
+const visibleConfigGroups = Object.fromEntries(
+  Object.entries(configGroups).filter(([group]) => !["本机环境", "接口占位"].includes(group)),
+);
+
+function sourceDisplayDetail(source: DataSourcesPayload["sources"][number]) {
+  const records = source.records.toLocaleString("zh-CN");
+  if (source.id === "warehouse") return `${records} 行经营数据已入库`;
+  if (source.id === "workflow") return `${records} 个生产 Agent 可用`;
+  if (source.id === "dingtalk") return `${records} 条经营记录 · 每日自动同步`;
+  return `${records} 条汇总记录`;
+}
+
+function uploadStatusLabel(status: string) {
+  return ({ waiting_parse: "待处理", imported: "已导入", failed: "导入失败" } as Record<string, string>)[status] ?? status;
+}
+
+function policyItemLabel(item: string) {
+  if (item.includes(".claude")) return "内容生产工作流";
+  if (item.includes("DuckDB")) return "经营数据仓库";
+  if (item.includes("Parquet")) return "增量数据分区";
+  if (item.includes("xsec_token")) return "带访问凭证的外部链接";
+  if (item.includes("App Secret")) return "应用密钥、访问令牌与登录凭证";
+  return item;
+}
+
+export function SettingsPage({ onAction, canManage }: SettingsPageProps) {
+  const [tokenMode, setTokenMode] = useState("不在浏览器保存");
   const [dataSources, setDataSources] = useState<DataSourcesPayload | null>(null);
   const [syncing, setSyncing] = useState<"warehouse" | "feishu" | "dingtalk" | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -23,10 +49,10 @@ export function SettingsPage({ onAction }: SettingsPageProps) {
     getDataSources()
       .then((payload) => {
         setDataSources(payload);
-        if (showFeedback) onAction("环境检测完成", "本机数据源、工作流和上传目录状态已刷新");
+        if (showFeedback) onAction("环境检测完成", "数据连接与工作流状态已刷新");
       })
       .catch((error: unknown) => {
-        if (showFeedback) onAction("本地服务不可用", error instanceof Error ? error.message : "请使用 npm run dev 启动单端口服务");
+        if (showFeedback) onAction("本地服务不可用", error instanceof Error ? error.message : "请确认本地服务已启动");
       });
   }
 
@@ -40,7 +66,7 @@ export function SettingsPage({ onAction }: SettingsPageProps) {
       await syncDataSource(source);
       loadSources();
       const details = {
-        warehouse: "本地文件增量分区、DuckDB 视图和经营快照已更新",
+        warehouse: "经营数据与看板快照已更新",
         feishu: "飞书共享表已完成脱敏聚合",
         dingtalk: "钉钉共享表已完成只读同步并生成脱敏快照",
       };
@@ -62,7 +88,7 @@ export function SettingsPage({ onAction }: SettingsPageProps) {
         category === "dingtalk_operations" ? "钉钉数据已完成本机导入" : "文件已进入本地导入队列",
         category === "dingtalk_operations"
           ? `${file.name} 已生成脱敏聚合快照，原始行不会写入看板数据库`
-          : `${file.name} 仅保存到 local-data/uploads，当前状态：${upload.status}`,
+          : `${file.name} 已进入导入队列，当前状态：${uploadStatusLabel(upload.status)}`,
       );
     } catch (error) {
       onAction("上传失败", error instanceof Error ? error.message : "仅支持 10 MB 内的 CSV/XLSX/JSON");
@@ -88,11 +114,11 @@ export function SettingsPage({ onAction }: SettingsPageProps) {
     <div>
       <PageHeader
         title="系统设置"
-        subtitle="本机环境、数据源、上传分级与 Claude Code 工作流端口；敏感字段不进入网页快照。"
+        subtitle="管理数据连接、同步计划与内容生产工作流，敏感信息仅在本机保存。"
         actions={
           <>
             <button className="btn" onClick={() => loadSources(true)} type="button">检测环境</button>
-            <button className="btn-primary" onClick={() => onAction("配置已保留", "连接设置由本机服务读取，不在浏览器保存密钥")} type="button">保存配置</button>
+            <button className="btn-primary" disabled={!canManage} onClick={() => onAction("配置已保留", "连接设置由本机服务读取，不在浏览器保存密钥")} title={canManage ? "保存系统配置" : "当前账号仅可查看设置"} type="button">保存配置</button>
           </>
         }
       />
@@ -109,7 +135,7 @@ export function SettingsPage({ onAction }: SettingsPageProps) {
               ref={uploadInput}
               type="file"
             />
-            <button className="btn" disabled={uploading} onClick={() => openUpload("operations_manual_import")} type="button">
+            <button className="btn" disabled={uploading || !canManage} onClick={() => openUpload("operations_manual_import")} type="button">
               {uploading ? "写入中..." : "上传脱敏数据"}
             </button>
           </>
@@ -122,16 +148,15 @@ export function SettingsPage({ onAction }: SettingsPageProps) {
                 <div className="min-w-0 text-[13.5px] font-bold">{source.name}</div>
                 <StatusTag label={source.statusLabel} tone={statusTone(source.status)} dot />
               </div>
-              <div className="min-h-10 text-xs leading-5 text-[var(--muted)]">{source.detail}</div>
-              <div className="mt-2 break-all rounded bg-white/[0.04] px-2 py-1.5 text-[11px] text-[var(--muted)]">{source.location}</div>
+              <div className="min-h-10 text-xs leading-5 text-[var(--muted)]">{sourceDisplayDetail(source)}</div>
               <div className="mt-3 flex items-center justify-between gap-2 text-[11px] text-[var(--muted)]">
                 <span>{source.lastSync ? new Date(source.lastSync).toLocaleString("zh-CN") : "尚无同步历史"}</span>
-                {source.id === "warehouse" && <button className="btn" disabled={syncing !== null} onClick={() => void handleSync("warehouse")} type="button">{syncing === "warehouse" ? "建仓中" : "同步"}</button>}
-                {source.id === "feishu" && <button className="btn" disabled={syncing !== null} onClick={() => void handleSync("feishu")} type="button">{syncing === "feishu" ? "聚合中" : "同步"}</button>}
+                {source.id === "warehouse" && <button className="btn" disabled={syncing !== null || !canManage} onClick={() => void handleSync("warehouse")} type="button">{syncing === "warehouse" ? "建仓中" : "同步"}</button>}
+                {source.id === "feishu" && <button className="btn" disabled={syncing !== null || !canManage} onClick={() => void handleSync("feishu")} type="button">{syncing === "feishu" ? "聚合中" : "同步"}</button>}
                 {source.id === "dingtalk" && (
                   <div className="flex gap-1.5">
-                    <button className="btn" disabled={syncing !== null} onClick={() => void handleSync("dingtalk")} type="button">{syncing === "dingtalk" ? "读取中" : "同步"}</button>
-                    <button className="btn" disabled={uploading} onClick={() => openUpload("dingtalk_operations")} type="button">文件回退</button>
+                    <button className="btn" disabled={syncing !== null || !canManage} onClick={() => void handleSync("dingtalk")} type="button">{syncing === "dingtalk" ? "读取中" : "同步"}</button>
+                    <button className="btn" disabled={uploading || !canManage} onClick={() => openUpload("dingtalk_operations")} type="button">文件回退</button>
                   </div>
                 )}
               </div>
@@ -139,7 +164,7 @@ export function SettingsPage({ onAction }: SettingsPageProps) {
           ))}
           {!dataSources && (
             <div className="rounded-lg border border-[var(--border)] p-3 text-xs leading-5 text-[var(--muted)] md:col-span-2 xl:col-span-4">
-              正在连接本机服务。若状态未出现，请通过 <code>npm run dev</code> 启动 UI 与 API 共用端口。
+              正在读取连接状态，请稍候。
             </div>
           )}
         </div>
@@ -151,42 +176,40 @@ export function SettingsPage({ onAction }: SettingsPageProps) {
             {(dataSources?.uploadPolicy ?? []).map((group) => (
               <div className="rounded-lg border border-[var(--border)] bg-white/[0.02] p-3" key={group.id}>
                 <div className="mb-2 flex items-center justify-between gap-2"><div className="font-bold">{group.category}</div><StatusTag label={group.items.length.toString()} tone={group.tone} /></div>
-                <div className="flex flex-wrap gap-1.5">{group.items.map((item) => <StatusTag key={item} label={item} tone="muted" />)}</div>
+                <div className="flex flex-wrap gap-1.5">{group.items.map((item) => <StatusTag key={item} label={policyItemLabel(item)} tone="muted" />)}</div>
                 <div className="mt-2 text-xs leading-5 text-[var(--muted)]">{group.reason}</div>
               </div>
             ))}
           </div>
         </Card>
 
-        <Card title="本地数仓与工作流状态">
+        <Card title="数据处理与工作流状态">
           <div className="grid gap-3">
             {dataSources?.warehouse && (
               <div className="rounded-lg border border-[var(--border)] bg-white/[0.02] p-3">
-                <div className="flex items-center justify-between gap-2"><div className="text-[13px] font-bold">DuckDB / Parquet</div><StatusTag label={`${dataSources.warehouse.completedQueries}/${dataSources.warehouse.queryCount} 查询`} tone={dataSources.warehouse.failedPartitionCount ? "orange" : "green"} dot /></div>
+                <div className="flex items-center justify-between gap-2"><div className="text-[13px] font-bold">经营数据仓库</div><StatusTag label={`${dataSources.warehouse.completedQueries}/${dataSources.warehouse.queryCount} 数据集`} tone={dataSources.warehouse.failedPartitionCount ? "orange" : "green"} dot /></div>
                 <div className="mt-2 grid grid-cols-3 gap-2 text-center text-[11px] text-[var(--muted)]">
-                  <div><b className="block text-[13px] text-[var(--text)]">{dataSources.warehouse.sourceFileCount}</b>源文件</div>
-                  <div><b className="block text-[13px] text-[var(--text)]">{dataSources.warehouse.partitionCount}</b>分区</div>
-                  <div><b className="block text-[13px] text-[var(--text)]">{dataSources.warehouse.rowCount.toLocaleString("zh-CN")}</b>行</div>
+                  <div><b className="block text-[13px] text-[var(--text)]">{dataSources.warehouse.sourceFileCount}</b>数据文件</div>
+                  <div><b className="block text-[13px] text-[var(--text)]">{dataSources.warehouse.partitionCount}</b>已入库</div>
+                  <div><b className="block text-[13px] text-[var(--text)]">{dataSources.warehouse.rowCount.toLocaleString("zh-CN")}</b>数据行</div>
                 </div>
-                <div className="mt-2 truncate text-[11px] text-[var(--muted)]">{dataSources.warehouse.databasePath}</div>
               </div>
             )}
             {dataSources?.workflow && (
               <div className="rounded-lg border border-[var(--border)] bg-white/[0.02] p-3">
-                <div className="flex items-center justify-between gap-2"><div className="text-[13px] font-bold">{dataSources.workflow.name}</div><StatusTag label={`${dataSources.workflow.readyCount}/${dataSources.workflow.expectedCount}`} tone={dataSources.workflow.status === "ready" ? "green" : "red"} dot /></div>
+                <div className="flex items-center justify-between gap-2"><div className="text-[13px] font-bold">内容生产工作流</div><StatusTag label={`${dataSources.workflow.readyCount}/${dataSources.workflow.expectedCount} 就绪`} tone={dataSources.workflow.status === "ready" ? "green" : "red"} dot /></div>
                 <div className="mt-2 text-xs leading-5 text-[var(--muted)]">{dataSources.workflow.stages.join(" → ")}</div>
-                <div className="mt-2 break-all rounded bg-white/[0.04] px-2 py-1.5 text-[11px] text-[var(--muted)]">{dataSources.workflow.executionPort}</div>
               </div>
             )}
             {(dataSources?.uploads.length ?? 0) > 0 && (
-              <div className="text-xs text-[var(--muted)]">最近导入：{dataSources?.uploads[0]?.fileName} · {dataSources?.uploads[0]?.status}</div>
+              <div className="text-xs text-[var(--muted)]">最近导入：{dataSources?.uploads[0]?.fileName} · {uploadStatusLabel(dataSources?.uploads[0]?.status ?? "")}</div>
             )}
           </div>
         </Card>
       </div>
 
       <div className="grid gap-4 xl:grid-cols-3">
-        {Object.entries(configGroups).map(([group, items]) => (
+        {Object.entries(visibleConfigGroups).map(([group, items]) => (
           <Card title={group} key={group}>
             <div className="grid gap-3">
               {items.map((item) => (
@@ -198,7 +221,6 @@ export function SettingsPage({ onAction }: SettingsPageProps) {
                     </div>
                     <StatusTag label={item.status} tone={item.tone} />
                   </div>
-                  <div className="rounded-lg bg-white/[0.04] px-3 py-2 text-xs text-[var(--muted)]">{item.value}</div>
                 </div>
               ))}
             </div>
@@ -207,15 +229,15 @@ export function SettingsPage({ onAction }: SettingsPageProps) {
       </div>
 
       <div className="mt-4 grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
-        <Card title="接口 Token 占位配置">
+        <Card title="连接与安全设置">
           <div className="grid gap-3 md:grid-cols-2">
             <label className="grid gap-1.5 text-xs text-[var(--muted)]">
-              模型服务 Token
-              <input className="input-field" placeholder="不填写真实密钥，仅展示字段" type="password" />
+              模型服务密钥
+              <input className="input-field" placeholder="从当前安全模式读取" type="password" />
             </label>
             <label className="grid gap-1.5 text-xs text-[var(--muted)]">
-              飞书 App Token
-              <input className="input-field" placeholder="feishu_token_placeholder" type="password" />
+              飞书应用凭证
+              <input className="input-field" placeholder="从当前安全模式读取" type="password" />
             </label>
             <label className="grid gap-1.5 text-xs text-[var(--muted)]">
               本地脚本目录
@@ -228,14 +250,14 @@ export function SettingsPage({ onAction }: SettingsPageProps) {
             <label className="grid gap-1.5 text-xs text-[var(--muted)] md:col-span-2">
               安全模式
               <select className="input-field" value={tokenMode} onChange={(event) => setTokenMode(event.target.value)}>
-                <option>仅本机占位，不保存真实密钥</option>
-                <option>使用环境变量读取</option>
-                <option>使用本地加密配置文件</option>
+                <option>不在浏览器保存</option>
+                <option>从环境变量读取</option>
+                <option>从本机加密配置读取</option>
               </select>
             </label>
           </div>
           <div className="mt-4 rounded-lg border border-[var(--border)] bg-[var(--orange-bg)] px-3 py-2 text-xs leading-5 text-[var(--orange)]">
-            当前选择：{tokenMode}。第一阶段不会请求真实平台接口，也不会绕过平台风控或反爬机制。
+            当前选择：{tokenMode}。密钥不会写入页面数据或操作日志。
           </div>
         </Card>
 

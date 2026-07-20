@@ -1,6 +1,16 @@
 # PowerBI 独有数据呈现方案
 
 日期：2026-07-13
+状态：⚠ 未实施 / backlog
+
+- 地基（OPERATIONS_DATA_INTEGRATION_PLAN）：✅ DuckDB + Parquet + 钉钉集成已就绪
+- P0 六张 mart 表（`mart_funnel_daily`、`mart_traffic_source_daily`、`mart_product_daily`、`mart_ad_plan_daily`、`mart_ad_keyword_daily`、`mart_ad_audience_daily`）：❌ 未建
+- 前端"增长诊断"层（GrowthDiagnosis / 流量与转化 / 商品机会 / 投放效率 / 目标与毛利 / 客服与人力 / 竞品观测）：❌ 未建
+- `scope = powerbi_unique_only` 快照标记：❌ 未落地
+- 数据边界规则（结果=钉钉，过程=PowerBI）：⚠ 前端 `ExecutiveCommerceOverview` / `PowerBiReplica` 已有雏形，规则未完全代码化
+
+最后核验：2026-07-20 — grep `mart_funnel_daily / 增长诊断 / GrowthDiagnosis / powerbi_unique_only` 在 src/pipeline/server 均无命中
+
 适用页面：运营数据看板
 目标：钉钉作为全渠道经营结果的权威来源；PowerBI 本地数仓只补充钉钉没有的过程、驱动因素和明细诊断。
 

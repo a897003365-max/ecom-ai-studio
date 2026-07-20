@@ -40,7 +40,7 @@ export function ImageProcessingPage({ onAction, onCreateTask }: ImageProcessingP
     <div>
       <PageHeader
         title="图片处理工坊"
-        subtitle="继承原型的导入、抠图去背景、主图版式、多平台尺寸适配和合规检测流水线，当前用 mock 缩略图模拟本地图片处理脚本接入前的前端形态。"
+        subtitle="批量完成抠图、尺寸适配、活动角标与合规检查，集中处理需人工确认的图片。"
         actions={
           <>
             <button className="btn-select" type="button">IMG-20260707-A ▾</button>
@@ -116,7 +116,7 @@ export function ImageProcessingPage({ onAction, onCreateTask }: ImageProcessingP
                 <td>{task.updatedAt}</td>
                 <td>
                   <div className="flex gap-2">
-                    <button className="btn" onClick={() => onAction("预览图片", `${task.productName} 使用 mock 占位预览`)} type="button">预览</button>
+                    <button className="btn" onClick={() => onAction("预览图片", `${task.productName} 的处理前后对比已打开`)} type="button">预览</button>
                     <button className="btn" onClick={() => markFirstWaiting("retrying", `${task.productName} 失败重试`, `RETRY-${task.sku}`)} type="button">重试</button>
                     <button className="btn" onClick={() => markFirstWaiting("success", `${task.productName} 人工确认`, `CONFIRM-${task.sku}`)} type="button">确认</button>
                   </div>

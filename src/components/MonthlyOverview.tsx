@@ -41,7 +41,6 @@ export function MonthlyOverview({ overview, selectedChannel }: MonthlyOverviewPr
           <div><span><Target size={13} />月度回款目标</span><b>{money(metrics.target)}</b></div>
           <div className="monthly-target-track"><i style={{ width: `${Math.min(100, Math.max(0, metrics.completionRate * 100))}%` }} /></div>
         </div>
-        <div className="monthly-source-note">数据来源：共享表格</div>
       </div>
       <ChannelRevenueChart overview={overview} selectedChannel={selectedChannel} />
     </div>

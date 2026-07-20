@@ -1,17 +1,23 @@
-import { createReadStream, existsSync, mkdirSync } from "node:fs";
+import { createReadStream, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { extname, join, normalize } from "node:path";
+import "dotenv/config";
 import { createServer as createViteServer } from "vite";
+import { AuthError, createAuthService, PERMISSIONS } from "./auth.mjs";
 import { parseDingTalkFile } from "./dingtalk.mjs";
 import { checkDingTalkApi, filterDingTalkSnapshot, syncDingTalkApi } from "./dingtalk-api.mjs";
+import { acquireDingTalkLock } from "./dingtalk-lock.mjs";
 import { checkFeishu, sheetInventory, syncFeishu } from "./feishu.mjs";
 import { buildDashboardDataStatus } from "./dashboard-status.mjs";
-import { checkWarehouse, readWarehouseSnapshot, syncWarehouse } from "./warehouse.mjs";
+import { buildWarehouseDashboardMetrics, checkWarehouse, queryProductsOnDemand, readWarehouseSnapshot, syncWarehouse } from "./warehouse.mjs";
+import { getPipelineState, hasSourceXlsx, sourceXlsxInfo, startAnalysisPipeline } from "./intelligence-pipeline.mjs";
+import { hasVisionKey } from "./vision-client.mjs";
 import {
   beginSync,
   dataDir,
   finishSync,
+  getTask,
   latestUpload,
   latestSnapshot,
   listSyncRuns,
@@ -22,7 +28,8 @@ import {
   updateTaskAction,
   upsertTask,
 } from "./storage.mjs";
-import { getWorkflowStatus, queueWorkflowEnvelope } from "./workflow.mjs";
+import { getWorkflowStatus, queueWorkflowEnvelope, workflowEnvelopePaths } from "./workflow.mjs";
+import { requiredTaskPermission } from "./task-permissions.mjs";
 
 const production = process.argv.includes("--production");
 const host = process.env.HOST || "127.0.0.1";
@@ -31,12 +38,61 @@ const distDir = join(process.cwd(), "dist");
 const uploadDir = join(dataDir, "uploads");
 mkdirSync(uploadDir, { recursive: true });
 
+const configuredSessionTtlHours = Number(process.env.AUTH_SESSION_TTL_HOURS || 12);
+const sessionTtlHours = Number.isFinite(configuredSessionTtlHours) && configuredSessionTtlHours > 0 && configuredSessionTtlHours <= 24 * 30
+  ? configuredSessionTtlHours
+  : 12;
+const authService = createAuthService({
+  storePath: process.env.AUTH_STORE_PATH || join(dataDir, "auth", "auth-store.json"),
+  sessionTtlMs: sessionTtlHours * 60 * 60 * 1000,
+});
+await authService.init();
+
+const authEnforcementEnabled = process.env.AUTH_ENFORCEMENT_ENABLED === "1";
+const localAccessTimestamp = new Date().toISOString();
+const localAccessUser = Object.freeze({
+  id: "local-access-mode",
+  name: "本地免登录",
+  email: "local-access@localhost",
+  phone: "",
+  role: "admin",
+  permissions: PERMISSIONS.map((permission) => permission.id),
+  active: true,
+  createdAt: localAccessTimestamp,
+  updatedAt: localAccessTimestamp,
+});
+
+const sessionCookieName = "ecom_session";
+const loginAttempts = new Map();
+const loginRateLimiter = {
+  limit: 5,
+  windowMs: 15 * 60 * 1000,
+  check(key) {
+    const now = Date.now();
+    const record = loginAttempts.get(key);
+    if (!record || record.resetAt <= now) return;
+    if (record.count >= this.limit) {
+      const retryAfter = Math.max(1, Math.ceil((record.resetAt - now) / 1000));
+      throw new AuthError(429, "rate_limit_exceeded", `登录尝试过多，请在 ${retryAfter} 秒后重试`, { retryAfter });
+    }
+  },
+  fail(key) {
+    const now = Date.now();
+    const record = loginAttempts.get(key);
+    if (!record || record.resetAt <= now) loginAttempts.set(key, { count: 1, resetAt: now + this.windowMs });
+    else record.count += 1;
+  },
+  success(key) {
+    loginAttempts.delete(key);
+  },
+};
+
 const uploadPolicy = [
   {
     id: "local-direct",
     category: "本地直连，不上传",
     tone: "green",
-    items: ["DuckDB 本地数仓", "3,828 个 Parquet 增量分区", "E:/Github/.claude 工作流与 Agent", "本地脚本和素材目录"],
+    items: ["DuckDB 本地数仓", "Parquet 增量分区（数量随快照变化）", "E:/Github/.claude 工作流与 Agent", "本地脚本和素材目录"],
     reason: "源文件与明细留在本机，网页只读取聚合结果和运行状态。",
   },
   {
@@ -62,12 +118,102 @@ const uploadPolicy = [
   },
 ];
 
-function sendJson(response, status, payload) {
+function sendJson(response, status, payload, headers = {}) {
   response.writeHead(status, {
     "Content-Type": "application/json; charset=utf-8",
     "Cache-Control": "no-store",
+    ...headers,
   });
   response.end(JSON.stringify(payload));
+}
+
+function parseCookies(request) {
+  return Object.fromEntries(
+    String(request.headers.cookie || "")
+      .split(";")
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .map((part) => {
+        const separator = part.indexOf("=");
+        return separator < 0 ? [part, ""] : [part.slice(0, separator), decodeURIComponent(part.slice(separator + 1))];
+      }),
+  );
+}
+
+function getSessionToken(request) {
+  return parseCookies(request)[sessionCookieName] || "";
+}
+
+async function requestUser(request) {
+  const sessionUser = await authService.authenticate(getSessionToken(request));
+  return sessionUser || (authEnforcementEnabled ? null : localAccessUser);
+}
+
+function sessionCookie(request, token, expiresAt) {
+  const maxAge = Math.max(0, Math.floor((Date.parse(expiresAt) - Date.now()) / 1000));
+  const forwardedProto = String(request.headers["x-forwarded-proto"] || "").split(",")[0].trim();
+  const secure = process.env.AUTH_SECURE_COOKIE === "1" || forwardedProto === "https";
+  return `${sessionCookieName}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${maxAge}${secure ? "; Secure" : ""}`;
+}
+
+function clearedSessionCookie(request) {
+  const forwardedProto = String(request.headers["x-forwarded-proto"] || "").split(",")[0].trim();
+  const secure = process.env.AUTH_SECURE_COOKIE === "1" || forwardedProto === "https";
+  return `${sessionCookieName}=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0${secure ? "; Secure" : ""}`;
+}
+
+function sendAuthError(response, error) {
+  const status = error instanceof AuthError ? error.status : 500;
+  const headers = error?.code === "rate_limit_exceeded" && error.details?.retryAfter
+    ? { "Retry-After": String(error.details.retryAfter) }
+    : {};
+  return sendJson(response, status, {
+    error: {
+      code: error instanceof AuthError ? error.code : "internal_error",
+      message: error instanceof AuthError ? error.message : "认证服务暂时不可用",
+      ...(error instanceof AuthError && error.details ? { details: error.details } : {}),
+    },
+  }, headers);
+}
+
+function requestIdentity(request, body = {}) {
+  const forwarded = String(request.headers["x-forwarded-for"] || "").split(",")[0].trim();
+  const address = process.env.AUTH_TRUST_PROXY === "1" && forwarded
+    ? forwarded
+    : request.socket.remoteAddress || "local";
+  return `${address}:${String(body.email || "").trim().toLowerCase()}:${String(body.phone || "").replace(/\D/g, "")}`;
+}
+
+function requiredPermissionForApi(method, path) {
+  if (path.startsWith("/api/admin/")) return "admin.users";
+  if (path === "/api/data-sources") return ["settings.view", "dashboard.view"];
+  if (path === "/api/history") return "settings.view";
+  if (path === "/api/uploads" || /^\/api\/sync\/(warehouse|feishu|dingtalk)$/.test(path)) return "settings.manage";
+  if (path === "/api/analytics") return "analytics.view";
+  if (path === "/api/sync/analytics") return "analytics.manage";
+  if (path === "/api/products") return "products.view";
+  if (path.startsWith("/api/workflows")) return method === "GET" ? "content.view" : "content.manage";
+  if (path.startsWith("/api/tasks")) return method === "GET"
+    ? ["tasks.view", "content.view", "images.view", "intelligence.view"]
+    : null;
+  if (path.startsWith("/api/intelligence")) return method === "GET" ? "intelligence.view" : "intelligence.manage";
+  return "dashboard.view";
+}
+
+function requireApiPermission(user, method, path) {
+  const required = requiredPermissionForApi(method, path);
+  if (!required) return;
+  const permissions = Array.isArray(required) ? required : [required];
+  if (user.role !== "admin" && !permissions.some((permission) => user.permissions.includes(permission))) {
+    throw new AuthError(403, "forbidden", "当前账号无权执行此操作", { permissions });
+  }
+}
+
+function requireTaskPermission(user, task) {
+  const permission = requiredTaskPermission(task?.type);
+  if (user.role !== "admin" && !user.permissions.includes(permission)) {
+    throw new AuthError(403, "forbidden", "当前账号无权操作该任务类型", { permissions: [permission], taskType: task.type });
+  }
 }
 
 async function readJson(request, maxBytes = 15 * 1024 * 1024) {
@@ -98,6 +244,99 @@ function localTaskId(prefix = "task") {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+function normalizeTaskId(value) {
+  return workflowEnvelopePaths(value).taskId;
+}
+
+function sameDatePeriod(left, right) {
+  return Boolean(
+    left?.start
+    && left?.end
+    && right?.start
+    && right?.end
+    && left.start === right.start
+    && left.end === right.end,
+  );
+}
+
+function hasCurrentProductManagementMetrics(productManagement) {
+  const kpis = productManagement?.kpis;
+  return Boolean(
+    kpis
+    && typeof kpis === "object"
+    && Object.hasOwn(kpis, "totalReceivedAmount")
+    && Object.hasOwn(kpis, "collectionRate")
+    && !Object.hasOwn(kpis, "totalShippedAmount")
+    && !Object.hasOwn(kpis, "totalShippedUnits")
+    && Array.isArray(productManagement?.fulfillmentByProduct),
+  );
+}
+
+async function productManagementForAnalytics(snapshot, requestedPeriod) {
+  const cached = snapshot?.productManagement ?? null;
+  if (
+    hasCurrentProductManagementMetrics(cached)
+    && (!requestedPeriod?.start || !requestedPeriod?.end || sameDatePeriod(cached?.period, requestedPeriod))
+  ) {
+    return { productManagement: cached, productManagementStatus: cached ? "aligned" : "unavailable" };
+  }
+  try {
+    const onDemand = await queryProductsOnDemand({
+      start: requestedPeriod.start,
+      end: requestedPeriod.end,
+      statuses: [],
+    });
+    const productManagement = onDemand?.productManagement ?? null;
+    const alignedProductManagement = hasCurrentProductManagementMetrics(productManagement)
+      && sameDatePeriod(productManagement?.period, requestedPeriod)
+      ? productManagement
+      : null;
+    return {
+      productManagement: alignedProductManagement,
+      productManagementStatus: alignedProductManagement ? "aligned" : "unavailable",
+    };
+  } catch {
+    // Do not silently mix a cached all-history product snapshot into a filtered analytics page.
+    return { productManagement: null, productManagementStatus: "unavailable" };
+  }
+}
+
+function dingtalkAutomationStatus() {
+  const runs = listSyncRuns(60).filter((run) => run.sourceId === "dingtalk");
+  const latest = runs[0] ?? null;
+  const lastSuccess = runs.find((run) => run.status === "success") ?? null;
+  const lastFailure = runs.find((run) => run.status === "failed") ?? null;
+  const ageMs = latest?.startedAt ? Date.now() - Date.parse(latest.startedAt) : Number.POSITIVE_INFINITY;
+  const stale = latest?.status === "running" && ageMs > 2 * 60 * 60 * 1000;
+  let state = "unknown";
+  let statusLabel = "尚无运行记录";
+  if (stale) {
+    state = "stale";
+    statusLabel = "运行记录超时";
+  } else if (latest?.status === "running") {
+    state = "running";
+    statusLabel = "无人值守同步中";
+  } else if (latest?.status === "failed") {
+    state = lastSuccess ? "degraded" : "failed";
+    statusLabel = lastSuccess ? "上次失败，沿用上一份快照" : "同步失败";
+  } else if (latest?.status === "success") {
+    state = "healthy";
+    statusLabel = "无人值守正常";
+  }
+  return {
+    enabled: checkDingTalkApi().configured,
+    unattended: true,
+    state,
+    statusLabel,
+    schedule: checkDingTalkApi().schedule,
+    lastAttemptAt: latest?.startedAt ?? null,
+    lastSuccessAt: lastSuccess?.finishedAt ?? null,
+    lastFailureAt: lastFailure?.finishedAt ?? null,
+    lastFailure: lastFailure?.detail ?? null,
+    staleAfterMinutes: 120,
+  };
+}
+
 async function getDataSources() {
   const warehouse = await checkWarehouse();
   const { snapshot: warehouseSnapshot, ...warehouseStatus } = warehouse;
@@ -107,6 +346,7 @@ async function getDataSources() {
   const feishuSnapshot = latestSnapshot("feishu");
   const dingtalkSnapshot = latestSnapshot("dingtalk");
   const dingtalkUpload = latestUpload("dingtalk_operations");
+  const dingtalkAutomation = dingtalkAutomationStatus();
 
   return {
     sources: [
@@ -136,8 +376,8 @@ async function getDataSources() {
         id: "dingtalk",
         name: "钉钉运营数据表",
         kind: dingtalk.configured ? "scheduled_read_only" : "upload_or_auth",
-        status: dingtalkSnapshot ? "connected" : dingtalk.configured ? "ready" : dingtalkUpload?.status === "parse_failed" ? "offline" : dingtalkUpload ? "ready" : "auth_required",
-        statusLabel: dingtalkSnapshot ? "已只读同步" : dingtalk.configured ? "定时同步就绪" : dingtalkUpload?.status === "parse_failed" ? "解析失败" : dingtalkUpload ? "等待同步" : "等待配置/导入",
+        status: dingtalkAutomation.state === "degraded" ? "cached" : dingtalkSnapshot ? "connected" : dingtalk.configured ? "ready" : dingtalkUpload?.status === "parse_failed" ? "offline" : dingtalkUpload ? "ready" : "auth_required",
+        statusLabel: dingtalkSnapshot ? dingtalkAutomation.statusLabel : dingtalk.configured ? "定时同步就绪" : dingtalkUpload?.status === "parse_failed" ? "解析失败" : dingtalkUpload ? "等待同步" : "等待配置/导入",
         detail: dingtalkSnapshot
           ? `${dingtalkSnapshot.snapshot.inventory?.length ?? 0} 个工作表，仅保存渠道、店铺、日期和经营指标聚合；每日 ${dingtalk.schedule.join(" / ")}`
           : dingtalk.configured
@@ -147,6 +387,7 @@ async function getDataSources() {
         records: dingtalkSnapshot?.recordCount ?? 0,
         location: dingtalk.configured ? "钉钉共享表 -> local-data 脱敏快照" : "钉钉本地导出",
         schedule: dingtalk.schedule,
+        automation: dingtalkAutomation,
         writeEnabled: false,
       },
       {
@@ -168,39 +409,59 @@ async function getDataSources() {
   };
 }
 
+let activeDingTalkSync = null;
+
 async function syncSource(sourceId) {
-  const run = beginSync(sourceId);
+  if (sourceId === "dingtalk" && activeDingTalkSync) return activeDingTalkSync;
+
+  const operation = (async () => {
+    const run = beginSync(sourceId);
+    try {
+      let snapshot;
+      if (sourceId === "warehouse") snapshot = await syncWarehouse();
+      else if (sourceId === "feishu") snapshot = await syncFeishu();
+      else if (sourceId === "dingtalk") {
+        const api = checkDingTalkApi();
+        if (api.configured) {
+          const lock = await acquireDingTalkLock("dashboard-server");
+          if (!lock) throw new Error("钉钉同步已在运行，本次请求未执行，请稍后重试");
+          try {
+            snapshot = await syncDingTalkApi();
+          } finally {
+            await lock.release();
+          }
+        } else {
+          const upload = latestUpload("dingtalk_operations");
+          if (!upload) throw new Error("钉钉只读连接尚未配置，且没有可用的 CSV/XLSX/JSON 导出文件");
+          snapshot = await parseDingTalkFile({ filePath: upload.storagePath, fileName: upload.fileName });
+          updateUploadStatus(upload.id, "parsed");
+        }
+      } else throw new Error(`不支持的数据源：${sourceId}`);
+      const recordCount = snapshot.recordCount ?? 0;
+      const detailBySource = {
+        warehouse: "本地源文件已完成增量同步，DuckDB 聚合快照已更新",
+        feishu: "两份飞书工作簿已完成脱敏聚合",
+        dingtalk: snapshot.source === "dingtalk_api" ? "钉钉共享表已完成只读同步与脱敏聚合" : "钉钉导出文件已完成本机解析与脱敏聚合",
+      };
+      finishSync(run.id, {
+        status: "success",
+        recordCount,
+        detail: detailBySource[sourceId],
+        snapshot,
+      });
+      return { runId: run.id, snapshot };
+    } catch (error) {
+      finishSync(run.id, { status: "failed", detail: errorMessage(error) });
+      throw error;
+    }
+  })();
+
+  if (sourceId !== "dingtalk") return operation;
+  activeDingTalkSync = operation;
   try {
-    let snapshot;
-    if (sourceId === "warehouse") snapshot = await syncWarehouse();
-    else if (sourceId === "feishu") snapshot = await syncFeishu();
-    else if (sourceId === "dingtalk") {
-      const api = checkDingTalkApi();
-      if (api.configured) {
-        snapshot = await syncDingTalkApi();
-      } else {
-        const upload = latestUpload("dingtalk_operations");
-        if (!upload) throw new Error("钉钉只读连接尚未配置，且没有可用的 CSV/XLSX/JSON 导出文件");
-        snapshot = await parseDingTalkFile({ filePath: upload.storagePath, fileName: upload.fileName });
-        updateUploadStatus(upload.id, "parsed");
-      }
-    } else throw new Error(`不支持的数据源：${sourceId}`);
-    const recordCount = snapshot.recordCount ?? 0;
-    const detailBySource = {
-      warehouse: "本地源文件已完成增量同步，DuckDB 聚合快照已更新",
-      feishu: "两份飞书工作簿已完成脱敏聚合",
-      dingtalk: snapshot.source === "dingtalk_api" ? "钉钉共享表已完成只读同步与脱敏聚合" : "钉钉导出文件已完成本机解析与脱敏聚合",
-    };
-    finishSync(run.id, {
-      status: "success",
-      recordCount,
-      detail: detailBySource[sourceId],
-      snapshot,
-    });
-    return { runId: run.id, snapshot };
-  } catch (error) {
-    finishSync(run.id, { status: "failed", detail: errorMessage(error) });
-    throw error;
+    return await operation;
+  } finally {
+    if (activeDingTalkSync === operation) activeDingTalkSync = null;
   }
 }
 
@@ -255,23 +516,124 @@ async function syncDashboardSources() {
   }
 }
 
+async function handleAuthApi(request, response, url) {
+  const path = url.pathname;
+  try {
+    if (request.method === "GET" && path === "/api/auth/status") {
+      const status = await authService.status();
+      const user = await requestUser(request);
+      return sendJson(response, 200, {
+        ...status,
+        enforcementEnabled: authEnforcementEnabled,
+        user,
+        permissionCatalog: user ? PERMISSIONS : [],
+      });
+    }
+    if (request.method === "POST" && path === "/api/auth/bootstrap") {
+      const body = await readJson(request, 64 * 1024);
+      const identity = requestIdentity(request, body);
+      loginRateLimiter.check(identity);
+      try {
+        const session = await authService.bootstrap(body);
+        loginRateLimiter.success(identity);
+        return sendJson(response, 201, { user: session.user, expiresAt: session.expiresAt }, {
+          "Set-Cookie": sessionCookie(request, session.token, session.expiresAt),
+          Location: `/api/admin/users/${session.user.id}`,
+        });
+      } catch (error) {
+        loginRateLimiter.fail(identity);
+        throw error;
+      }
+    }
+    if (request.method === "POST" && path === "/api/auth/login") {
+      const body = await readJson(request, 64 * 1024);
+      const identity = requestIdentity(request, body);
+      loginRateLimiter.check(identity);
+      try {
+        const session = await authService.login(body);
+        loginRateLimiter.success(identity);
+        return sendJson(response, 200, { user: session.user, expiresAt: session.expiresAt }, {
+          "Set-Cookie": sessionCookie(request, session.token, session.expiresAt),
+        });
+      } catch (error) {
+        loginRateLimiter.fail(identity);
+        throw error;
+      }
+    }
+    if (request.method === "POST" && path === "/api/auth/logout") {
+      await authService.logout(getSessionToken(request));
+      return sendJson(response, 200, { ok: true }, { "Set-Cookie": clearedSessionCookie(request) });
+    }
+    return sendJson(response, 404, { error: { code: "not_found", message: "认证接口不存在" } });
+  } catch (error) {
+    if (error instanceof SyntaxError) return sendAuthError(response, new AuthError(400, "invalid_json", "请求内容不是有效 JSON"));
+    return sendAuthError(response, error);
+  }
+}
+
+async function handleAdminApi(request, response, url, user) {
+  const path = url.pathname;
+  try {
+    if (request.method === "GET" && path === "/api/admin/users") {
+      return sendJson(response, 200, { users: await authService.listUsers(user), permissionCatalog: PERMISSIONS });
+    }
+    if (request.method === "POST" && path === "/api/admin/users") {
+      const created = await authService.createUser(user, await readJson(request, 64 * 1024));
+      return sendJson(response, 201, { user: created }, { Location: `/api/admin/users/${created.id}` });
+    }
+    const userMatch = path.match(/^\/api\/admin\/users\/([^/]+)$/);
+    if (request.method === "PATCH" && userMatch) {
+      const updated = await authService.updateUser(user, decodeURIComponent(userMatch[1]), await readJson(request, 64 * 1024));
+      return sendJson(response, 200, { user: updated });
+    }
+    return sendJson(response, 404, { error: { code: "not_found", message: "管理接口不存在" } });
+  } catch (error) {
+    if (error instanceof SyntaxError) return sendAuthError(response, new AuthError(400, "invalid_json", "请求内容不是有效 JSON"));
+    return sendAuthError(response, error);
+  }
+}
+
 async function handleApi(request, response, url) {
   const path = url.pathname;
   if (request.method === "GET" && path === "/api/health") {
-    return sendJson(response, 200, { ok: true, mode: production ? "production" : "development", time: new Date().toISOString() });
+    return sendJson(response, 200, { ok: true, mode: production ? "production" : "development", time: new Date().toISOString(), dingtalk: dingtalkAutomationStatus() });
   }
+  if (path.startsWith("/api/auth/")) return handleAuthApi(request, response, url);
+
+  const currentUser = await requestUser(request);
+  if (!currentUser) return sendAuthError(response, new AuthError(401, "authentication_required", "请先登录后再访问"));
+  try {
+    requireApiPermission(currentUser, request.method || "GET", path);
+  } catch (error) {
+    return sendAuthError(response, error);
+  }
+  if (path.startsWith("/api/admin/")) return handleAdminApi(request, response, url, currentUser);
+
   if (request.method === "GET" && path === "/api/data-sources") {
     return sendJson(response, 200, await getDataSources());
   }
   if (request.method === "GET" && path === "/api/analytics") {
     const dingtalkSnapshot = latestSnapshot("dingtalk")?.snapshot ?? null;
-    const warehouse = await readWarehouseSnapshot();
+    const warehouseSnapshot = await readWarehouseSnapshot();
     const dingtalk = dingtalkSnapshot
       ? filterDingTalkSnapshot(dingtalkSnapshot, {
         start: url.searchParams.get("start") || undefined,
         end: url.searchParams.get("end") || undefined,
       })
       : null;
+    const requestedPeriod = dingtalk?.period?.start && dingtalk?.period?.end
+      ? dingtalk.period
+      : {
+        start: url.searchParams.get("start") || warehouseSnapshot?.powerbiPages?.period?.start,
+        end: url.searchParams.get("end") || warehouseSnapshot?.powerbiPages?.period?.end,
+      };
+    const product = await productManagementForAnalytics(warehouseSnapshot, requestedPeriod);
+    const warehouse = warehouseSnapshot ? {
+      ...warehouseSnapshot,
+      productManagement: product.productManagement,
+      productManagementStatus: product.productManagementStatus,
+      dashboard: buildWarehouseDashboardMetrics(warehouseSnapshot, requestedPeriod),
+    } : null;
     return sendJson(response, 200, {
       warehouse,
       feishu: latestSnapshot("feishu")?.snapshot ?? null,
@@ -279,6 +641,59 @@ async function handleApi(request, response, url) {
       dataStatus: dashboardDataStatus({ dingtalk: dingtalkSnapshot, warehouse }),
       history: listSyncRuns(12),
     });
+  }
+  if (request.method === "GET" && path === "/api/products") {
+    const start = url.searchParams.get("start") || undefined;
+    const end = url.searchParams.get("end") || undefined;
+    const statuses = url.searchParams.getAll("status");
+    const channels = url.searchParams.getAll("channel");
+    const storeShortNames = url.searchParams.getAll("storeShortName");
+    if (start || end || statuses.length || channels.length || storeShortNames.length) {
+      try {
+        const onDemand = await queryProductsOnDemand({ start, end, statuses, channels, storeShortNames });
+        return sendJson(response, 200, {
+          productManagement: onDemand.productManagement,
+          refreshedAt: new Date().toISOString(),
+          status: "ok",
+          filtered: { start: start ?? null, end: end ?? null, statuses, channels, storeShortNames },
+        });
+      } catch (error) {
+        return sendJson(response, 200, {
+          productManagement: null,
+          refreshedAt: null,
+          status: "stale",
+          error: error instanceof Error ? error.message : "按条件查询失败",
+        });
+      }
+    }
+    const warehouse = await readWarehouseSnapshot();
+    const cachedProductManagement = warehouse?.productManagement ?? null;
+    if (hasCurrentProductManagementMetrics(cachedProductManagement)) {
+      return sendJson(response, 200, {
+        productManagement: cachedProductManagement,
+        refreshedAt: warehouse?.refreshedAt ?? null,
+        status: "ok",
+      });
+    }
+    try {
+      const onDemand = await queryProductsOnDemand({ statuses: [], channels: [], storeShortNames: [] });
+      const productManagement = hasCurrentProductManagementMetrics(onDemand?.productManagement)
+        ? onDemand.productManagement
+        : null;
+      return sendJson(response, 200, {
+        productManagement,
+        refreshedAt: productManagement ? new Date().toISOString() : null,
+        status: productManagement ? "ok" : "stale",
+        ...(productManagement ? {} : { error: "商品管理快照缺少当前口径字段" }),
+      });
+    } catch (error) {
+      return sendJson(response, 200, {
+        productManagement: null,
+        refreshedAt: null,
+        status: "stale",
+        error: error instanceof Error ? error.message : "商品管理口径重算失败",
+      });
+    }
   }
   if (request.method === "POST" && path === "/api/sync/analytics") {
     return sendJson(response, 200, await syncDashboardSources());
@@ -298,8 +713,14 @@ async function handleApi(request, response, url) {
   if (request.method === "POST" && path === "/api/workflows/douyin-ecom-copy/run") {
     const body = await readJson(request);
     const now = new Date().toISOString();
+    let taskId;
+    try {
+      taskId = normalizeTaskId(body.id || localTaskId("workflow"));
+    } catch (error) {
+      return sendJson(response, 400, { error: errorMessage(error) });
+    }
     const task = {
-      id: body.id || localTaskId("workflow"),
+      id: taskId,
       name: body.name || "抖音电商文案与分镜工作流",
       type: body.type || "content_generate",
       module: "内容生产",
@@ -329,18 +750,76 @@ async function handleApi(request, response, url) {
   if (request.method === "POST" && path === "/api/tasks") {
     const task = await readJson(request);
     if (!task.id || !task.type) return sendJson(response, 400, { error: "任务缺少 id 或 type" });
-    const stored = upsertTask(task);
+    let taskId;
+    try {
+      taskId = normalizeTaskId(task.id);
+    } catch (error) {
+      return sendJson(response, 400, { error: errorMessage(error) });
+    }
+    try {
+      requireTaskPermission(currentUser, task);
+    } catch (error) {
+      return error instanceof AuthError
+        ? sendAuthError(response, error)
+        : sendJson(response, 400, { error: errorMessage(error) });
+    }
+    const stored = upsertTask({ ...task, id: taskId });
     const workflow = await queueWorkflowEnvelope(stored);
     return sendJson(response, 201, { task: stored, workflow });
   }
   const taskActionMatch = path.match(/^\/api\/tasks\/([^/]+)\/actions$/);
   if (request.method === "POST" && taskActionMatch) {
     const body = await readJson(request);
-    const task = updateTaskAction(decodeURIComponent(taskActionMatch[1]), body.action);
-    return task ? sendJson(response, 200, { task }) : sendJson(response, 404, { error: "任务不存在" });
+    let taskId;
+    try {
+      taskId = normalizeTaskId(decodeURIComponent(taskActionMatch[1]));
+    } catch (error) {
+      return sendJson(response, 400, { error: errorMessage(error) });
+    }
+    const existing = getTask(taskId);
+    if (!existing) return sendJson(response, 404, { error: "任务不存在" });
+    try {
+      requireTaskPermission(currentUser, existing);
+    } catch (error) {
+      return error instanceof AuthError
+        ? sendAuthError(response, error)
+        : sendJson(response, 400, { error: errorMessage(error) });
+    }
+    const task = updateTaskAction(taskId, body.action);
+    return sendJson(response, 200, { task });
   }
   if (request.method === "GET" && path === "/api/history") {
     return sendJson(response, 200, { syncRuns: listSyncRuns(), uploads: listUploads(), tasks: listTasks(30) });
+  }
+  if (request.method === "GET" && path === "/api/intelligence/top100") {
+    return serveIntelligenceJson(response, "top100.json");
+  }
+  if (request.method === "GET" && path === "/api/intelligence/brand-ranking") {
+    return serveIntelligenceJson(response, "brand-ranking.json");
+  }
+  if (request.method === "GET" && path === "/api/intelligence/insights") {
+    return serveIntelligenceJson(response, "insights.json");
+  }
+  if (request.method === "GET" && path === "/api/intelligence/analyze-status") {
+    return sendJson(response, 200, {
+      state: getPipelineState(),
+      hasSourceXlsx: hasSourceXlsx(),
+      hasVisionKey: hasVisionKey(),
+      sourceInfo: sourceXlsxInfo(),
+    });
+  }
+  if (request.method === "POST" && path === "/api/intelligence/analyze-source") {
+    try {
+      const body = await readJson(request).catch(() => ({}));
+      const useMock = body?.mock === true;
+      await startAnalysisPipeline({ mock: useMock });
+      return sendJson(response, 202, {
+        state: getPipelineState(),
+        message: "分析任务已启动",
+      });
+    } catch (error) {
+      return sendJson(response, 400, { error: errorMessage(error) });
+    }
   }
   if (request.method === "POST" && path === "/api/uploads") {
     const body = await readJson(request);
@@ -394,7 +873,38 @@ const mimeTypes = {
   ".png": "image/png",
   ".svg": "image/svg+xml",
   ".webp": "image/webp",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
 };
+
+const intelligenceDir = join(dataDir, "intelligence");
+const intelligenceImagesDir = join(intelligenceDir, "images");
+
+function serveCompetitorImage(response, fileName) {
+  const safe = safeFileName(fileName);
+  const filePath = normalize(join(intelligenceImagesDir, safe));
+  if (!filePath.startsWith(intelligenceImagesDir) || !existsSync(filePath)) {
+    return sendJson(response, 404, { error: "图片不存在" });
+  }
+  response.writeHead(200, {
+    "Content-Type": mimeTypes[extname(filePath).toLowerCase()] ?? "application/octet-stream",
+    "Cache-Control": "public, max-age=86400",
+  });
+  createReadStream(filePath).pipe(response);
+}
+
+function serveIntelligenceJson(response, name) {
+  const filePath = join(intelligenceDir, name);
+  if (!existsSync(filePath)) {
+    return sendJson(response, 404, { error: `${name} 尚未生成，请先运行 node scripts/build-intelligence-dataset.mjs` });
+  }
+  try {
+    const payload = JSON.parse(readFileSync(filePath, "utf8"));
+    return sendJson(response, 200, payload);
+  } catch (error) {
+    return sendJson(response, 500, { error: errorMessage(error) });
+  }
+}
 
 function serveProduction(response, pathname) {
   const requested = pathname === "/" ? "index.html" : pathname.replace(/^\/+/, "");
@@ -418,6 +928,17 @@ const server = createServer(async (request, response) => {
     if (url.pathname.startsWith("/api/")) {
       await handleApi(request, response, url);
       return;
+    }
+    if (request.method === "GET" && url.pathname.startsWith("/competitor-images/")) {
+      const currentUser = await requestUser(request);
+      if (!currentUser) return sendAuthError(response, new AuthError(401, "authentication_required", "请先登录后再访问"));
+      try {
+        requireApiPermission(currentUser, "GET", "/api/intelligence/images");
+      } catch (error) {
+        return sendAuthError(response, error);
+      }
+      const fileName = decodeURIComponent(url.pathname.slice("/competitor-images/".length));
+      return serveCompetitorImage(response, fileName);
     }
     if (vite) {
       vite.middlewares(request, response, (error) => {
