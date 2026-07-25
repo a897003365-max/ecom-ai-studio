@@ -1,5 +1,5 @@
 import { useMemo, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
-import { BarChart3, BadgeDollarSign, CircleGauge, Megaphone, RefreshCcw, Target } from "lucide-react";
+import { BarChart3, BadgeDollarSign, CircleGauge, Megaphone, RefreshCcw, Share2, Target } from "lucide-react";
 import type { Platform } from "../types";
 import type {
   DingTalkMetricTrend,
@@ -7,11 +7,13 @@ import type {
   DingTalkSnapshot,
   ProductManagementPages,
 } from "../types/integration";
+import { ChannelRevenueChart } from "./ChannelRevenueChart";
 import { PlatformBadge } from "./PlatformBadge";
 
 interface ExecutiveCommerceOverviewProps {
   dingtalk: DingTalkSnapshot;
   productManagement: ProductManagementPages | null;
+  selectedChannel?: string;
 }
 
 interface ExecutiveKpi {
@@ -26,13 +28,17 @@ interface ExecutiveKpi {
 
 const moneyFormat = new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 1 });
 const percentFormat = new Intl.NumberFormat("zh-CN", { style: "percent", minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const channelOrder = ["天猫", "京东", "拼多多", "抖音"];
+const countFormat = new Intl.NumberFormat("zh-CN", { notation: "compact", maximumFractionDigits: 1 });
 const chartWidth = 920;
 const chartHeight = 330;
 const chartPlot = { left: 58, right: 18, top: 26, bottom: 42 };
 
 function money(value: number) {
   return `¥${moneyFormat.format((value || 0) / 10_000)}万`;
+}
+
+function count(value: number) {
+  return countFormat.format(value || 0);
 }
 
 function percent(value?: number | null) {
@@ -337,18 +343,17 @@ function RevenueQualityBridge({ totals }: { totals: DingTalkMetricTotals }) {
 }
 
 function ChannelQualityTable({ platforms }: { platforms: DingTalkSnapshot["platforms"] }) {
-  const rows = channelOrder
-    .map((name) => platforms.find((item) => item.platform === name))
-    .filter((item): item is DingTalkSnapshot["platforms"][number] => Boolean(item))
+  const rows = [...platforms]
+    .sort((left, right) => right.gmv - left.gmv)
     .map(withRates);
   const maxGmv = Math.max(...rows.map((item) => item.gmv), 1);
+  const totalNetRevenue = rows.reduce((sum, item) => sum + item.netRevenue, 0);
   const summary = rows.reduce((total, item) => ({
     gmv: total.gmv + item.gmv,
     netRevenue: total.netRevenue + item.netRevenue,
     spend: total.spend + item.spend,
     refund: total.refund + item.refund,
-    channelShare: total.channelShare + (item.channelShare || 0),
-  }), { gmv: 0, netRevenue: 0, spend: 0, refund: 0, channelShare: 0 });
+  }), { gmv: 0, netRevenue: 0, spend: 0, refund: 0 });
 
   return (
     <section className="exec-panel exec-channel-panel" data-testid="executive-channel-quality">
@@ -363,7 +368,7 @@ function ChannelQualityTable({ platforms }: { platforms: DingTalkSnapshot["platf
         <table className="exec-channel-table">
           <thead>
             <tr>
-              <th>渠道</th><th>GMV</th><th>占比</th><th>净回款</th><th>回款率</th><th>推广费</th><th>费比</th><th>退款率</th>
+              <th>渠道</th><th>GMV</th><th>净回款</th><th>回款率</th><th>推广费</th><th>费比</th><th>退款率</th><th>占比</th>
             </tr>
           </thead>
           <tbody>
@@ -378,7 +383,6 @@ function ChannelQualityTable({ platforms }: { platforms: DingTalkSnapshot["platf
                       <b>{money(item.gmv)}</b>
                     </span>
                   </td>
-                  <td>{percent(item.channelShare)}</td>
                   <td className="is-net">{money(item.netRevenue)}</td>
                   <td>{percent(item.recoveryRate)}</td>
                   <td>{money(item.spend)}</td>
@@ -386,18 +390,96 @@ function ChannelQualityTable({ platforms }: { platforms: DingTalkSnapshot["platf
                   <td className={refundPending || item.refundRate >= 0.4 ? "is-risk" : ""}>
                     {refundPending ? "待核对" : percent(item.refundRate)}
                   </td>
+                  <td>{percent(totalNetRevenue ? item.netRevenue / totalNetRevenue : 0)}</td>
                 </tr>
               );
             })}
           </tbody>
           <tfoot>
             <tr>
-              <td>四渠道小计</td><td>{money(summary.gmv)}</td><td>{percent(summary.channelShare)}</td>
+              <td>{rows.length} 渠道小计</td><td>{money(summary.gmv)}</td>
               <td>{money(summary.netRevenue)}</td>
               <td>{percent(rate(summary.netRevenue, summary.gmv))}</td>
               <td>{money(summary.spend)}</td>
               <td>{percent(rate(summary.spend, summary.netRevenue))}</td>
               <td>{percent(rate(summary.refund, summary.gmv))}</td>
+              <td>{percent(1)}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+function StoreQualityTable({ stores }: { stores: DingTalkSnapshot["stores"] }) {
+  const rows = [...stores]
+    .sort((left, right) => right.netRevenue - left.netRevenue)
+    .map(withRates);
+  const maxGmv = Math.max(...rows.map((item) => item.gmv), 1);
+  const totalNetRevenue = rows.reduce((sum, item) => sum + item.netRevenue, 0);
+  const summary = rows.reduce((total, item) => ({
+    gmv: total.gmv + item.gmv,
+    netRevenue: total.netRevenue + item.netRevenue,
+    spend: total.spend + item.spend,
+    refund: total.refund + item.refund,
+    offsiteSpend: total.offsiteSpend + Number(item.offsiteSpend || 0),
+  }), { gmv: 0, netRevenue: 0, spend: 0, refund: 0, offsiteSpend: 0 });
+
+  return (
+    <section className="exec-panel exec-channel-panel" data-testid="executive-store-quality">
+      <header className="exec-panel-head">
+        <div>
+          <span className="exec-panel-kicker"><CircleGauge size={14} />店铺经营</span>
+          <h2>店铺明细与回款质量</h2>
+        </div>
+        <span className="exec-panel-unit">单位：万元</span>
+      </header>
+      <div className="exec-channel-table-wrap">
+        <table className="exec-channel-table">
+          <thead>
+            <tr>
+              <th>排名</th><th>渠道</th><th>店铺</th><th>GMV</th><th>净回款</th><th>回款率</th><th>推广费</th><th>费比</th><th>退款率</th><th>小红书推广费</th><th>占比</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((item, index) => {
+              const refundPending = item.platform === "京东" && item.gmv > 0 && item.refund === 0;
+              return (
+                <tr key={`${item.platform}-${item.store}`}>
+                  <td>{index + 1}</td>
+                  <td><PlatformBadge platform={item.platform as Platform} /></td>
+                  <td className="font-semibold">{item.store}</td>
+                  <td>
+                    <span className="exec-table-bar">
+                      <i style={{ width: `${item.gmv / maxGmv * 100}%` }} />
+                      <b>{money(item.gmv)}</b>
+                    </span>
+                  </td>
+                  <td className="is-net">{money(item.netRevenue)}</td>
+                  <td>{percent(item.recoveryRate)}</td>
+                  <td>{money(item.spend)}</td>
+                  <td className={item.feeRate >= 0.3 ? "is-warning" : ""}>{percent(item.feeRate)}</td>
+                  <td className={refundPending || item.refundRate >= 0.4 ? "is-risk" : ""}>
+                    {refundPending ? "待核对" : percent(item.refundRate)}
+                  </td>
+                  <td>{item.offsiteSpend ? money(item.offsiteSpend) : "—"}</td>
+                  <td>{percent(totalNetRevenue ? item.netRevenue / totalNetRevenue : 0)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colSpan={3}>{rows.length} 店铺小计</td>
+              <td>{money(summary.gmv)}</td>
+              <td>{money(summary.netRevenue)}</td>
+              <td>{percent(rate(summary.netRevenue, summary.gmv))}</td>
+              <td>{money(summary.spend)}</td>
+              <td>{percent(rate(summary.spend, summary.netRevenue))}</td>
+              <td>{percent(rate(summary.refund, summary.gmv))}</td>
+              <td>{summary.offsiteSpend ? money(summary.offsiteSpend) : "—"}</td>
+              <td>{percent(1)}</td>
             </tr>
           </tfoot>
         </table>
@@ -408,8 +490,7 @@ function ChannelQualityTable({ platforms }: { platforms: DingTalkSnapshot["platf
 
 function CategoryPerformance({ productManagement }: { productManagement: ProductManagementPages | null }) {
   const rows = [...(productManagement?.mattressCategoryBreakdown ?? [])]
-    .sort((left, right) => right.salesAmount - left.salesAmount)
-    .slice(0, 5);
+    .sort((left, right) => right.salesAmount - left.salesAmount);
   const maxValue = Math.max(...rows.map((item) => item.salesAmount), 1);
   return (
     <section className="exec-panel exec-category-panel" data-testid="executive-category-performance">
@@ -436,9 +517,8 @@ function CategoryPerformance({ productManagement }: { productManagement: Product
 }
 
 function ChannelSpendEfficiency({ platforms }: { platforms: DingTalkSnapshot["platforms"] }) {
-  const rows = channelOrder
-    .map((name) => platforms.find((item) => item.platform === name))
-    .filter((item): item is DingTalkSnapshot["platforms"][number] => Boolean(item))
+  const rows = [...platforms]
+    .sort((left, right) => right.spend - left.spend)
     .map(withRates);
   const maxSpend = Math.max(...rows.map((item) => item.spend), 1);
   const maxFeeRate = Math.max(...rows.map((item) => item.feeRate), 0.01);
@@ -448,6 +528,7 @@ function ChannelSpendEfficiency({ platforms }: { platforms: DingTalkSnapshot["pl
         <div>
           <span className="exec-panel-kicker"><Megaphone size={14} />投放效率</span>
           <h2>渠道推广费与费比</h2>
+          <p>推广费额 · 费比（推广费 ÷ 净回款）</p>
         </div>
         <div className="exec-spend-legend"><span><i />推广费</span><span><i />费比</span></div>
       </header>
@@ -462,27 +543,107 @@ function ChannelSpendEfficiency({ platforms }: { platforms: DingTalkSnapshot["pl
           </div>
         ))}
       </div>
-      <footer className="exec-spend-foot">
-        <span>推广费额</span><span>费比（推广费 ÷ 净回款）</span>
-      </footer>
     </section>
   );
 }
 
-export function ExecutiveCommerceOverview({ dingtalk, productManagement }: ExecutiveCommerceOverviewProps) {
+function PromotionFunnelPanel({ totals, scope }: { totals: DingTalkMetricTotals; scope: string }) {
+  const metric = withRates(totals);
+  const stages = [
+    { label: "曝光", value: metric.exposure, rate: null as number | null },
+    { label: "点击", value: metric.clicks, rate: metric.exposure ? metric.clicks / metric.exposure : null },
+    { label: "加购", value: metric.addToCart, rate: metric.clicks ? metric.addToCart / metric.clicks : null },
+    { label: "成交订单", value: metric.paidOrders, rate: metric.addToCart ? metric.paidOrders / metric.addToCart : null },
+  ];
+  const maxValue = Math.max(...stages.map((stage) => stage.value), 1);
+  return (
+    <section className="exec-panel exec-funnel-panel" data-testid="promotion-funnel">
+      <header className="exec-panel-head">
+        <div>
+          <span className="exec-panel-kicker"><Megaphone size={14} />推广漏斗</span>
+          <h2>曝光 → 点击 → 加购 → 成交</h2>
+          <p>{scope}推广过程指标，按钉钉每日明细聚合；选渠道后随渠道切换。</p>
+        </div>
+        <span className="exec-panel-unit">曝光点击率 <b>{percent(metric.ctr)}</b></span>
+      </header>
+      <div className="exec-funnel-list">
+        {stages.map((stage, index) => (
+          <div className="exec-funnel-row" key={stage.label}>
+            <span><em>{String(index + 1).padStart(2, "0")}</em>{stage.label}</span>
+            <div><i style={{ width: `${(stage.value / maxValue) * 100}%` }} /></div>
+            <b>{stage.value > 0 ? count(stage.value) : "-"}</b>
+            <small>{stage.rate === null ? "起点" : `转化 ${percent(stage.rate)}`}</small>
+          </div>
+        ))}
+      </div>
+      {metric.paidOrders === 0 && (
+        <footer className="exec-quality-summary"><small>成交订单数暂无明细，末端以加购为参考；成交金额见 GMV 卡。</small></footer>
+      )}
+    </section>
+  );
+}
+
+function dateSequence(start: string, end: string): string[] {
+  const dates: string[] = [];
+  const current = new Date(`${start}T00:00:00Z`);
+  const last = new Date(`${end}T00:00:00Z`);
+  while (current <= last) {
+    dates.push(current.toISOString().slice(0, 10));
+    current.setUTCDate(current.getUTCDate() + 1);
+  }
+  return dates;
+}
+
+function buildChannelDailyTrend(
+  dailyPlatforms: Array<{ date: string; platform: string; netRevenue: number }> | undefined,
+  fallbackDaily: Array<{ date: string; totalNetRevenue: number; channels: Array<{ platform: string; netRevenue: number }> }> | undefined,
+  period: { start: string | null; end: string | null } | undefined,
+) {
+  const start = period?.start;
+  const end = period?.end;
+  if (!dailyPlatforms || !start || !end) return fallbackDaily ?? [];
+
+  const platformMap = new Map<string, Map<string, number>>();
+  const totalMap = new Map<string, number>();
+  for (const row of dailyPlatforms) {
+    if (row.date < start || row.date > end) continue;
+    const channels = platformMap.get(row.date) ?? new Map<string, number>();
+    channels.set(row.platform, (channels.get(row.platform) || 0) + row.netRevenue);
+    platformMap.set(row.date, channels);
+    totalMap.set(row.date, (totalMap.get(row.date) || 0) + row.netRevenue);
+  }
+
+  return dateSequence(start, end).map((date) => {
+    const channels = platformMap.get(date);
+    return {
+      date,
+      totalNetRevenue: totalMap.get(date) || 0,
+      channels: channels
+        ? [...channels.entries()].map(([platform, netRevenue]) => ({ platform, netRevenue }))
+        : [],
+    };
+  });
+}
+
+export function ExecutiveCommerceOverview({ dingtalk, productManagement, selectedChannel }: ExecutiveCommerceOverviewProps) {
   const totals = withRates(dingtalk.totals);
   const reporting = dingtalk.reporting;
   const monthly = reporting?.monthlyOverview?.metrics;
   const targetGap = Math.max(0, (monthly?.target || totals.target || 0) - (monthly?.netRevenue || totals.netRevenue));
+  const scope = selectedChannel && selectedChannel !== "all" ? `${selectedChannel}` : "全渠道";
+  // 小红书推广费（站外）由服务端归入天猫麻大师旗舰店行，随渠道筛选联动
+  const offsiteSpend = dingtalk.stores.reduce((sum, item) => sum + Number(item.offsiteSpend || 0), 0);
+  const offsiteFeeRate = rate(offsiteSpend, totals.netRevenue);
+  // 渠道每日回款折线图按时间筛选器所选起止日期联动，不再固定从 1 号开始
+  const channelDailyTrend = useMemo(
+    () => buildChannelDailyTrend(
+      reporting?.dailyPlatforms?.map((row) => ({ date: row.date, platform: row.platform, netRevenue: row.netRevenue })),
+      reporting?.monthlyOverview?.daily,
+      dingtalk.period,
+    ),
+    [reporting?.dailyPlatforms, reporting?.monthlyOverview?.daily, dingtalk.period],
+  );
   const kpis: ExecutiveKpi[] = [
-    {
-      label: "全渠道 GMV",
-      value: money(totals.gmv),
-      detail: "筛选期成交规模",
-      icon: <BarChart3 size={21} />,
-      tone: "green",
-      trend: reporting?.metricTrends?.gmv,
-    },
     {
       label: "净回款",
       value: money(totals.netRevenue),
@@ -497,6 +658,15 @@ export function ExecutiveCommerceOverview({ dingtalk, productManagement }: Execu
       detail: `距目标 ${money(targetGap)}`,
       icon: <Target size={21} />,
       tone: "green",
+    },
+    {
+      label: "站内推广费",
+      value: money(totals.spend),
+      detail: "筛选期站内投放",
+      icon: <Megaphone size={21} />,
+      tone: "green",
+      trend: reporting?.metricTrends?.spend,
+      inverseTrend: true,
     },
     {
       label: "站内推广费比",
@@ -517,13 +687,18 @@ export function ExecutiveCommerceOverview({ dingtalk, productManagement }: Execu
       inverseTrend: true,
     },
     {
-      label: "站内推广费",
-      value: money(totals.spend),
-      detail: "筛选期站内投放",
-      icon: <Megaphone size={21} />,
+      label: "小红书推广费",
+      value: money(offsiteSpend),
+      detail: "筛选期小红书站外投放",
+      icon: <Share2 size={21} />,
       tone: "green",
-      trend: reporting?.metricTrends?.spend,
-      inverseTrend: true,
+    },
+    {
+      label: "小红书推广费比",
+      value: percent(offsiteFeeRate),
+      detail: "小红书推广费 ÷ 净回款",
+      icon: <CircleGauge size={21} />,
+      tone: "orange",
     },
   ];
 
@@ -538,11 +713,21 @@ export function ExecutiveCommerceOverview({ dingtalk, productManagement }: Execu
         <RevenueQualityBridge totals={dingtalk.totals} />
       </div>
 
+      {channelDailyTrend.length > 0 && (
+        <div className="exec-mid-grid">
+          <section className="exec-panel exec-channel-trend-panel" data-testid="executive-channel-trend">
+            <ChannelRevenueChart daily={channelDailyTrend} selectedChannel={selectedChannel ?? "all"} />
+          </section>
+          <CategoryPerformance productManagement={productManagement} />
+          <PromotionFunnelPanel totals={dingtalk.totals} scope={scope} />
+        </div>
+      )}
+
       <div className="exec-bottom-grid">
         <ChannelQualityTable platforms={dingtalk.platforms} />
-        <CategoryPerformance productManagement={productManagement} />
         <ChannelSpendEfficiency platforms={dingtalk.platforms} />
       </div>
+      <StoreQualityTable stores={dingtalk.stores} />
     </div>
   );
 }

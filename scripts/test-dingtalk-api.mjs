@@ -2,10 +2,10 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { buildDingTalkSnapshot, checkDingTalkApi, filterDingTalkSnapshot } from "../server/dingtalk-api.mjs";
 
-assert.deepEqual(checkDingTalkApi().schedule, ["10:00", "12:30", "17:30"], "API 应返回新的每日三次同步计划");
+assert.deepEqual(checkDingTalkApi().schedule, ["10:30", "13:00", "17:30"], "API 应返回新的每日三次同步计划");
 assert.match(
   readFileSync(new URL("./register-dingtalk-schedule.ps1", import.meta.url), "utf8"),
-  /\[string\[\]\]\$Times = @\("10:00", "12:30", "17:30"\)/,
+  /\$Times = @\("10:30", "13:00", "17:30"\)/,
   "Windows 计划任务注册脚本应默认创建三个新时间点",
 );
 
@@ -91,6 +91,8 @@ assert.equal(filtered.stores.find((item) => item.store === "麻大师旗舰店")
 assert.equal(filtered.stores.find((item) => item.store === "抖音1").gmv, 300);
 assert.equal(filtered.stores.find((item) => item.store === "抖音1").refund, 50);
 assert.equal(filtered.daily.length, 1);
+assert.equal(filtered.reporting.dailyPlatforms.length, 2, "筛选后应暴露 dailyPlatforms 供前端按渠道切分日趋势");
+assert.equal(filtered.reporting.dailyPlatforms.find((item) => item.platform === "天猫").exposure, 700, "dailyPlatforms 应携带曝光过程指标");
 assert.deepEqual(filtered.reporting.monthlyOverview.period, { start: "2024-12-01", end: "2024-12-02" });
 assert.equal(filtered.reporting.monthlyOverview.metrics.netRevenue, 1560, "最新月份 MTD 应与全渠道第 3 行回款额对账");
 assert.equal(filtered.reporting.monthlyOverview.metrics.priorYearNetRevenue, 1300);
@@ -114,6 +116,21 @@ assert.equal(priorRhythmFiltered.reporting.monthlyOverview.priorYearDaily.length
 assert.equal(priorRhythmFiltered.reporting.monthlyOverview.priorYearDaily[0].netRevenue, 100);
 assert.equal(priorRhythmFiltered.reporting.monthlyOverview.priorYearDaily[1].netRevenue, 200);
 assert.equal(priorRhythmFiltered.reporting.monthlyOverview.priorYearFullMonthNetRevenue, 300);
+
+// 渠道级月度目标 + 去年同期逐日渠道拆分：切渠道时目标进度带跟随的依据
+assert.ok(filtered.reporting.monthlyTargetsByPlatform, "应暴露渠道级月度目标 monthlyTargetsByPlatform");
+assert.equal(filtered.reporting.monthlyTargetsByPlatform["2024-12"]?.天猫, 1200, "天猫当月目标应来自销售目标表该渠道行");
+assert.equal(filtered.reporting.monthlyTargetsByPlatform["2024-12"]?.抖音, 800, "抖音当月目标应来自销售目标表该渠道行");
+assert.ok(priorRhythmFiltered.reporting.monthlyOverview.priorYearDailyChannels, "应产出 priorYearDailyChannels 供前端切渠道");
+assert.equal(priorRhythmFiltered.reporting.monthlyOverview.priorYearDailyChannels.length, 31, "priorYearDailyChannels 应覆盖去年同期完整月");
+assert.equal(
+  priorRhythmFiltered.reporting.monthlyOverview.priorYearDailyChannels[0].channels.reduce((sum, item) => sum + item.netRevenue, 0),
+  100,
+  "去年同期首日渠道合计应与全渠道 priorYearDaily 一致",
+);
+const priorDayChannel = priorRhythmFiltered.reporting.monthlyOverview.priorYearDailyChannels[0].channels.find((item) => item.netRevenue > 0);
+assert.ok(priorDayChannel, "去年同期首日应存在有回款的渠道行");
+assert.equal(priorDayChannel.netRevenue, 100, "去年同期首日该渠道回款应为 100");
 
 assert.equal(filtered.reporting.monthlyAchievement.length, 12, "逐月销售达成应返回连续 12 个月");
 assert.equal(

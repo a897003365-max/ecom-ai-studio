@@ -2,6 +2,30 @@
 
 本文件只记录可复核的运行事件、数据口径修复和验证结果；日期使用 YYYY-MM-DD。
 
+## 2026-07-25
+
+### 商品经营明细字段补齐（对齐 .pbix）
+
+- 背景：网站「天猫明细 -> 旗舰店整体 -> 商品经营明细」表对比 `D:\麻大师\BI文件\麻大师店铺推广数据报表.pbix`「07-旗舰店商品销售数据」商品粒度 measure，缺少「国补后金额(万)」「国补后金额同比」「销额占比」；原「商品费比」分母为支付金额，与 .pbix 减退金额口径不一致，无法对账。
+- 决策：用「国补后费比」（`花费 / ((支付−退款)×0.85)`）直接替换原「商品费比」列，不保留旧口径；两层全做（纯派生字段 + 国补后金额同比数据层扩展）；数仓去年同期数据已确认可用。
+- 字段真值来源：[migration/powerbi-tmdl/tables/07-旗舰店商品销售数据.tmdl](../migration/powerbi-tmdl/tables/07-旗舰店商品销售数据.tmdl)；完整方案与对账数据：[docs/POWERBI-PRODUCT-TABLE-FIELD-GAP-PLAN.md](POWERBI-PRODUCT-TABLE-FIELD-GAP-PLAN.md)。
+- 改动文件：
+  - `pipeline/ecom_pipeline/warehouse.py`：`_build_powerbi_pages` 增加 `product_daily_prior_year` 查询，窗口 `period_start−365 ~ period_end−365`（对齐 .pbix `DATEADD(-365, DAY)`），按 productId 聚合 payAmount/refund；空返回兜底 `[]`。
+  - `src/types/integration.ts`：`PowerBiPages` 增加 `productDailyPriorYear: Array<{productId, payAmount, refund}>`。
+  - `src/components/PowerBiReplica.tsx`：`OverallPage` 增加 `priorYearMap` + `totalSubsidized`；表头 13->16 列；行内派生国补后金额/销额占比/同比/国补后费比；「商品费比」由「国补后费比」替换；同比复用 `Delta` 组件（红绿箭头），去年同期数据缺失时渲染 `.pb-na`「数据不足」。
+  - `src/styles.css`：`.pb-business-product-table` min-width 1120->1440；新增 `.pb-na`（muted 兜底样式）。
+  - `scripts/test-powerbi-replica-contract.mjs`：新增 5 条断言（国补后金额/销额占比/同比/国补后费比列、priorYear 接入、pb-na、类型、数仓）。
+  - 新增 `scripts/audit-product-subsidized-yoy.py`：数仓对账脚本，同步后随时可跑。
+- 数据约束：`POWERBI_PAGE_WINDOW_DAYS = 60`，productDaily 只查最近 60 天；同比需去年同期数据，由新增 `product_daily_prior_year` 提供；缺失时前端降级「数据不足」，不显示错误的 0%。
+- 口径对照：网站原「商品费比」= 花费/支付金额；.pbix「商品费比」= 花费/(支付−退款)；.pbix「国补后费比」= 花费/((支付−退款)×0.85)。本次采用国补后费比替换。
+- 验证：
+  - `node scripts/test-powerbi-replica-contract.mjs` -> `powerbi replica contract ok`。
+  - `npx tsc --noEmit` 通过。
+  - 数仓同步 `node scripts/sync-warehouse.mjs` 成功，period 2026-05-26 ~ 2026-07-24，2,716,580 记录。
+  - 对账 `python scripts/audit-product-subsidized-yoy.py`：07 表覆盖 2024-08-17 ~ 2026-07-24；去年同期窗口 138 商品 = 快照 productDailyPriorYear 138 商品（完全一致）；公式自洽抽查（豆芽）`(13462424−4792175)×0.85/10000 = 736.9712万`，偏差 0.000000；Top60 中 49 个有去年同期数据，11 个去年未上架降级「数据不足」。
+- 待人工核对：在 PowerBI Desktop 打开 `麻大师店铺推广数据报表.pbix`「07-旗舰店商品销售数据」页，对照方案文档 §6.1 Top10 表的「本期国补后(万)」「去年国补后(万)」「同比」三列数值。
+- 注意事项：catalog 内部 `07-旗舰店商品销售数据` 映射到 `model_q08_*` 视图（query 清单编号与文件名编号不一致，属正常）；warehouse.py 用 query_name 查 `warehouse_query_catalog` 取视图，对账脚本同样用 catalog 查询，不要按 `model_q07_*` 表名硬查。Windows cp936 locale 下 python 源码中文字面量传给 duckdb 时 stderr 报错信息会乱码，但实际查询不受影响。
+
 ## 2026-07-16
 
 ### 账号登录与权限管理

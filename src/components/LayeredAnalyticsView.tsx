@@ -213,7 +213,7 @@ export function LayeredAnalyticsView({
                 </select>
               </label>
             </div>
-            <div><MonthlyOverview overview={reporting.monthlyOverview} selectedChannel={activeChartChannel} /></div>
+            <div><MonthlyOverview overview={reporting.monthlyOverview} /></div>
           </section>
 
           {/* 双图表行：渠道完成率条形图 + 逐月目标达成率 */}

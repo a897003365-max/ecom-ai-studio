@@ -191,6 +191,7 @@ export interface PowerBiPages {
   period: { start: string; end: string } | null;
   overallDaily: PowerBiOverallDaily[];
   productDaily: PowerBiProductDaily[];
+  productDailyPriorYear: Array<{ productId: string; payAmount: number; refund: number }>;
   promotionSceneDaily: PowerBiPromotionDaily[];
   promotionProductDaily: PowerBiPromotionDaily[];
   products: Array<{
@@ -259,6 +260,7 @@ export interface ProductNameOverviewItem {
 export interface ProductDailyTrendItem {
   date: string;
   receivedAmount: number;
+  salesUnits: number;
   salesAmount: number;
   refundAmount: number;
   orderLines: number;
@@ -267,6 +269,7 @@ export interface ProductDailyTrendItem {
 export interface ProductMonthlyTrendItem {
   month: string;
   receivedAmount: number;
+  salesUnits: number;
   salesAmount: number;
   refundAmount: number;
   orderLines: number;
@@ -275,6 +278,7 @@ export interface ProductMonthlyTrendItem {
 export interface ProductStoreBreakdownItem {
   store: string;
   receivedAmount: number;
+  salesUnits: number;
   salesAmount: number;
   refundAmount: number;
   orderLines: number;
@@ -297,6 +301,7 @@ export interface ProductChannelBreakdownItem {
 export interface ProductMattressCategoryBreakdownItem {
   category: string;
   receivedAmount: number;
+  salesUnits: number;
   salesAmount: number;
   refundAmount: number;
   grossProfit: number;
@@ -310,6 +315,7 @@ export interface ProductMattressCategoryBreakdownItem {
 export interface ProductDarenBreakdownItem {
   daren: string;
   receivedAmount: number;
+  salesUnits: number;
   salesAmount: number;
   orderLines: number;
 }
@@ -317,6 +323,7 @@ export interface ProductDarenBreakdownItem {
 export interface ProductCategoryBreakdownItem {
   category: string;
   receivedAmount: number;
+  salesUnits: number;
   salesAmount: number;
   refundAmount: number;
   orderLines: number;
@@ -330,6 +337,19 @@ export interface ProductReturnRankingItem {
   receivedAmount: number;
   orderLines: number;
   refundRate: number | null;
+  refundOrderCount: number;
+  refundOrderShare: number | null;
+}
+
+export interface ProductReturnDimensionBreakdownItem {
+  dim: string;
+  refundAmount: number;
+  refundUnits: number;
+  refundOrderCount: number;
+  refundOrderShare: number | null;
+  refundRate: number | null;
+  receivedAmount: number;
+  orderLines: number;
 }
 
 export interface ProductFulfillmentByProductItem {
@@ -358,6 +378,10 @@ export interface ProductManagementPages {
   categoryBreakdown: ProductCategoryBreakdownItem[];
   mattressCategoryBreakdown: ProductMattressCategoryBreakdownItem[];
   returnRanking: ProductReturnRankingItem[];
+  returnChannelBreakdown: ProductReturnDimensionBreakdownItem[];
+  returnStoreBreakdown: ProductReturnDimensionBreakdownItem[];
+  returnDarenBreakdown: ProductReturnDimensionBreakdownItem[];
+  returnCategoryBreakdown: ProductReturnDimensionBreakdownItem[];
   fulfillmentByProduct: ProductFulfillmentByProductItem[];
   monthlyComparison: ProductMonthlyComparison | null;
   categoryChannelMatrix: ProductMatrix;
@@ -370,6 +394,10 @@ export interface ProductManagementPages {
   availableChannels: string[];
   availableStoreShortNames: string[];
   privacy: { rawRowsExposed: boolean; sourcePathsExposed: boolean };
+  priceStructure: ProductPriceStructurePages;
+  sizeStructure: ProductSizeStructurePages;
+  spuSalesTrend: ProductSpuSalesTrendPages;
+  customizationStructure: ProductCustomizationStructurePages;
 }
 
 export interface ProductMonthlyComparison {
@@ -383,6 +411,186 @@ export interface ProductMonthlyComparison {
 export interface ProductMatrix {
   columns: string[];
   rows: Array<{ rowKey: string; values: Record<string, number>; total: number }>;
+}
+
+// ---- 商品管理新增四模块：价格 / 尺寸 / SPU 销量 / 定制结构（推导）----
+
+export interface ProductDimensionCoverage {
+  totalOrderLines: number;
+  matchedOrderLines: number;
+  totalProductCodes: number;
+  matchedProductCodes: number;
+  ambiguousProductCodes: number;
+  orderLineRatio: number | null;
+  productCodeRatio: number | null;
+}
+
+export interface ProductModuleQuality {
+  status: "ready" | "degraded" | "unavailable";
+  coverage: ProductDimensionCoverage | null;
+  warnings: string[];
+}
+
+export interface ProductShareMatrixRow {
+  rowKey: string;
+  orderLines: number;
+  shares: Record<string, number>;
+}
+
+export interface ProductShareMatrix {
+  columns: string[];
+  rows: ProductShareMatrixRow[];
+}
+
+// 价格结构
+export type ProductPriceBucketCode =
+  | "LE_1000"
+  | "1001_1500"
+  | "1501_2000"
+  | "2001_2500"
+  | "2501_3000"
+  | "3001_4000"
+  | "GT_4000";
+
+export interface ProductPriceBucketRow {
+  bucket: ProductPriceBucketCode;
+  label:
+    | "1000以下"
+    | "1001–1500"
+    | "1501–2000"
+    | "2001–2500"
+    | "2501–3000"
+    | "3001–4000"
+    | "4000以上";
+  orderLines: number;
+  orderLineShare: number;
+  salesUnits: number;
+  receivedAmount: number;
+  receivedAmountShare: number;
+}
+
+export interface ProductPriceStructurePages {
+  buckets: ProductPriceBucketRow[];
+  channelMatrix: ProductShareMatrix;
+  mattressCategoryMatrix: ProductShareMatrix;
+  topProductMatrix: ProductShareMatrix;
+  validOrderLines: number;
+  excludedOrderLines: number;
+  totalReceivedAmount: number;
+  formula: "商家实收 / 销售数量";
+  quality: ProductModuleQuality;
+}
+
+// 尺寸结构
+export type ProductSizeSource = "q18" | "q27" | "colorSpec" | "unknown";
+
+export interface ProductSizeRow {
+  size: string;
+  source: ProductSizeSource;
+  orderLines: number;
+  orderLineShare: number;
+  salesUnits: number;
+  receivedAmount: number;
+  receivedAmountShare: number;
+}
+
+export interface ProductSizeStructurePages {
+  sizes: ProductSizeRow[];
+  unknownSize: ProductSizeRow;
+  mattressCategoryMatrix: ProductShareMatrix;
+  topProductMatrix: ProductShareMatrix;
+  recognizedOrderLines: number;
+  totalOrderLines: number;
+  quality: ProductModuleQuality;
+}
+
+// SPU 销量趋势
+export interface ProductSpuDailyPoint {
+  date: string;
+  spu: string;
+  orderLines: number;
+  salesUnits: number;
+  receivedAmount: number;
+}
+
+export interface ProductCategoryDailyPoint {
+  date: string;
+  mattressCategory: string;
+  salesUnits: number;
+  receivedAmount: number;
+}
+
+export interface ProductSpuSummary {
+  spu: string;
+  productName: string;
+  orderLines: number;
+  salesUnits: number;
+  receivedAmount: number;
+}
+
+export interface ProductSpuSalesTrendPages {
+  spuChannelMatrix: ProductMatrix;
+  dailySpuTrend: ProductSpuDailyPoint[];
+  categoryDailyTrend: ProductCategoryDailyPoint[];
+  availableSpus: string[];
+  defaultSpus: string[];
+  summaries: ProductSpuSummary[];
+  quality: ProductModuleQuality;
+}
+
+// 定制结构（推导）
+export type ProductCustomTag =
+  | "定制尺寸"
+  | "未填写标签"
+  | "定制厚度"
+  | "定制内材"
+  | "定制折叠"
+  | "定制异形"
+  | "定制缺角";
+
+export interface ProductCustomComparisonRow {
+  orderType: "常规" | "定制";
+  orderLines: number;
+  orderLineShare: number;
+  receivedAmount: number;
+  grossMargin: number | null;
+  shippedOrderLines: number;
+  avgShippingDays: number | null;
+  shippedWithin7DaysShare: number | null;
+  shippedWithin15DaysShare: number | null;
+}
+
+export interface ProductCustomTagRow {
+  tag: ProductCustomTag;
+  orderLines: number;
+  customOrderLineShare: number;
+}
+
+export interface ProductCustomCategoryRow {
+  mattressCategory: string;
+  customOrderLines: number;
+  customOrderLineShare: number;
+}
+
+export interface ProductCustomProductRow {
+  productName: string;
+  totalOrderLines: number;
+  customOrderLines: number;
+  customShareWithinProduct: number;
+  customReceivedAmount: number;
+  shippedCustomOrderLines: number;
+  shippedWithin7DaysShare: number | null;
+  shippedWithin10DaysShare: number | null;
+  shippedWithin15DaysShare: number | null;
+}
+
+export interface ProductCustomizationStructurePages {
+  comparison: ProductCustomComparisonRow[];
+  categoryStructure: ProductCustomCategoryRow[];
+  tags: ProductCustomTagRow[];
+  topProducts: ProductCustomProductRow[];
+  derivationNote: string;
+  quality: ProductModuleQuality;
 }
 
 export interface ProductsPayload {
@@ -550,6 +758,11 @@ export interface DingTalkMonthlyOverview {
     netRevenue: number;
   }>;
   priorYearFullMonthNetRevenue?: number;
+  // 渠道级去年同期逐日回款，供切渠道时重算目标进度带；结构与 daily.channels 对齐。
+  priorYearDailyChannels?: Array<{
+    date: string;
+    channels: Array<{ platform: string; netRevenue: number }>;
+  }>;
   source: string;
 }
 
@@ -615,6 +828,8 @@ export interface DingTalkSnapshot {
     dailyStores?: Array<{ date: string; platform: string; store: string } & DingTalkMetricTotals>;
     dailyOffsiteSpend?: Array<{ date: string; spend: number }>;
     targetYears?: string[];
+    // 月度渠道级目标：{ [YYYY-MM]: { [platform]: 目标金额 } }，供前端切渠道取该渠道当月目标。
+    monthlyTargetsByPlatform?: Record<string, Record<string, number>>;
     monthlyOverview?: DingTalkMonthlyOverview;
     monthlyAchievement?: DingTalkMonthlyAchievement[];
     metricTrends?: Record<"gmv" | "netRevenue" | "recoveryRate" | "addToCart" | "spend" | "feeRate" | "refund" | "refundRate", DingTalkMetricTrend>;

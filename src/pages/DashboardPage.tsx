@@ -104,7 +104,7 @@ export function DashboardPage({ onNavigate, onAction, tasks, canCreateTasks }: D
     <div className="animate-fade-in-up">
       <PageHeader
         title="工作台首页"
-        subtitle="汇总本地任务、异常与待确认项，帮助运营快速判断下一步动作。"
+        subtitle="汇总生产任务、异常与待确认项，帮助运营快速判断下一步动作。"
         actions={
           <>
             <button className="btn" onClick={() => refreshSources(true)} type="button">

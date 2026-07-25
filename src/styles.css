@@ -304,6 +304,10 @@ select option:disabled {
     letter-spacing: -0.01em;
   }
 
+  .card-spu-trend .section-title {
+    flex-wrap: wrap;
+  }
+
   .metric-grid {
     @apply grid gap-2.5;
     grid-template-columns: repeat(auto-fit, minmax(158px, 1fr));
@@ -532,11 +536,11 @@ select option:disabled {
 
   .monthly-overview-grid {
     @apply grid min-w-0;
-    grid-template-columns: minmax(310px, 0.82fr) minmax(0, 1.7fr);
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .monthly-overview-summary {
-    @apply border-r border-[var(--border)] p-4;
+    @apply p-4;
     background: linear-gradient(145deg, rgba(166, 229, 54, 0.045), transparent 42%);
   }
 
@@ -635,7 +639,7 @@ select option:disabled {
   }
 
   .channel-chart-canvas svg {
-    @apply block min-w-[620px];
+    @apply block;
   }
 
   .chart-guide {
@@ -660,7 +664,7 @@ select option:disabled {
   .chart-total-line {
     fill: none;
     stroke: var(--brand);
-    stroke-width: 3;
+    stroke-width: 2.5;
   }
 
   .chart-hover-line {
@@ -1212,15 +1216,6 @@ select option:disabled {
   .split-grid > * {
     min-width: 0;
   }
-
-  .monthly-overview-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .monthly-overview-summary {
-    border-bottom: 1px solid var(--border);
-    border-right: 0;
-  }
 }
 
 @media (max-width: 520px) {
@@ -1392,6 +1387,17 @@ select option:disabled {
     linear-gradient(145deg, rgba(73, 191, 227, 0.035), transparent 40%),
     #0b181c;
   animation: pb-canvas-in 480ms var(--ease-out-expo) both;
+}
+
+/* 天猫明细 tab 下整体协调放大 30%（字体、边框、间距同步） */
+.powerbi-replica-section {
+  overflow-x: auto;
+}
+
+.pb-tmall-detail-scale {
+  zoom: 1.3;
+  transform-origin: top left;
+  overflow: visible;
 }
 
 .pb-replica-canvas::before {
@@ -1567,10 +1573,11 @@ select option:disabled {
 
 .pb-overall-layout {
   display: grid;
-  grid-template-columns: 130px minmax(390px, 0.85fr) minmax(520px, 1.15fr);
+  grid-template-columns: minmax(390px, 0.85fr) minmax(520px, 1.15fr);
   grid-template-areas:
-    "date main daily"
-    "date products products";
+    "main daily"
+    "products products";
+  grid-template-rows: 1fr auto;
   gap: 1px;
   min-width: 1060px;
   background: var(--border);
@@ -1729,6 +1736,12 @@ select option:disabled {
   color: var(--muted);
 }
 
+.pb-na {
+  color: var(--muted);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
 .pb-fee-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -1785,6 +1798,85 @@ select option:disabled {
 .pb-data-table th:first-child,
 .pb-data-table td:first-child {
   text-align: left;
+}
+
+.pb-data-table th .th-sort-arrows {
+  display: inline-flex;
+  flex-direction: column;
+  vertical-align: middle;
+  margin-left: 4px;
+  line-height: 1;
+}
+.pb-data-table th .th-sort-arrows button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font-size: 8px;
+  line-height: 8px;
+  height: 8px;
+  cursor: pointer;
+  opacity: 0.4;
+  transition: opacity 120ms;
+}
+.pb-data-table th .th-sort-arrows button:hover {
+  opacity: 0.9;
+}
+.pb-data-table th .th-sort-arrows button.is-active {
+  color: var(--brand);
+  opacity: 1;
+}
+
+.pb-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: #0b181c;
+  font-size: 10px;
+  color: var(--muted);
+}
+.pb-pagination-info {
+  white-space: nowrap;
+}
+.pb-pagination-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.pb-pagination-controls button {
+  min-width: 24px;
+  padding: 2px 7px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 15px;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: background 120ms, color 120ms, border-color 120ms;
+}
+.pb-pagination-controls button:hover:not(:disabled) {
+  color: var(--text);
+  border-color: var(--muted-2);
+}
+.pb-pagination-controls button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.pb-pagination-controls button.is-active {
+  background: var(--brand);
+  color: #132328;
+  border-color: var(--brand);
+  font-weight: 700;
+}
+.pb-pagination-ellipsis {
+  padding: 0 2px;
+  color: var(--muted-2);
 }
 
 .pb-data-table tbody tr:hover {
@@ -1871,7 +1963,7 @@ select option:disabled {
 }
 
 .pb-business-product-table {
-  min-width: 1120px;
+  min-width: 1440px;
   font-size: 10px;
 }
 
@@ -1932,11 +2024,7 @@ select option:disabled {
 }
 
 .pb-detail-layout {
-  grid-template-columns: 145px minmax(0, 1fr);
-}
-
-.pb-detail-layout .pb-date-rail {
-  grid-area: auto;
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .pb-detail-layout main,
@@ -2745,7 +2833,7 @@ select option:disabled {
 
 .exec-kpi-grid {
   display: grid;
-  grid-template-columns: repeat(6, minmax(148px, 1fr));
+  grid-template-columns: repeat(7, minmax(148px, 1fr));
   gap: 9px;
 }
 
@@ -2858,10 +2946,57 @@ select option:disabled {
   gap: 10px;
 }
 
+.exec-channel-trend-panel .channel-chart-canvas svg {
+  width: auto;
+  max-width: 100%;
+  height: auto;
+}
+
+.exec-mid-grid {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-rows: 360px;
+  gap: 10px;
+}
+
+.exec-mid-grid > .exec-panel {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.exec-mid-grid .channel-chart {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+}
+
+.exec-mid-grid .channel-chart-canvas {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.exec-mid-grid .channel-chart-canvas svg {
+  height: 100%;
+  width: auto;
+  min-width: 620px;
+}
+
+.exec-mid-grid .exec-category-panel .exec-category-list,
+.exec-mid-grid .exec-funnel-panel .exec-funnel-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
 .exec-bottom-grid {
   display: grid;
   min-width: 0;
-  grid-template-columns: minmax(640px, 1.75fr) minmax(260px, 0.78fr) minmax(330px, 0.98fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
 }
 
@@ -3325,6 +3460,72 @@ select option:disabled {
   font-size: 9px;
 }
 
+.exec-funnel-panel .exec-panel-unit b {
+  margin-left: 6px;
+  color: var(--brand);
+  font-size: 16px;
+}
+
+.exec-funnel-list {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.exec-funnel-row {
+  display: grid;
+  grid-template-columns: minmax(96px, 1fr) minmax(120px, 1.6fr) auto auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.exec-funnel-row > span {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #d7e2de;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.exec-funnel-row > span em {
+  color: var(--muted-2);
+  font-family: var(--font-display);
+  font-size: 9px;
+  font-style: normal;
+}
+
+.exec-funnel-row > div {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.exec-funnel-row > div i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #49bfe3, var(--brand));
+  box-shadow: 0 0 10px rgba(166, 229, 54, 0.15);
+  transform-origin: left;
+  animation: exec-width-grow 760ms 300ms var(--ease-out-expo) both;
+}
+
+.exec-funnel-row > b {
+  color: var(--text);
+  font-size: 12px;
+  min-width: 52px;
+  text-align: right;
+}
+
+.exec-funnel-row > small {
+  color: var(--muted);
+  font-size: 10px;
+  min-width: 72px;
+  text-align: right;
+}
+
 .exec-empty {
   display: grid;
   min-height: 190px;
@@ -3433,19 +3634,23 @@ select option:disabled {
 @media (max-width: 1500px) {
   .exec-kpi-grid { grid-template-columns: repeat(3, minmax(170px, 1fr)); }
   .exec-bottom-grid {
-    grid-template-columns: minmax(620px, 1.7fr) minmax(300px, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-  .exec-spend-panel { grid-column: 1 / -1; }
-  .exec-spend-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 1150px) {
   .exec-main-grid,
+  .exec-mid-grid,
   .exec-bottom-grid {
     grid-template-columns: 1fr;
   }
-  .exec-channel-panel,
-  .exec-spend-panel { grid-column: auto; }
+  .exec-mid-grid {
+    grid-template-rows: auto;
+  }
+  .exec-mid-grid .channel-chart-canvas svg {
+    height: auto;
+    width: 100%;
+  }
   .exec-quality-panel { min-width: 0; }
 }
 

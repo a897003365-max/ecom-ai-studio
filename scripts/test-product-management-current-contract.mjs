@@ -56,6 +56,15 @@ try {
   assert.ok(Array.isArray(pages.fulfillmentByProduct), "商品管理必须返回按产品名称的仓配履约表");
   assert.ok(pages.fulfillmentByProduct.some((row) => Number(row.orderCount) > 0), "仓配履约表必须包含订单量");
   assert.ok(pages.fulfillmentByProduct.some((row) => Object.hasOwn(row, "avgShippingDays")), "仓配履约表必须包含平均发货时效");
+  assert.ok(pages.priceStructure, "商品管理必须返回价格结构");
+  assert.ok(Array.isArray(pages.priceStructure.buckets), "价格结构必须返回分桶数组");
+  assert.ok(pages.priceStructure.quality, "价格结构必须返回 quality");
+  assert.ok(pages.sizeStructure, "商品管理必须返回尺寸结构");
+  assert.ok(pages.sizeStructure.unknownSize, "尺寸结构必须返回未填写尺寸行");
+  assert.ok(pages.spuSalesTrend, "商品管理必须返回 SPU 销量趋势");
+  assert.ok(Array.isArray(pages.spuSalesTrend.dailySpuTrend), "SPU 销量趋势必须返回日趋势数组");
+  assert.ok(pages.customizationStructure, "商品管理必须返回定制结构");
+  assert.ok(Array.isArray(pages.customizationStructure.tags), "定制结构必须返回标签数组");
   console.log("product management current contract: ok");
 } finally {
   child.kill();

@@ -14,6 +14,13 @@ import polars as pl
 
 from .catalog import QuerySpec, load_catalog
 from .config import WarehousePaths
+from .product_structure_builders import (
+    build_product_structure_modules,
+    empty_customization_structure,
+    empty_price_structure,
+    empty_size_structure,
+    empty_spu_sales_trend,
+)
 from .readers import discover_files, read_source_file
 from .source_policy import (
     DINGTALK_COVERED_QUERIES,
@@ -461,6 +468,7 @@ def _build_powerbi_pages(connection: duckdb.DuckDBPyConnection) -> dict[str, Any
             "period": None,
             "overallDaily": [],
             "productDaily": [],
+            "productDailyPriorYear": [],
             "promotionSceneDaily": [],
             "promotionProductDaily": [],
             "products": [],
@@ -536,6 +544,32 @@ def _build_powerbi_pages(connection: duckdb.DuckDBPyConnection) -> dict[str, Any
         GROUP BY 1, 2 ORDER BY 1, visitors DESC
         """,
         [period_start, period_end],
+    )
+
+    # 去年同期商品级聚合，用于「国补后金额同比」（对齐 .pbix DATEADD(-365, DAY)）
+    prior_year_start = period_start - timedelta(days=365)
+    prior_year_end = period_end - timedelta(days=365)
+    product_daily_prior_year = _records(
+        connection,
+        f"""
+        WITH dedup AS (
+          SELECT * EXCLUDE (_snapshot_rank) FROM (
+            SELECT *, row_number() OVER (
+              PARTITION BY try_cast("日期" AS DATE), cast("商品ID" AS VARCHAR)
+              ORDER BY "_source_mtime_ns" DESC, "_source_path" DESC
+            ) AS _snapshot_rank
+            FROM {product_view}
+            WHERE try_cast("日期" AS DATE) BETWEEN ? AND ? AND "商品ID" IS NOT NULL
+          ) WHERE _snapshot_rank = 1
+        )
+        SELECT
+          cast("商品ID" AS VARCHAR) AS productId,
+          sum(coalesce(try_cast("支付金额" AS DOUBLE), 0)) AS payAmount,
+          sum(coalesce(try_cast("退款金额" AS DOUBLE), 0)) AS refund
+        FROM dedup
+        GROUP BY 1
+        """,
+        [prior_year_start, prior_year_end],
     )
 
     promotion_scene_daily = _records(
@@ -646,6 +680,7 @@ def _build_powerbi_pages(connection: duckdb.DuckDBPyConnection) -> dict[str, Any
         "period": {"start": period_start, "end": period_end},
         "overallDaily": overall_daily,
         "productDaily": product_daily,
+        "productDailyPriorYear": product_daily_prior_year,
         "promotionSceneDaily": promotion_scene_daily,
         "promotionProductDaily": promotion_product_daily,
         "products": products,
@@ -686,6 +721,10 @@ def _build_product_management_pages(
             "categoryBreakdown": [],
             "mattressCategoryBreakdown": [],
             "returnRanking": [],
+            "returnChannelBreakdown": [],
+            "returnStoreBreakdown": [],
+            "returnDarenBreakdown": [],
+            "returnCategoryBreakdown": [],
             "fulfillmentByProduct": [],
             "monthlyComparison": None,
             "categoryChannelMatrix": {"columns": [], "rows": []},
@@ -698,6 +737,10 @@ def _build_product_management_pages(
             "availableChannels": [],
             "availableStoreShortNames": [],
             "privacy": {"rawRowsExposed": False, "sourcePathsExposed": False},
+            "priceStructure": empty_price_structure(),
+            "sizeStructure": empty_size_structure(),
+            "spuSalesTrend": empty_spu_sales_trend(),
+            "customizationStructure": empty_customization_structure(),
         }
 
     # 可选切片器值始终取自未过滤 base_view，避免联动后把其余可选项隐藏。
@@ -780,6 +823,13 @@ def _build_product_management_pages(
         if has_master and pm_view
         else set()
     )
+    # 辅4-床垫编码（q18）提供 SPU/尺寸/厚度/是否折叠等富维度，仅作 supplemental join。
+    try:
+        q18_view = _model_view(connection, "辅4-床垫编码")
+        q18_columns = {row[0] for row in connection.execute(f"DESCRIBE {q18_view}").fetchall()}
+    except ValueError:
+        q18_view = None
+        q18_columns = set()
     jd_master_view = _source_view(connection, "product-master") if has_master else None
     jd_master_columns = (
         {row[0] for row in connection.execute(f"DESCRIBE {jd_master_view}").fetchall()}
@@ -938,7 +988,7 @@ def _build_product_management_pages(
                count(*) AS orderLines
         FROM {view} s {pm_join}
         WHERE s."商品编码" IS NOT NULL
-        GROUP BY 1 ORDER BY receivedAmount DESC NULLS LAST LIMIT 200
+        GROUP BY 1 ORDER BY receivedAmount DESC NULLS LAST LIMIT 500000
         """,
     )
     for row in product_overview:
@@ -952,6 +1002,7 @@ def _build_product_management_pages(
         f"""
         SELECT "订单日期" AS date,
                sum(coalesce(try_cast("商家实收" AS DOUBLE),0)) AS receivedAmount,
+               sum(coalesce(try_cast("销售数量" AS DOUBLE),0)) AS salesUnits,
                sum(coalesce(try_cast("销售金额" AS DOUBLE),0)) AS salesAmount,
                sum(coalesce(try_cast("退货金额" AS DOUBLE),0)) AS refundAmount,
                count(*) AS orderLines
@@ -967,11 +1018,12 @@ def _build_product_management_pages(
         f"""
         SELECT {store_short_expr} AS store,
                sum(coalesce(try_cast("商家实收" AS DOUBLE),0)) AS receivedAmount,
+               sum(coalesce(try_cast("销售数量" AS DOUBLE),0)) AS salesUnits,
                sum(coalesce(try_cast("销售金额" AS DOUBLE),0)) AS salesAmount,
                sum(coalesce(try_cast("退货金额" AS DOUBLE),0)) AS refundAmount,
                count(*) AS orderLines
         FROM {view} s
-        GROUP BY 1 ORDER BY receivedAmount DESC NULLS LAST LIMIT 50
+        GROUP BY 1 ORDER BY receivedAmount DESC NULLS LAST LIMIT 5000
         """,
     )
 
@@ -980,11 +1032,12 @@ def _build_product_management_pages(
         f"""
         SELECT "达人名称" AS daren,
                sum(coalesce(try_cast("商家实收" AS DOUBLE),0)) AS receivedAmount,
+               sum(coalesce(try_cast("销售数量" AS DOUBLE),0)) AS salesUnits,
                sum(coalesce(try_cast("销售金额" AS DOUBLE),0)) AS salesAmount,
                count(*) AS orderLines
         FROM {view}
         WHERE "达人名称" IS NOT NULL AND trim(cast("达人名称" AS VARCHAR)) <> ''
-        GROUP BY 1 ORDER BY receivedAmount DESC NULLS LAST LIMIT 50
+        GROUP BY 1 ORDER BY receivedAmount DESC NULLS LAST LIMIT 5000
         """,
     )
 
@@ -993,12 +1046,13 @@ def _build_product_management_pages(
         f"""
         SELECT "产品分类" AS category,
                sum(coalesce(try_cast("商家实收" AS DOUBLE),0)) AS receivedAmount,
+               sum(coalesce(try_cast("销售数量" AS DOUBLE),0)) AS salesUnits,
                sum(coalesce(try_cast("销售金额" AS DOUBLE),0)) AS salesAmount,
                sum(coalesce(try_cast("退货金额" AS DOUBLE),0)) AS refundAmount,
                count(*) AS orderLines
         FROM {view}
         WHERE "产品分类" IS NOT NULL AND trim(cast("产品分类" AS VARCHAR)) <> ''
-        GROUP BY 1 ORDER BY receivedAmount DESC NULLS LAST LIMIT 50
+        GROUP BY 1 ORDER BY receivedAmount DESC NULLS LAST LIMIT 5000
         """,
     )
 
@@ -1010,15 +1064,58 @@ def _build_product_management_pages(
                sum(coalesce(try_cast(s."退货数量" AS DOUBLE),0)) AS refundUnits,
                sum(coalesce(try_cast(s."退货金额" AS DOUBLE),0)) AS refundAmount,
                sum(coalesce(try_cast(s."商家实收" AS DOUBLE),0)) AS receivedAmount,
+               sum(CASE WHEN cast(s."订单状态明细" AS VARCHAR) LIKE '%交易关闭%' THEN 1 ELSE 0 END) AS refundOrderCount,
                count(*) AS orderLines
         FROM {view} s {pm_join}
         WHERE s."商品编码" IS NOT NULL
-        GROUP BY 1 ORDER BY refundAmount DESC NULLS LAST LIMIT 100
+        GROUP BY 1 ORDER BY refundAmount DESC NULLS LAST LIMIT 5000
         """,
     )
     for row in return_ranking:
         received = row.get("receivedAmount") or 0
+        order_lines = row.get("orderLines") or 0
         row["refundRate"] = round(row["refundAmount"] / received, 4) if received else None
+        row["refundOrderShare"] = round(row["refundOrderCount"] / order_lines, 4) if order_lines else None
+
+    # 退货维度拆分：渠道/店铺/达人/床垫类别。退款订单 = 订单状态明细含「交易关闭」
+    # （仅退款 + 退货退款两个子类，合计贡献 100% 退货金额）。
+    # 退货率 = 退货金额/商家实收；退款订单占比 = 交易关闭订单数/订单行。
+    def _return_breakdown(dim_expr: str, where: str, join: str = "", limit: int = 50) -> list[dict]:
+        rows = _records(
+            connection,
+            f"""
+            SELECT {dim_expr} AS dim,
+                   sum(coalesce(try_cast(s."退货金额" AS DOUBLE),0)) AS refundAmount,
+                   sum(coalesce(try_cast(s."退货数量" AS DOUBLE),0)) AS refundUnits,
+                   sum(CASE WHEN cast(s."订单状态明细" AS VARCHAR) LIKE '%交易关闭%' THEN 1 ELSE 0 END) AS refundOrderCount,
+                   sum(coalesce(try_cast(s."商家实收" AS DOUBLE),0)) AS receivedAmount,
+                   count(*) AS orderLines
+            FROM {view} s {join}
+            WHERE {where}
+            GROUP BY 1 ORDER BY refundAmount DESC NULLS LAST LIMIT {limit}
+            """,
+        )
+        for row in rows:
+            received = row.get("receivedAmount") or 0
+            order_lines = row.get("orderLines") or 0
+            row["refundRate"] = round(row["refundAmount"] / received, 4) if received else None
+            row["refundOrderShare"] = round(row["refundOrderCount"] / order_lines, 4) if order_lines else None
+        return rows
+
+    daren_dim_expr = f"coalesce({_nonempty_text('s', '达人名称')}, '(无达人)')"
+    category_dim_expr = f"coalesce({_nonempty_text('pm', '床垫类别')}, '(未分类)')"
+    return_channel_breakdown = _return_breakdown(channel_expr, "TRUE", "")
+    return_store_breakdown = _return_breakdown(store_short_expr, "TRUE", "")
+    return_daren_breakdown = _return_breakdown(
+        daren_dim_expr,
+        "s.\"达人名称\" IS NOT NULL AND trim(cast(s.\"达人名称\" AS VARCHAR)) <> ''",
+        "",
+    )
+    return_category_breakdown = _return_breakdown(
+        category_dim_expr,
+        "pm.\"床垫类别\" IS NOT NULL AND trim(cast(pm.\"床垫类别\" AS VARCHAR)) <> ''",
+        pm_join,
+    ) if has_master else []
 
     # 仓配履约：同一产品名称内按订单去重，时效为发货日期 - 订单日期的自然日差。
     # 第 N 天为日期差恰好 N 天；15 天内为 0～15 天累计。订单量为全部订单分母，
@@ -1055,7 +1152,7 @@ def _build_product_management_pages(
         FROM shipping_durations
         GROUP BY 1
         ORDER BY orderCount DESC, avgShippingDays DESC NULLS LAST, productName
-        LIMIT 200
+        LIMIT 5000
         """,
     )
 
@@ -1079,7 +1176,7 @@ def _build_product_management_pages(
                count(*) AS orderLines
         FROM {view} s {pm_join}
         WHERE {product_name_expr} <> '(未命名)'
-        GROUP BY 1 ORDER BY receivedAmount DESC NULLS LAST LIMIT 200
+        GROUP BY 1 ORDER BY receivedAmount DESC NULLS LAST LIMIT 500000
         """,
     )
     name_total = sum((row.get("receivedAmount") or 0) for row in product_name_overview) or 1
@@ -1122,6 +1219,7 @@ def _build_product_management_pages(
         f"""
         SELECT strftime('%Y-%m', "订单日期") AS month,
                sum(coalesce(try_cast("商家实收" AS DOUBLE),0)) AS receivedAmount,
+               sum(coalesce(try_cast("销售数量" AS DOUBLE),0)) AS salesUnits,
                sum(coalesce(try_cast("销售金额" AS DOUBLE),0)) AS salesAmount,
                sum(coalesce(try_cast("退货金额" AS DOUBLE),0)) AS refundAmount,
                count(*) AS orderLines
@@ -1137,6 +1235,7 @@ def _build_product_management_pages(
             f"""
             SELECT pm."床垫类别" AS category,
                    sum(coalesce(try_cast(s."商家实收" AS DOUBLE),0)) AS receivedAmount,
+                   sum(coalesce(try_cast(s."销售数量" AS DOUBLE),0)) AS salesUnits,
                    sum(coalesce(try_cast(s."销售金额" AS DOUBLE),0)) AS salesAmount,
                    sum(coalesce(try_cast(s."退货金额" AS DOUBLE),0)) AS refundAmount,
                    {margin_select}
@@ -1308,6 +1407,10 @@ def _build_product_management_pages(
         "categoryBreakdown": category_breakdown,
         "mattressCategoryBreakdown": mattress_category_breakdown,
         "returnRanking": return_ranking,
+        "returnChannelBreakdown": return_channel_breakdown,
+        "returnStoreBreakdown": return_store_breakdown,
+        "returnDarenBreakdown": return_daren_breakdown,
+        "returnCategoryBreakdown": return_category_breakdown,
         "fulfillmentByProduct": fulfillment_by_product,
         "monthlyComparison": monthly_comparison,
         "categoryChannelMatrix": category_channel_matrix,
@@ -1320,6 +1423,10 @@ def _build_product_management_pages(
         "availableChannels": available_channels,
         "availableStoreShortNames": available_store_short_names,
         "privacy": {"rawRowsExposed": False, "sourcePathsExposed": False},
+        **build_product_structure_modules(
+            connection, view, base_view, pm_view if has_master else None, master_columns,
+            q18_view, q18_columns
+        ),
     }
 
 

@@ -1,8 +1,11 @@
 import { useMemo, useState, type PointerEvent } from "react";
-import type { DingTalkMonthlyOverview } from "../types/integration";
 
 interface ChannelRevenueChartProps {
-  overview: DingTalkMonthlyOverview;
+  daily: Array<{
+    date: string;
+    totalNetRevenue: number;
+    channels: Array<{ platform: string; netRevenue: number }>;
+  }>;
   selectedChannel: string;
 }
 
@@ -37,9 +40,8 @@ function shortMoney(value: number) {
   return `${(value / 10_000).toFixed(value >= 100_000 ? 1 : 2)}万`;
 }
 
-export function ChannelRevenueChart({ overview, selectedChannel }: ChannelRevenueChartProps) {
+export function ChannelRevenueChart({ daily, selectedChannel }: ChannelRevenueChartProps) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
-  const daily = overview.daily;
   const allChannels = useMemo(() => daily[0]?.channels.map((item) => item.platform) ?? [], [daily]);
   const channels = useMemo(
     () => selectedChannel === "all" ? allChannels : allChannels.filter((channel) => channel === selectedChannel),
@@ -77,7 +79,7 @@ export function ChannelRevenueChart({ overview, selectedChannel }: ChannelRevenu
         </div>
       </div>
       <div className="channel-chart-canvas">
-        <svg aria-label={selectedChannel === "all" ? "当月各渠道每日回款额平滑折线图" : `当月${selectedChannel}每日回款额平滑折线图`} role="img" viewBox={`0 0 ${width} ${height}`}>
+        <svg aria-label={selectedChannel === "all" ? "当月各渠道每日回款额平滑折线图" : `当月${selectedChannel}每日回款额平滑折线图`} role="img" viewBox={`0 0 ${width} ${height}`} width={width} height={height}>
           {[0, 0.25, 0.5, 0.75, 1].map((ratio) => {
             const value = maxValue * ratio;
             const rowY = plot.top + (1 - ratio) * plotHeight;
@@ -94,13 +96,13 @@ export function ChannelRevenueChart({ overview, selectedChannel }: ChannelRevenu
               x: x(index),
               y: y(item.channels.find((row) => row.platform === channel)?.netRevenue ?? 0),
             }));
-            return <path d={smoothPath(points)} fill="none" key={channel} stroke={channelColor(channel)} strokeWidth="2" />;
+            return <path d={smoothPath(points)} fill="none" key={channel} stroke={channelColor(channel)} strokeWidth="1.5" />;
           })}
           {hoveredIndex !== null && hovered && (
             <g>
               <line className="chart-hover-line" x1={x(hoveredIndex)} x2={x(hoveredIndex)} y1={plot.top} y2={plot.top + plotHeight} />
-              <circle cx={x(hoveredIndex)} cy={y(hovered.totalNetRevenue)} fill="var(--brand)" r="4" stroke="var(--bg)" strokeWidth="2" />
-              {hoveredChannels.map((item) => <circle cx={x(hoveredIndex)} cy={y(item.netRevenue)} fill={channelColor(item.platform)} key={item.platform} r="3.5" stroke="var(--bg)" strokeWidth="2" />)}
+              <circle cx={x(hoveredIndex)} cy={y(hovered.totalNetRevenue)} fill="var(--brand)" r="3.5" stroke="var(--bg)" strokeWidth="1.5" />
+              {hoveredChannels.map((item) => <circle cx={x(hoveredIndex)} cy={y(item.netRevenue)} fill={channelColor(item.platform)} key={item.platform} r="3" stroke="var(--bg)" strokeWidth="1.5" />)}
             </g>
           )}
           <rect fill="transparent" height={plotHeight} onPointerLeave={() => setHoveredIndex(null)} onPointerMove={move} width={plotWidth} x={plot.left} y={plot.top} />

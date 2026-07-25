@@ -54,7 +54,7 @@ D:\麻大师\日更数据 本地源文件
   -> 单端口 /api/analytics
   -> React 运营数据页面
 
-钉钉共享表 Sheet API（只读，每日 10:00 / 12:30 / 17:30）
+钉钉共享表 Sheet API（只读，每日 10:30 / 13:00 / 17:30）
   -> local-data 脱敏聚合快照
   -> 单端口 /api/analytics
 
@@ -87,7 +87,7 @@ DINGTALK_APP_SECRET
 DINGTALK_WORKBOOK_ID
 DINGTALK_OPERATOR_ID
 DINGTALK_OPERATOR_USER_ID
-DINGTALK_SYNC_TIMES=10:00,12:30,17:30
+DINGTALK_SYNC_TIMES=10:30,13:00,17:30
 # 可选：无人值守重试与单请求超时
 DINGTALK_SYNC_ATTEMPTS=3
 DINGTALK_API_TIMEOUT_MS=45000

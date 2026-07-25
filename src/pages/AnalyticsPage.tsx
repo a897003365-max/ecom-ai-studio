@@ -13,6 +13,7 @@ import { StatusTag } from "../components/StatusTag";
 import { TableShell } from "../components/TableShell";
 import { useAnalyticsViewMode, ViewModeToggle } from "../components/ViewModeToggle";
 import { getAnalyticsData, syncAnalyticsData } from "../services/localApi";
+import { channelOptions, selectChannelSnapshot } from "../utils/channelSnapshot";
 import type { KpiMetric, Platform, RegenerationSuggestion } from "../types";
 import type { AnalyticsIntegrationPayload, DingTalkMetricTotals, DingTalkSnapshot } from "../types/integration";
 
@@ -46,14 +47,16 @@ function withBusinessRates<T extends DingTalkMetricTotals>(metric: T): T & Requi
   };
 }
 
-function liveKpis(snapshot: DingTalkSnapshot): KpiMetric[] {
+function liveKpis(snapshot: DingTalkSnapshot, channel = "all"): KpiMetric[] {
   const totals = withBusinessRates(snapshot.totals);
+  const scope = channel === "all" ? "全渠道" : channel;
   return [
-    { label: "GMV", value: money(totals.gmv), detail: "全渠道成交口径", tone: "green" },
+    { label: "GMV", value: money(totals.gmv), detail: `${scope}成交口径`, tone: "green" },
     { label: "回款额", value: money(totals.netRevenue), detail: "扣除退款后的经营回款", tone: "blue" },
     { label: "回款率", value: percent(totals.recoveryRate), detail: "回款额 / GMV", tone: "green" },
     { label: "站内费额", value: money(totals.spend), detail: "按全渠道表站内费用口径", tone: "orange" },
     { label: "费比", value: percent(totals.feeRate), detail: "站内费额 / 回款额", tone: "orange" },
+    { label: "推广ROI", value: totals.spend ? totals.roi.toFixed(2) : "-", detail: "GMV / 站内费额", tone: "green" },
     { label: "退款金额", value: money(totals.refund), detail: "成功退款聚合", tone: "pink" },
     { label: "退款率", value: percent(totals.refundRate), detail: "退款金额 / GMV", tone: "red" },
     { label: "加购人数", value: count(totals.addToCart), detail: "含“加购人数 / 日加购”", tone: "purple" },
@@ -115,15 +118,17 @@ export function AnalyticsPage({ onAction, canManage }: AnalyticsPageProps) {
     ? productManagement
     : null;
   const dataStatus = integration?.dataStatus;
-  const metrics = dingtalk ? liveKpis(dingtalk) : [];
-  const platforms = useMemo(() => (dingtalk?.platforms ?? []).map(withBusinessRates), [dingtalk]);
-  const stores = useMemo(() => (dingtalk?.stores ?? []).map(withBusinessRates), [dingtalk]);
+  const channelDingtalk = useMemo(
+    () => (dingtalk ? selectChannelSnapshot(dingtalk, selectedChannel) : null),
+    [dingtalk, selectedChannel],
+  );
+  const viewDingtalk = channelDingtalk ?? dingtalk;
+  const metrics = viewDingtalk ? liveKpis(viewDingtalk, selectedChannel) : [];
+  const platforms = useMemo(() => (viewDingtalk?.platforms ?? []).map(withBusinessRates), [viewDingtalk]);
+  const stores = useMemo(() => (viewDingtalk?.stores ?? []).map(withBusinessRates), [viewDingtalk]);
   const latestSync = integration?.history.find((item) => item.sourceId === "dingtalk" && item.status === "success")?.finishedAt
     ?? dingtalk?.refreshedAt;
-  const chartChannels = useMemo(
-    () => reporting?.monthlyOverview?.daily[0]?.channels.map((item) => item.platform) ?? [],
-    [reporting?.monthlyOverview],
-  );
+  const chartChannels = useMemo(() => channelOptions(dingtalk), [dingtalk]);
   const activeChartChannel = selectedChannel === "all" || chartChannels.includes(selectedChannel) ? selectedChannel : "all";
 
   const highestRefund = [...platforms].sort((left, right) => right.refundRate - left.refundRate)[0];
@@ -158,13 +163,23 @@ export function AnalyticsPage({ onAction, canManage }: AnalyticsPageProps) {
     <div>
       <PageHeader
         title="全渠道经营总览"
-        subtitle={`成交、回款、投放与渠道质量一屏决策 · 最近同步 ${dateTime(latestSync)} · 每日同步计划 ${dingtalk?.schedule?.join(" / ") || "10:00 / 12:30 / 17:30"}`}
+        subtitle={`成交、回款、投放与渠道质量一屏决策 · 最近同步 ${dateTime(latestSync)} · 每日同步计划 ${dingtalk?.schedule?.join(" / ") || "10:30 / 13:00 / 17:30"}`}
         actions={
           <>
             <ViewModeToggle mode={viewMode} onChange={setViewMode} />
             <button className="btn" disabled={syncing !== null || !canManage} onClick={() => void syncDashboard()} title={canManage ? "同步钉钉经营数据与本地数仓" : "当前账号仅可查看，不能同步数据"} type="button">
               {syncing === "analytics" ? "同步中..." : "同步数据"}
             </button>
+            {dingtalk && (
+              <label className="channel-filter" data-testid="global-channel-filter">
+                <Filter aria-hidden="true" size={13} />
+                <span>渠道</span>
+                <select aria-label="筛选全局渠道" onChange={(event) => setSelectedChannel(event.target.value)} value={activeChartChannel}>
+                  <option value="all">全部渠道</option>
+                  {chartChannels.map((channel) => <option key={channel} value={channel}>{channel}</option>)}
+                </select>
+              </label>
+            )}
             {dingtalk && reporting && (
               <AnalyticsDateFilter
                 available={reporting.availablePeriod}
@@ -194,11 +209,12 @@ export function AnalyticsPage({ onAction, canManage }: AnalyticsPageProps) {
       {loading && !dingtalk ? (
         <Card><div className="py-16 text-center text-sm text-[var(--muted)]">正在读取钉钉经营数据...</div></Card>
       ) : dingtalk ? (
-        <PowerBiReplica dingtalk={dingtalk} period={globalPeriod} warehouse={integration?.warehouse ?? null} overview={
+        <PowerBiReplica period={globalPeriod} warehouse={integration?.warehouse ?? null} overview={
           viewMode === "layered" ? (
             <ExecutiveCommerceOverview
-              dingtalk={dingtalk}
+              dingtalk={viewDingtalk!}
               productManagement={alignedProductManagement}
+              selectedChannel={activeChartChannel}
             />
           ) : (
             <>
@@ -219,7 +235,7 @@ export function AnalyticsPage({ onAction, canManage }: AnalyticsPageProps) {
                       </select>
                     </label>
                   </div>
-                  <div><MonthlyOverview overview={reporting.monthlyOverview} selectedChannel={activeChartChannel} /></div>
+                  <div><MonthlyOverview overview={reporting.monthlyOverview} /></div>
                 </section>
               )}
 

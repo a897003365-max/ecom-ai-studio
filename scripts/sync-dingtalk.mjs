@@ -41,7 +41,8 @@ function retryAttempts(readLocalEnv) {
 }
 
 function retryDelay(attempt) {
-  return Math.min(60_000, 5_000 * (2 ** (attempt - 1))) + Math.floor(Math.random() * 500);
+  // 30s/60s/120s 退避，封顶 120s：覆盖钉钉早高峰 503 时段（原 5s/10s 窗口太短）
+  return Math.min(120_000, 30_000 * (2 ** (attempt - 1))) + Math.floor(Math.random() * 1_000);
 }
 
 function sleep(milliseconds) {

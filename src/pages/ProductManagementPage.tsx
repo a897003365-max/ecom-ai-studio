@@ -10,7 +10,12 @@ import { TableShell } from "../components/TableShell";
 import { Tabs } from "../components/Tabs";
 import { getProductData, syncDataSource } from "../services/localApi";
 import type { KpiMetric } from "../types";
-import type { ProductManagementPages, ProductMatrix, ProductMonthlyComparison } from "../types/integration";
+import type { ProductManagementPages, ProductMatrix, ProductMonthlyComparison, ProductReturnDimensionBreakdownItem } from "../types/integration";
+import { CustomizationStructurePanel } from "../components/product-management/CustomizationStructurePanel";
+import { PriceStructurePanel } from "../components/product-management/PriceStructurePanel";
+import { SizeStructurePanel } from "../components/product-management/SizeStructurePanel";
+import { SpuSalesTrendPanel } from "../components/product-management/SpuSalesTrendPanel";
+import { DailyTrendChart } from "../components/product-management/DailyTrendChart";
 
 interface DateRange {
   start: string;
@@ -21,7 +26,7 @@ interface ProductManagementPageProps {
   onAction: (title: string, detail?: string) => void;
 }
 
-type ProductTab = "overview" | "trend" | "returns" | "channel" | "daily" | "fulfillment";
+type ProductTab = "overview" | "trend" | "returns" | "channel" | "daily" | "fulfillment" | "price" | "size" | "spu" | "custom";
 
 const compactNumber = new Intl.NumberFormat("zh-CN", { notation: "compact", maximumFractionDigits: 1 });
 const currencyNumber = new Intl.NumberFormat("zh-CN", {
@@ -181,7 +186,6 @@ function MatrixTable({ matrix, rowHeader, minWidth }: { matrix: ProductMatrix; r
 const COMPARISON_ROWS: Array<{ key: string; label: string; kind: "money" | "count" }> = [
   { key: "receivedAmount", label: "商家实收", kind: "money" },
   { key: "refundAmount", label: "退货金额", kind: "money" },
-  { key: "orderLines", label: "订单行", kind: "count" },
 ];
 
 function MonthlyComparisonCard({ comparison }: { comparison: ProductMonthlyComparison }) {
@@ -198,6 +202,39 @@ function MonthlyComparisonCard({ comparison }: { comparison: ProductMonthlyCompa
                     { key: "delta", label: "环比", align: "right", sortValue: (r) => r.delta ?? -999, render: (r) => <StatusTag label={r.delta === null ? "-" : `${r.delta >= 0 ? "+" : ""}${(r.delta * 100).toFixed(1)}%`} tone={r.delta === null ? "muted" : r.delta >= 0 ? "green" : "red"} /> },
                   ]}
                 />
+    </Card>
+  );
+}
+
+function ReturnBreakdownTable({
+  title,
+  rows,
+  dimLabel,
+  emptyHint,
+}: {
+  title: string;
+  rows: ProductReturnDimensionBreakdownItem[];
+  dimLabel: string;
+  emptyHint?: string;
+}) {
+  return (
+    <Card title={title} className="mt-4">
+      <SortableTable
+        minWidth={920}
+        rowKey={(r) => r.dim}
+        rows={rows}
+        emptyHint={emptyHint}
+        columns={[
+          { key: "rank", label: "#", render: (_r, i) => <span className="text-[var(--muted)]">{i + 1}</span> },
+          { key: "dim", label: dimLabel, sortValue: (r) => r.dim, render: (r) => <span className="font-semibold">{r.dim}</span> },
+          { key: "refundAmount", label: "退货金额", align: "right", sortValue: (r) => r.refundAmount, render: (r) => <span className="font-semibold text-[var(--pink)]">{money(r.refundAmount)}</span> },
+          { key: "refundUnits", label: "退货数量", align: "right", sortValue: (r) => r.refundUnits, render: (r) => count(r.refundUnits) },
+          { key: "refundOrderCount", label: "退款订单数", align: "right", sortValue: (r) => r.refundOrderCount, render: (r) => count(r.refundOrderCount) },
+          { key: "refundOrderShare", label: "退款订单占比", align: "right", sortValue: (r) => r.refundOrderShare ?? -1, render: (r) => <StatusTag label={percent(r.refundOrderShare, 1)} tone={r.refundOrderShare !== null && r.refundOrderShare >= 0.15 ? "red" : "muted"} /> },
+          { key: "refundRate", label: "退货率", align: "right", sortValue: (r) => r.refundRate ?? 99, render: (r) => <StatusTag label={percent(r.refundRate)} tone={r.refundRate !== null && r.refundRate >= 0.1 ? "red" : "muted"} /> },
+          { key: "receivedAmount", label: "商家实收", align: "right", sortValue: (r) => r.receivedAmount, render: (r) => <span className="text-[var(--green)]">{money(r.receivedAmount)}</span> },
+                  ]}
+      />
     </Card>
   );
 }
@@ -333,7 +370,6 @@ export function ProductManagementPage({ onAction }: ProductManagementPageProps) 
   }
 
   const period = pm?.period;
-  const trendMax = pm ? Math.max(1, ...pm.dailyTrend.map((item) => item.receivedAmount)) : 1;
   const filterPeriod = dateRange ?? fullPeriod;
   const activeRangeLabel = dateRange ? `${dateRange.start} ~ ${dateRange.end}（已筛选）` : period ? `${period.start} ~ ${period.end}` : "尚未同步";
   const activeFilterCount = (dateRange ? 1 : 0) + statuses.length + channels.length + storeShortNames.length;
@@ -342,7 +378,7 @@ export function ProductManagementPage({ onAction }: ProductManagementPageProps) 
     <div>
       <PageHeader
         title="商品管理"
-        subtitle={`商品销售、毛利、退货与渠道分布；数据周期 ${activeRangeLabel}，最近刷新 ${dateTime(refreshedAt)}。`}
+        subtitle={`商品销售、履约、退货与渠道分布；数据周期 ${activeRangeLabel}，最近刷新 ${dateTime(refreshedAt)}。`}
         actions={
           <div className="product-filter-toolbar" data-testid="product-operations-filter">
             <div className="product-filter-kicker">
@@ -436,6 +472,10 @@ export function ProductManagementPage({ onAction }: ProductManagementPageProps) 
               { id: "channel", label: "渠道与达人" },
               { id: "daily", label: "每日订单分析" },
               { id: "fulfillment", label: "仓配履约" },
+              { id: "price", label: "价格结构" },
+              { id: "size", label: "尺寸结构" },
+              { id: "spu", label: "SPU 销量" },
+              { id: "custom", label: "定制结构" },
             ]}
           />
 
@@ -446,16 +486,39 @@ export function ProductManagementPage({ onAction }: ProductManagementPageProps) 
                   <MetricCard key={metric.label} metric={metric} />
                 ))}
               </div>
+              <Card title="各渠道商家实收与金额占比" className="mb-4">
+                {pm.channelBreakdown.length === 0 ? (
+                  <div className="py-6 text-center text-[12px] text-[var(--muted)]">当前筛选条件下暂无渠道数据</div>
+                ) : (
+                  <div className="flex flex-col gap-2.5">
+                    {(() => {
+                      const maxAmount = Math.max(...pm.channelBreakdown.map((x) => x.receivedAmount), 1);
+                      return [...pm.channelBreakdown]
+                        .sort((a, b) => b.receivedAmount - a.receivedAmount)
+                        .map((c) => (
+                          <div key={c.channel} className="grid grid-cols-[minmax(88px,140px)_1fr_auto] items-center gap-3">
+                            <span className="truncate text-[13px] font-semibold" title={c.channel}>{c.channel}</span>
+                            <TrendBar value={c.receivedAmount} max={maxAmount} />
+                            <span className="whitespace-nowrap text-[13px] tabular-nums">
+                              <span className="font-semibold text-[var(--green)]">{money(c.receivedAmount)}</span>
+                              <span className="ml-2 text-[var(--muted)]">{percent(c.amountShare, 1)}</span>
+                            </span>
+                          </div>
+                        ));
+                    })()}
+                  </div>
+                )}
+              </Card>
               {pm.monthlyComparison && (
                 <div className="mb-4">
                   <MonthlyComparisonCard comparison={pm.monthlyComparison} />
                 </div>
               )}
-              <Card title="单品明细分析（按产品名称，Top 100）">
+              <Card title="单品明细分析（按产品名称）">
                 <SortableTable
                   minWidth={1080}
                   rowKey={(r) => r.productName}
-                  rows={pm.productNameOverview.slice(0, 100)}
+                  rows={pm.productNameOverview}
                   columns={[
                     { key: "rank", label: "#", render: (_r, i) => <span className="text-[var(--muted)]">{i + 1}</span> },
                     { key: "productName", label: "产品名称", sortValue: (r) => r.productName, render: (r) => <span className="font-semibold">{r.productName}</span> },
@@ -466,8 +529,7 @@ export function ProductManagementPage({ onAction }: ProductManagementPageProps) 
                     { key: "grossMargin", label: "毛利率", align: "right", sortValue: (r) => r.grossMargin ?? -1, render: (r) => <StatusTag label={percent(r.grossMargin)} tone={r.grossMargin !== null && r.grossMargin >= 0.5 ? "green" : "muted"} /> },
                     { key: "refundAmount", label: "退货金额", align: "right", sortValue: (r) => r.refundAmount, render: (r) => <span className="text-[var(--pink)]">{money(r.refundAmount)}</span> },
                     { key: "refundRate", label: "退货率", align: "right", sortValue: (r) => r.refundRate ?? 99, render: (r) => <StatusTag label={percent(r.refundRate)} tone={r.refundRate !== null && r.refundRate >= 0.1 ? "red" : "muted"} /> },
-                    { key: "orderLines", label: "订单行", align: "right", sortValue: (r) => r.orderLines, render: (r) => count(r.orderLines) },
-                  ]}
+                                      ]}
                 />
               </Card>
               <Card title="渠道销售明细" className="mt-4">
@@ -484,8 +546,7 @@ export function ProductManagementPage({ onAction }: ProductManagementPageProps) 
                     { key: "grossMargin", label: "毛利率", align: "right", sortValue: (r) => r.grossMargin ?? -1, render: (r) => <StatusTag label={percent(r.grossMargin)} tone={r.grossMargin !== null && r.grossMargin >= 0.5 ? "green" : "muted"} /> },
                     { key: "refundAmount", label: "退货金额", align: "right", sortValue: (r) => r.refundAmount, render: (r) => <span className="text-[var(--pink)]">{money(r.refundAmount)}</span> },
                     { key: "refundRate", label: "退货率", align: "right", sortValue: (r) => r.refundRate ?? 99, render: (r) => <StatusTag label={percent(r.refundRate)} tone={r.refundRate !== null && r.refundRate >= 0.1 ? "red" : "muted"} /> },
-                    { key: "orderLines", label: "订单行", align: "right", sortValue: (r) => r.orderLines, render: (r) => count(r.orderLines) },
-                  ]}
+                                      ]}
                 />
               </Card>
               <Card title="床垫类别销售分析" className="mt-4">
@@ -497,12 +558,12 @@ export function ProductManagementPage({ onAction }: ProductManagementPageProps) 
                   columns={[
                     { key: "category", label: "床垫类别", sortValue: (r) => r.category, render: (r) => <span className="font-semibold">{r.category}</span> },
                     { key: "receivedAmount", label: "商家实收", align: "right", sortValue: (r) => r.receivedAmount, render: (r) => <span className="font-semibold text-[var(--green)]">{money(r.receivedAmount)}</span> },
+                    { key: "salesUnits", label: "销量", align: "right", sortValue: (r) => r.salesUnits, render: (r) => count(r.salesUnits) },
                     { key: "amountShare", label: "金额占比", align: "right", sortValue: (r) => r.amountShare, render: (r) => percent(r.amountShare, 1) },
                     { key: "grossMargin", label: "毛利率", align: "right", sortValue: (r) => r.grossMargin ?? -1, render: (r) => <StatusTag label={percent(r.grossMargin)} tone={r.grossMargin !== null && r.grossMargin >= 0.6 ? "green" : "muted"} /> },
                     { key: "refundAmount", label: "退货金额", align: "right", sortValue: (r) => r.refundAmount, render: (r) => <span className="text-[var(--pink)]">{money(r.refundAmount)}</span> },
                     { key: "refundRate", label: "退货率", align: "right", sortValue: (r) => r.refundRate ?? 99, render: (r) => <StatusTag label={percent(r.refundRate)} tone={r.refundRate !== null && r.refundRate >= 0.1 ? "red" : "muted"} /> },
-                    { key: "orderLines", label: "订单行", align: "right", sortValue: (r) => r.orderLines, render: (r) => count(r.orderLines) },
-                  ]}
+                                      ]}
                 />
               </Card>
               <Card className="mt-4 border-[var(--orange)]">
@@ -511,11 +572,11 @@ export function ProductManagementPage({ onAction }: ProductManagementPageProps) 
                   当前成本匹配覆盖 57.8% 的商品；未匹配商品显示“—”。
                 </div>
               </Card>
-              <Card title={`SKU 明细（按商品编码，Top 100）· 快照 ${pm.productOverview.length} 条`} className="mt-4">
+              <Card title={`SKU 明细（按商品编码）· 快照 ${pm.productOverview.length} 条`} className="mt-4">
                 <SortableTable
                   minWidth={1180}
                   rowKey={(r) => r.productCode}
-                  rows={pm.productOverview.slice(0, 100)}
+                  rows={pm.productOverview}
                   columns={[
                     { key: "rank", label: "#", render: (_r, i) => <span className="text-[var(--muted)]">{i + 1}</span> },
                     { key: "productName", label: "产品名称", sortValue: (r) => r.productName || "", render: (r) => <span className="font-semibold">{r.productName || "-"}</span> },
@@ -526,8 +587,7 @@ export function ProductManagementPage({ onAction }: ProductManagementPageProps) 
                     { key: "collectionRate", label: "回款率", align: "right", sortValue: (r) => r.collectionRate ?? -1, render: (r) => <StatusTag label={percent(r.collectionRate)} tone={r.collectionRate !== null && r.collectionRate >= 0.8 ? "green" : "orange"} /> },
                     { key: "refundAmount", label: "退货金额", align: "right", sortValue: (r) => r.refundAmount, render: (r) => <span className="text-[var(--pink)]">{money(r.refundAmount)}</span> },
                     { key: "refundRate", label: "退货率", align: "right", sortValue: (r) => r.refundRate ?? 99, render: (r) => <StatusTag label={percent(r.refundRate)} tone={r.refundRate !== null && r.refundRate >= 0.1 ? "red" : "muted"} /> },
-                    { key: "orderLines", label: "订单行", align: "right", sortValue: (r) => r.orderLines, render: (r) => count(r.orderLines) },
-                  ]}
+                                      ]}
                 />
               </Card>
             </>
@@ -540,26 +600,24 @@ export function ProductManagementPage({ onAction }: ProductManagementPageProps) 
                   minWidth={620}
                   rowKey={(r) => r.month}
                   rows={pm.monthlyTrend}
+                  defaultSortKey="month"
+                  defaultSortDir="desc"
                   columns={[
                     { key: "month", label: "月份", sortValue: (r) => r.month, render: (r) => <span className="font-medium">{r.month}</span> },
                     { key: "receivedAmount", label: "商家实收", align: "right", sortValue: (r) => r.receivedAmount, render: (r) => <span className="font-semibold text-[var(--green)]">{money(r.receivedAmount)}</span> },
+                    { key: "salesUnits", label: "销量", align: "right", sortValue: (r) => r.salesUnits, render: (r) => count(r.salesUnits) },
                     { key: "refundAmount", label: "退货金额", align: "right", sortValue: (r) => r.refundAmount, render: (r) => <span className="text-[var(--pink)]">{money(r.refundAmount)}</span> },
-                    { key: "orderLines", label: "订单行", align: "right", sortValue: (r) => r.orderLines, render: (r) => count(r.orderLines) },
-                  ]}
+                                      ]}
                 />
               </Card>
-              <Card title="每日商家实收趋势（近 400 天）· 按订单日期聚合实收 / 销售 / 退货金额" className="mt-4">
-                <SortableTable
-                  minWidth={820}
-                  rowKey={(r) => r.date}
-                  rows={pm.dailyTrend}
-                  columns={[
-                    { key: "date", label: "日期", sortValue: (r) => r.date, render: (r) => <span className="font-medium">{r.date}</span> },
-                    { key: "receivedAmount", label: "商家实收", align: "right", sortValue: (r) => r.receivedAmount, render: (r) => <span className="font-semibold text-[var(--green)]">{money(r.receivedAmount)}</span> },
-                    { key: "share", label: "占比", align: "right", sortValue: (r) => r.receivedAmount / trendMax, render: (r) => (<div className="w-[160px]"><TrendBar value={r.receivedAmount} max={trendMax} /><div className="text-[var(--muted)]">{((r.receivedAmount / trendMax) * 100).toFixed(0)}%</div></div>) },
-                    { key: "refundAmount", label: "退货金额", align: "right", sortValue: (r) => r.refundAmount, render: (r) => <span className="text-[var(--pink)]">{money(r.refundAmount)}</span> },
-                    { key: "orderLines", label: "订单行", align: "right", sortValue: (r) => r.orderLines, render: (r) => count(r.orderLines) },
-                  ]}
+              <Card title="每日经营趋势 · 商家实收 / 退货金额 / 退款金额占比" className="mt-4">
+                <DailyTrendChart
+                  data={pm.dailyTrend.map((r) => ({
+                    date: r.date,
+                    receivedAmount: r.receivedAmount,
+                    refundAmount: r.refundAmount,
+                    refundRate: r.receivedAmount > 0 ? r.refundAmount / r.receivedAmount : 0,
+                  }))}
                 />
               </Card>
               <Card title="产品分类分布" className="mt-4">
@@ -570,18 +628,19 @@ export function ProductManagementPage({ onAction }: ProductManagementPageProps) 
                   columns={[
                     { key: "category", label: "产品分类", sortValue: (r) => r.category, render: (r) => <span className="font-semibold">{r.category}</span> },
                     { key: "receivedAmount", label: "商家实收", align: "right", sortValue: (r) => r.receivedAmount, render: (r) => <span className="text-[var(--green)]">{money(r.receivedAmount)}</span> },
+                    { key: "salesUnits", label: "销量", align: "right", sortValue: (r) => r.salesUnits, render: (r) => count(r.salesUnits) },
                     { key: "refundAmount", label: "退货金额", align: "right", sortValue: (r) => r.refundAmount, render: (r) => <span className="text-[var(--pink)]">{money(r.refundAmount)}</span> },
-                    { key: "orderLines", label: "订单行", align: "right", sortValue: (r) => r.orderLines, render: (r) => count(r.orderLines) },
-                  ]}
+                                      ]}
                 />
               </Card>
             </>
           )}
 
           {tab === "returns" && (
-            <Card title="退货排名（按退货金额，Top 100）· 定位高退货商品，结合回款与售后复盘">
-              <SortableTable
-                  minWidth={920}
+            <>
+              <Card title="退货排名（按退货金额）· 定位高退货商品，结合回款与售后复盘">
+                <SortableTable
+                  minWidth={1040}
                   rowKey={(r) => r.productCode}
                   rows={pm.returnRanking}
                   columns={[
@@ -590,12 +649,18 @@ export function ProductManagementPage({ onAction }: ProductManagementPageProps) 
                     { key: "productCode", label: "商品编码", sortValue: (r) => r.productCode, render: (r) => <span className="text-[var(--muted)]">{r.productCode}</span> },
                     { key: "refundUnits", label: "退货数量", align: "right", sortValue: (r) => r.refundUnits, render: (r) => count(r.refundUnits) },
                     { key: "refundAmount", label: "退货金额", align: "right", sortValue: (r) => r.refundAmount, render: (r) => <span className="font-semibold text-[var(--pink)]">{money(r.refundAmount)}</span> },
+                    { key: "refundOrderCount", label: "退款订单数", align: "right", sortValue: (r) => r.refundOrderCount, render: (r) => count(r.refundOrderCount) },
+                    { key: "refundOrderShare", label: "退款订单占比", align: "right", sortValue: (r) => r.refundOrderShare ?? -1, render: (r) => <StatusTag label={percent(r.refundOrderShare, 1)} tone={r.refundOrderShare !== null && r.refundOrderShare >= 0.15 ? "red" : "muted"} /> },
                     { key: "refundRate", label: "退货率", align: "right", sortValue: (r) => r.refundRate ?? 99, render: (r) => <StatusTag label={percent(r.refundRate)} tone={r.refundRate !== null && r.refundRate >= 0.1 ? "red" : "orange"} /> },
                     { key: "receivedAmount", label: "商家实收", align: "right", sortValue: (r) => r.receivedAmount, render: (r) => <span className="text-[var(--green)]">{money(r.receivedAmount)}</span> },
-                    { key: "orderLines", label: "订单行", align: "right", sortValue: (r) => r.orderLines, render: (r) => count(r.orderLines) },
-                  ]}
+                                      ]}
                 />
-            </Card>
+              </Card>
+              <ReturnBreakdownTable title="渠道退货拆分 · 按退货金额排序" rows={pm.returnChannelBreakdown} dimLabel="渠道平台" />
+              <ReturnBreakdownTable title="店铺退货拆分 · 按退货金额排序" rows={pm.returnStoreBreakdown} dimLabel="店铺简称" />
+              <ReturnBreakdownTable title="达人退货拆分 · 按退货金额排序" rows={pm.returnDarenBreakdown} dimLabel="达人" emptyHint="该批次无达人关联订单" />
+              <ReturnBreakdownTable title="床垫类别退货拆分 · 按退货金额排序" rows={pm.returnCategoryBreakdown} dimLabel="床垫类别" emptyHint="产品主表未同步，无床垫类别数据" />
+            </>
           )}
 
           {tab === "channel" && (
@@ -608,9 +673,9 @@ export function ProductManagementPage({ onAction }: ProductManagementPageProps) 
                   columns={[
                     { key: "store", label: "店铺简称", sortValue: (r) => r.store, render: (r) => <span className="font-semibold">{r.store}</span> },
                     { key: "receivedAmount", label: "商家实收", align: "right", sortValue: (r) => r.receivedAmount, render: (r) => <span className="text-[var(--green)]">{money(r.receivedAmount)}</span> },
+                    { key: "salesUnits", label: "销量", align: "right", sortValue: (r) => r.salesUnits, render: (r) => count(r.salesUnits) },
                     { key: "refundAmount", label: "退货金额", align: "right", sortValue: (r) => r.refundAmount, render: (r) => <span className="text-[var(--pink)]">{money(r.refundAmount)}</span> },
-                    { key: "orderLines", label: "订单行", align: "right", sortValue: (r) => r.orderLines, render: (r) => count(r.orderLines) },
-                  ]}
+                                      ]}
                 />
               </Card>
               <Card title="达人贡献排名 · 按商家实收排序的带货达人" className="mt-4">
@@ -622,8 +687,8 @@ export function ProductManagementPage({ onAction }: ProductManagementPageProps) 
                   columns={[
                     { key: "daren", label: "达人", sortValue: (r) => r.daren, render: (r) => <span className="font-semibold">{r.daren}</span> },
                     { key: "receivedAmount", label: "商家实收", align: "right", sortValue: (r) => r.receivedAmount, render: (r) => <span className="text-[var(--green)]">{money(r.receivedAmount)}</span> },
-                    { key: "orderLines", label: "订单行", align: "right", sortValue: (r) => r.orderLines, render: (r) => count(r.orderLines) },
-                  ]}
+                    { key: "salesUnits", label: "销量", align: "right", sortValue: (r) => r.salesUnits, render: (r) => count(r.salesUnits) },
+                                      ]}
                 />
               </Card>
             </>
@@ -631,16 +696,16 @@ export function ProductManagementPage({ onAction }: ProductManagementPageProps) 
 
           {tab === "daily" && (
             <>
-              <Card title="床垫类别 × 渠道销量 · 对齐参考看板「每日订单数据表」">
+              <Card title="床垫类别 × 渠道销量">
                 <MatrixTable matrix={pm.categoryChannelMatrix} rowHeader="床垫类别" minWidth={960} />
               </Card>
               <Card title="发货仓 × 订单状态 销售数量" className="mt-4">
                 <MatrixTable matrix={pm.warehouseStatusMatrix} rowHeader="发货仓" minWidth={860} />
               </Card>
-              <Card title="每日渠道销量（近 30 天）· 日期 × 渠道" className="mt-4">
+              <Card title="每日渠道销量 · 日期 × 渠道销售数量" className="mt-4">
                 <MatrixTable matrix={pm.dailyChannelMatrix} rowHeader="日期" minWidth={960} />
               </Card>
-              <Card title="每日订单状态分布（近 30 天）· 日期 × 订单状态销售数量" className="mt-4">
+              <Card title="每日订单状态分布 · 日期 × 订单状态销售数量" className="mt-4">
                 <MatrixTable matrix={pm.dailyStatusMatrix} rowHeader="日期" minWidth={960} />
               </Card>
               <Card title="产品名称 × 渠道销量（Top 30）" className="mt-4">
@@ -676,6 +741,11 @@ export function ProductManagementPage({ onAction }: ProductManagementPageProps) 
               />
             </Card>
           )}
+
+          {tab === "price" && <PriceStructurePanel data={pm.priceStructure} />}
+          {tab === "size" && <SizeStructurePanel data={pm.sizeStructure} />}
+          {tab === "spu" && <SpuSalesTrendPanel data={pm.spuSalesTrend} />}
+          {tab === "custom" && <CustomizationStructurePanel data={pm.customizationStructure} />}
         </>
       )}
     </div>

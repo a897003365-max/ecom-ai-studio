@@ -16,6 +16,9 @@ const channelPerformance = readFileSync(new URL("../src/components/ChannelPerfor
 const funnel = readFileSync(new URL("../src/components/FunnelMini.tsx", import.meta.url), "utf8");
 const powerBiReplica = readFileSync(new URL("../src/components/PowerBiReplica.tsx", import.meta.url), "utf8");
 const styles = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8");
+const integration = readFileSync(new URL("../src/types/integration.ts", import.meta.url), "utf8");
+const channelSnapshot = readFileSync(new URL("../src/utils/channelSnapshot.ts", import.meta.url), "utf8");
+const dingtalkApi = readFileSync(new URL("../server/dingtalk-api.mjs", import.meta.url), "utf8");
 
 assert.doesNotMatch(app, /showStoreSelector=/, "顶部不应再按页面显示店铺选择器");
 assert.doesNotMatch(topbar, /床垫旗舰店（天猫）/, "全站顶部不应保留固定天猫店铺入口");
@@ -28,6 +31,14 @@ assert.doesNotMatch(productManagement, /label: "销售金额"/, "商品管理不
 assert.doesNotMatch(productManagement, /实发金额|实发量|实发数量/, "商品管理仍展示实发金额或实发量字段");
 assert.doesNotMatch(productManagement, /dailyWarehouseMatrix/, "商品管理仍展示每日工厂出货量矩阵");
 assert.match(productManagement, /id: "fulfillment", label: "仓配履约"/, "商品管理缺少仓配履约页");
+assert.match(productManagement, /id: "price", label: "价格结构"/, "商品管理缺少价格结构页签");
+assert.match(productManagement, /id: "size", label: "尺寸结构"/, "商品管理缺少尺寸结构页签");
+assert.match(productManagement, /id: "spu", label: "SPU 销量"/, "商品管理缺少 SPU 销量页签");
+assert.match(productManagement, /id: "custom", label: "定制结构"/, "商品管理缺少定制结构页签");
+assert.match(productManagement, /PriceStructurePanel/, "商品管理未接入价格结构面板");
+assert.match(productManagement, /SizeStructurePanel/, "商品管理未接入尺寸结构面板");
+assert.match(productManagement, /SpuSalesTrendPanel/, "商品管理未接入 SPU 销量面板");
+assert.match(productManagement, /CustomizationStructurePanel/, "商品管理未接入定制结构面板");
 assert.match(productManagement, /平均发货时效/, "仓配履约页缺少平均发货时效指标");
 assert.match(productManagement, /第3天发货占比/, "仓配履约页缺少第3天发货占比指标");
 assert.match(localApi, /channels\?: string\[\]/, "商品接口缺少渠道平台筛选参数");
@@ -38,7 +49,7 @@ assert.match(analytics, /data-testid="comparison-ticker"/, "页面缺少渠道�
 assert.match(analytics, /每日同步计划/, "页面未显示钉钉固定同步计划");
 assert.match(analytics, /最近同步/, "页面未显示钉钉最近实际同步时间");
 assert.doesNotMatch(analytics, /月度指标沿用/, "标题仍显示冗余的月度公式依赖说明");
-assert.match(analytics, /aria-label="筛选图表渠道"/, "月度概览缺少渠道下拉筛选");
+assert.match(analytics, /aria-label="筛选全局渠道"/, "缺少全局渠道下拉筛选");
 assert.match(analytics, /selectedChannel=/, "渠道筛选未传递到月度图表");
 assert.match(revenueChart, /selectedChannel/, "渠道回款图未实现渠道联动");
 assert.doesNotMatch(monthlyOverview, /数据来源：共享表格/, "月度概览仍显示无助于读数的来源注释");
@@ -47,6 +58,15 @@ assert.doesNotMatch(analytics, /经营比率趋势/, "旧经营比率趋势模�
 assert.match(analytics, /ExecutiveCommerceOverview/, "默认经营概览尚未切换为全渠道首屏");
 assert.match(executive, /data-testid="executive-commerce-overview"/, "缺少全渠道经营总览容器");
 assert.match(executive, /目标进度带（去年同期回款节奏）/, "目标进度带未使用去年同期逐日回款节奏");
+// 切渠道时目标进度带应跟随：服务端暴露渠道级目标 + 去年同期逐日渠道拆分，前端按渠道重算 monthlyOverview
+assert.match(integration, /monthlyTargetsByPlatform/, "reporting 类型应暴露渠道级月度目标 monthlyTargetsByPlatform");
+assert.match(integration, /priorYearDailyChannels/, "DingTalkMonthlyOverview 应含渠道级去年同期逐日 priorYearDailyChannels");
+assert.match(channelSnapshot, /buildChannelMonthlyOverview/, "切渠道时应通过 buildChannelMonthlyOverview 重算 monthlyOverview");
+assert.match(channelSnapshot, /monthlyTargetsByPlatform/, "切渠道应读取 monthlyTargetsByPlatform 取该渠道月度目标");
+assert.match(channelSnapshot, /priorYearDailyChannels/, "切渠道应从 priorYearDailyChannels 取该渠道去年同期节奏");
+assert.match(dingtalkApi, /byPlatformByMonth/, "parseTargets 应产出全月份渠道级目标 byPlatformByMonth");
+assert.match(dingtalkApi, /priorYearDailyChannels/, "buildMonthlyOverview 应产出 priorYearDailyChannels 供前端切渠道");
+assert.match(dingtalkApi, /monthlyTargetsByPlatform:/, "buildDingTalkSnapshot 应暴露 monthlyTargetsByPlatform");
 assert.match(executive, /data-testid="revenue-quality-bridge"/, "缺少回款质量拆解");
 assert.match(executive, /data-testid="executive-channel-quality"/, "缺少渠道贡献与回款质量");
 assert.match(executive, /data-testid="executive-category-performance"/, "缺少核心品类经营模块");

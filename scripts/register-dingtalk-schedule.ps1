@@ -1,9 +1,26 @@
 param(
   [string]$TaskName = "EcomAIStudio-DingTalk-Sync",
-  [string[]]$Times = @("10:00", "12:30", "17:30")
+  [string[]]$Times
 )
 
 $ErrorActionPreference = "Stop"
+
+# Read DINGTALK_SYNC_TIMES from the registry by default so the scheduled task
+# stays in sync with dingtalk-api.mjs scheduleTimes() (the single source of truth).
+if (-not $Times) {
+  $envValue = $null
+  try {
+    $envValue = (Get-ItemProperty -Path 'HKCU:\Environment' -Name DINGTALK_SYNC_TIMES -ErrorAction Stop).DINGTALK_SYNC_TIMES
+  } catch {
+    $envValue = $null
+  }
+  if ($envValue) {
+    $Times = $envValue -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ }
+  } else {
+    $Times = @("10:30", "13:00", "17:30")
+  }
+}
+
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $scriptPath = Join-Path $PSScriptRoot "sync-dingtalk.mjs"
 $nodePath = (Get-Command node -ErrorAction Stop).Source

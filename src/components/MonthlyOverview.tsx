@@ -1,10 +1,8 @@
 import { CircleGauge, Target } from "lucide-react";
 import type { DingTalkMonthlyOverview } from "../types/integration";
-import { ChannelRevenueChart } from "./ChannelRevenueChart";
 
 interface MonthlyOverviewProps {
   overview: DingTalkMonthlyOverview;
-  selectedChannel: string;
 }
 
 const compactMoney = new Intl.NumberFormat("zh-CN", { style: "currency", currency: "CNY", notation: "compact", maximumFractionDigits: 1 });
@@ -17,7 +15,7 @@ function percent(value: number | null) {
   return value === null ? "—" : `${(value * 100).toFixed(2)}%`;
 }
 
-export function MonthlyOverview({ overview, selectedChannel }: MonthlyOverviewProps) {
+export function MonthlyOverview({ overview }: MonthlyOverviewProps) {
   const { metrics } = overview;
   return (
     <div className="monthly-overview-grid">
@@ -42,7 +40,6 @@ export function MonthlyOverview({ overview, selectedChannel }: MonthlyOverviewPr
           <div className="monthly-target-track"><i style={{ width: `${Math.min(100, Math.max(0, metrics.completionRate * 100))}%` }} /></div>
         </div>
       </div>
-      <ChannelRevenueChart overview={overview} selectedChannel={selectedChannel} />
     </div>
   );
 }

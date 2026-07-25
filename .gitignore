@@ -17,5 +17,6 @@ __pycache__/
 
 # Local verification artifacts and licensed/raw reference workbooks stay outside Git.
 .playwright-cli/
+.playwright-mcp/
 output/
 参考文件/

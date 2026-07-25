@@ -24,7 +24,7 @@ function requiredConfig() {
 }
 
 function scheduleTimes() {
-  return readLocalEnv("DINGTALK_SYNC_TIMES", "10:00,12:30,17:30")
+  return readLocalEnv("DINGTALK_SYNC_TIMES", "10:30,13:00,17:30")
     .split(",")
     .map((value) => value.trim())
     .filter((value) => /^\d{2}:\d{2}$/.test(value));
@@ -342,7 +342,7 @@ function parseSummarySheet(rows) {
 
 function parseTargets(rows, selectedDate) {
   const headerIndex = rows.findIndex((row) => row.map(normalizedHeader).includes("渠道") && row.map(normalizedHeader).includes("店铺"));
-  if (headerIndex < 0) return { byPlatform: new Map(), total: 0, monthlyTotals: {}, targetYears: [] };
+  if (headerIndex < 0) return { byPlatform: new Map(), total: 0, monthlyTotals: {}, targetYears: [], byPlatformByMonth: {} };
   const headers = rows[headerIndex].map(textValue);
   const monthColumns = headers
     .map((value, index) => {
@@ -351,7 +351,7 @@ function parseTargets(rows, selectedDate) {
     })
     .filter(Boolean);
   const totalRowIndex = rows.findIndex((row, index) => index > headerIndex && /总计|合计/.test(textValue(row[0])));
-  if (totalRowIndex < 0 || !monthColumns.length) return { byPlatform: new Map(), total: 0, monthlyTotals: {}, targetYears: [] };
+  if (totalRowIndex < 0 || !monthColumns.length) return { byPlatform: new Map(), total: 0, monthlyTotals: {}, targetYears: [], byPlatformByMonth: {} };
 
   const targetMonthByColumn = new Map();
   const alignedYears = [];
@@ -380,21 +380,31 @@ function parseTargets(rows, selectedDate) {
     if (targetMonth && !isBlank(totalRow[column.index])) monthlyTotals[targetMonth] = numberValue(totalRow[column.index]);
   }
 
+  // 渠道级月度目标：按月份列遍历数据行，聚合到 platform，key 与 monthlyTotals 对齐（YYYY-MM）。
+  // 供前端切渠道时取该渠道当月目标，避免用全渠道目标覆盖单渠道。
+  const byPlatformByMonth = {};
+  const dataRows = rows.slice(headerIndex + 1, totalRowIndex);
+  for (const column of monthColumns) {
+    const targetMonth = targetMonthByColumn.get(column.index);
+    if (!targetMonth || isBlank(totalRow[column.index])) continue;
+    const platformMap = {};
+    for (const row of dataRows) {
+      const label = textValue(row[0]);
+      if (!label) continue;
+      const platform = platformName(label);
+      platformMap[platform] = (platformMap[platform] || 0) + numberValue(row[column.index]);
+    }
+    byPlatformByMonth[targetMonth] = platformMap;
+  }
+
   const selectedMonth = String(selectedDate || "").slice(0, 7);
   const selectedColumn = monthColumns.find((column) => targetMonthByColumn.get(column.index) === selectedMonth);
   const targetYears = [...new Set(Object.keys(monthlyTotals).map((month) => month.slice(0, 4)))].sort();
-  if (!selectedColumn || !(selectedMonth in monthlyTotals)) return { byPlatform: new Map(), total: 0, monthlyTotals, targetYears };
+  if (!selectedColumn || !(selectedMonth in monthlyTotals)) return { byPlatform: new Map(), total: 0, monthlyTotals, targetYears, byPlatformByMonth };
 
-  const byPlatform = new Map();
-  for (const row of rows.slice(headerIndex + 1, totalRowIndex)) {
-    const label = textValue(row[0]);
-    if (!label) continue;
-    const value = numberValue(row[selectedColumn.index]);
-    const platform = platformName(label);
-    byPlatform.set(platform, (byPlatform.get(platform) || 0) + value);
-  }
+  const byPlatform = new Map(Object.entries(byPlatformByMonth[selectedMonth] || {}));
   const total = numberValue(totalRow[selectedColumn.index]);
-  return { byPlatform, total, monthlyTotals, targetYears };
+  return { byPlatform, total, monthlyTotals, targetYears, byPlatformByMonth };
 }
 
 function detailMetricIndexes(headers) {
@@ -643,6 +653,20 @@ function buildMonthlyOverview(snapshot, end) {
   const channelOrder = aggregateMetricRows(platformRows, ["platform"])
     .sort((left, right) => right.netRevenue - left.netRevenue)
     .map((row) => row.platform);
+  // 渠道级去年同期逐日回款：去年行同样按 platformName 归一，再用与 daily 一致的 channelOrder 对齐，
+  // 供前端切渠道时重算目标进度带，避免前端无法从日期筛选后的 dailyPlatforms 重算去年同期。
+  const priorYearPlatformRows = priorYearRows.map((row) => ({ ...row, platform: platformName(row.platform) }));
+  const priorYearDayPlatformMap = new Map(
+    aggregateMetricRows(priorYearPlatformRows, ["date", "platform"])
+      .map((row) => [`${row.date} ${row.platform}`, Number(row.netRevenue || 0)]),
+  );
+  const priorYearDailyChannels = dateSequence(priorStart, priorMonthEnd).map((date) => ({
+    date,
+    channels: channelOrder.map((platform) => ({
+      platform,
+      netRevenue: Number(priorYearDayPlatformMap.get(`${date} ${platform}`) || 0),
+    })),
+  }));
   const dayMap = new Map(aggregateMetricRows(platformRows, ["date", "platform"])
     .map((row) => [`${row.date}\u0000${row.platform}`, row]));
   const daily = dateSequence(start, end).map((date) => {
@@ -660,6 +684,7 @@ function buildMonthlyOverview(snapshot, end) {
     daily,
     priorYearDaily,
     priorYearFullMonthNetRevenue,
+    priorYearDailyChannels,
     source: sourceSummary ? "全渠道数据表第2-3行及其跨表依赖" : "按筛选结束日期重算的跨渠道日明细",
   };
 }
@@ -769,6 +794,8 @@ export function filterDingTalkSnapshot(snapshot, range = {}) {
       availablePeriod: snapshot.reporting.availablePeriod,
       completedThrough: snapshot.reporting.completedThrough,
       selectedPeriod: period,
+      dailyPlatforms: platformDaily,
+      monthlyTargetsByPlatform: snapshot.reporting.monthlyTargetsByPlatform,
       monthlyOverview: buildMonthlyOverview(snapshot, period.end),
       monthlyAchievement: buildMonthlyAchievement(snapshot, period.end),
       metricTrends: buildMetricTrends(snapshot, period),
@@ -837,6 +864,7 @@ export function buildDingTalkSnapshot(sheets) {
       dailyStores,
       dailyOffsiteSpend,
       monthlyTargets: targets.monthlyTotals,
+      monthlyTargetsByPlatform: targets.byPlatformByMonth,
       targetYears: targets.targetYears,
       formulaLineage: {
         summary: "全渠道数据表!A2:I3 → C53/E53/F53/G53/H53/L57",

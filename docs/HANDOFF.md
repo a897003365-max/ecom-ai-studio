@@ -1,6 +1,6 @@
 # ecom AI Studio 交接文档
 
-更新时间：2026-07-16  
+更新时间：2026-07-25  
 项目路径：E:\Github\ecom-ai-studio
 
 ## 1. 服务与入口
@@ -27,7 +27,7 @@
 
 - Windows 任务：EcomAIStudio-DingTalk-Sync。
 - 任务属性：Ready、S4U、Limited、StartWhenAvailable、IgnoreNew、网络可用、失败重试 3 次、重试间隔 10 分钟。
-- 执行时间：10:00、12:30、17:30（Asia/Shanghai）。
+- 执行时间：10:30、13:00、17:30（Asia/Shanghai）。
 - 2026-07-14 06:03:50 启动的同步在 06:09:32 成功，读取 19 张表、7669 条记录。
 - 健康状态文件：local-data/runtime/dingtalk-sync-health.json。
 - 运行日志：local-data/logs/dingtalk-sync.log。
@@ -54,6 +54,10 @@
 - 推广费用明细和商品推广费用页面已接入商品缩略图；商品行高和字体已按可读性要求调整。
 - 运营分层视图已通过 `/api/analytics -> warehouse.dashboard` 接入本地数仓：访客、成交客户、支付转化、加购、客单价、件单价和推广 ROI 均为快照聚合值。
 - 数仓同比/环比按相同筛选区间平移计算；对比期超出快照覆盖范围时返回 null，前端显示 `—`，不再生成随机 MOCK。
+
+- 2026-07-25 商品经营明细字段补齐：新增「国补后金额(万)」「销额占比」「国补后金额同比」「国补后费比」列；原「商品费比」（分母为支付金额）由「国补后费比」（`花费 / ((支付−退款)×0.85)`）替换。国补后金额、销额占比、国补后费比为前端纯派生；国补后金额同比由 `_build_powerbi_pages` 新增的 `product_daily_prior_year` 查询提供（窗口 `period_start−365 ~ period_end−365`，对齐 .pbix `DATEADD(-365, DAY)`），缺失时前端降级「数据不足」。
+- catalog 内部 `07-旗舰店商品销售数据` 映射到 `model_q08_*` 视图（query 清单编号与文件名编号不一致，属正常）；warehouse.py 用 query_name 查 `warehouse_query_catalog` 取视图，对账脚本 `scripts/audit-product-subsidized-yoy.py` 同样走 catalog，不要按 `model_q07_*` 表名硬查。
+- 完整方案与对账数据见 `docs/POWERBI-PRODUCT-TABLE-FIELD-GAP-PLAN.md`；本次对账确认 07 表覆盖 2024-08-17 ~ 2026-07-24，去年同期 138 商品 = 快照 productDailyPriorYear 138 商品。
 
 ## 4.1 分层视图图表
 
@@ -98,17 +102,20 @@
 
 以下命令在 2026-07-16 通过：npm run build、npm run test:auth、npm run test:analytics-dashboard、npm run test:smoke、npm run test:dingtalk-api、npm run test:dingtalk-unattended、npm run test:powerbi-images、npm run test:powerbi-replica、npm run test:dashboard-ui、npm run test:select-theme、npm run test:analytics-sync、npm run test:public-surface、python -m unittest discover -s pipeline/tests -v、git diff --check。
 
+2026-07-25 增量验证：`npx tsc --noEmit`、`node scripts/sync-warehouse.mjs`、`python scripts/audit-product-subsidized-yoy.py`、`node scripts/test-powerbi-replica-contract.mjs` 均通过。
+
 当前 `npm run test:ux-polish` 有一个既存的过期文案断言：它要求商品管理页出现“商品销售、履约、退货与渠道分布”，而当前页面已经移除该句。目标年份、漏斗和无人值守相关测试均通过。
 
 ## 8. 接手前检查
 
-1. 访问 /api/health，确认 dingtalk healthy、schedule 为 10:00,12:30,17:30。
+1. 访问 /api/health，确认 dingtalk healthy、schedule 为 10:30,13:00,17:30。
 2. 确认 Windows 任务 EcomAIStudio-DingTalk-Sync 的 LastResult 为 0。
 3. 保留 local-data/runtime/dingtalk-sync-health.json 和 local-data/logs/dingtalk-sync.log，勿将它们清理为“临时文件”。
 4. 检查 MaterialId、ContentId、SKU 的映射是否仍与 PowerBI 快照一致。
 5. Intelligence 上传、目录监视和真实 Vision 长任务仍是待实施项。
 6. 本地默认免登录；上线设置 `AUTH_ENFORCEMENT_ENABLED=1` 后，首次启动若出现管理员初始化页属于预期。不要在仓库、日志或交接文档记录实际账号密码。
 7. 工作区保留用户已有未提交改动；本次没有执行 reset、checkout 或提交。
+8. 商品经营明细「国补后金额同比」依赖 07 表覆盖去年同期（当前 07 表覆盖 2024-08-17 ~ 2026-07-24）；可跑 `python scripts/audit-product-subsidized-yoy.py` 复核数据通道，若同比列显示「数据不足」说明该商品去年未上架或源数据未覆盖，属预期降级。
 
 ## 9. 残余风险
 
