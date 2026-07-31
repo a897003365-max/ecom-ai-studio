@@ -2,13 +2,22 @@ from __future__ import annotations
 
 import sys
 import unittest
+from datetime import date
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
 
 import duckdb
+import polars as pl
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from ecom_pipeline.warehouse import _build_powerbi_pages  # noqa: E402
+from ecom_pipeline.config import WarehousePaths  # noqa: E402
+from ecom_pipeline.warehouse import (  # noqa: E402
+    _build_powerbi_pages,
+    _load_pbix_store_rank_daily,
+    _store_rank_sort_key,
+)
 
 
 class PowerBiDailyCoreTests(unittest.TestCase):
@@ -25,7 +34,6 @@ class PowerBiDailyCoreTests(unittest.TestCase):
         self.connection.executemany(
             "INSERT INTO warehouse_query_catalog VALUES (?, ?)",
             [
-                ("00-月表汇总", "summary_model"),
                 ("04-旗舰店基础数据", "base_model"),
                 ("05-旗舰店ID对照表", "catalog_model"),
                 ("07-旗舰店商品销售数据", "product_model"),
@@ -139,30 +147,36 @@ class PowerBiDailyCoreTests(unittest.TestCase):
                 ("p2", "补差价专拍", "P2", None, 5, 50),
             ],
         )
-        self.connection.execute(
-            """
-            CREATE TABLE summary_model (
-              "日期" DATE,
-              "店铺" VARCHAR,
-              "渠道" VARCHAR,
-              "店铺排名" VARCHAR
-            )
-            """
-        )
-        self.connection.executemany(
-            "INSERT INTO summary_model VALUES (?, ?, ?, ?)",
-            [
-                ("2026-07-01", "麻大师旗舰店", "淘系", "2"),
-                ("2026-07-01", "麻大师旗舰店", "淘宝", "3"),
-                ("2026-07-01", "其他店铺", "淘系", "1"),
-            ],
-        )
-
     def tearDown(self) -> None:
         self.connection.close()
 
+    def test_store_rank_uses_pbix_numeric_min_order(self) -> None:
+        self.assertLess(_store_rank_sort_key("2"), _store_rank_sort_key("10"))
+
+    def test_store_rank_loader_reads_pbix_store_rank_not_search_rank(self) -> None:
+        frame = pl.DataFrame(
+            {
+                "日期": [date(2026, 7, 1), date(2026, 7, 1)],
+                "店铺": ["麻大师旗舰店", "麻大师旗舰店"],
+                "渠道": ["淘系", "淘宝"],
+                "店铺排名": [10, 5],
+                "搜索排名数": [2, 26],
+            }
+        )
+        spec = SimpleNamespace(name="00-月表汇总", source_paths=["unused"])
+        paths = WarehousePaths.discover()
+        with (
+            patch("ecom_pipeline.warehouse.load_catalog", return_value=(None, [spec])),
+            patch("ecom_pipeline.warehouse.discover_files", return_value=[Path("source.xlsx")]),
+            patch("ecom_pipeline.warehouse.read_source_file", return_value=object()),
+            patch("ecom_pipeline.warehouse.transform_source_file", return_value=frame),
+        ):
+            ranks = _load_pbix_store_rank_daily(paths)
+
+        self.assertEqual(ranks, {"2026-07-01": "5"})
+
     def test_daily_core_matches_pbix_sources_and_dax_formulas(self) -> None:
-        pages = _build_powerbi_pages(self.connection)
+        pages = _build_powerbi_pages(self.connection, {"2026-07-01": "2"})
 
         self.assertIn("dailyCore", pages)
         self.assertEqual(len(pages["dailyCore"]), 1)
@@ -173,6 +187,8 @@ class PowerBiDailyCoreTests(unittest.TestCase):
         self.assertEqual(row["day"], "01")
         self.assertEqual(row["productVisitors"], 150)
         self.assertEqual(row["addToCart"], 15)
+        self.assertEqual(row["payBuyers"], 5)
+        self.assertEqual(row["promotionCarts"], 10)
         self.assertAlmostEqual(row["addToCartRate"], 0.1)
         self.assertAlmostEqual(row["addToCartCost"], 50)
         self.assertEqual(row["payAmount"], 21_000)
