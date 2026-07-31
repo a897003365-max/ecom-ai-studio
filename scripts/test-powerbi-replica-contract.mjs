@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { buildDailyCoreHierarchy } from "../src/components/powerBiDailyCoreHierarchy.ts";
+import { buildDailyCoreHierarchy, pbixDefaultDailyCoreExpansion } from "../src/components/powerBiDailyCoreHierarchy.ts";
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -62,6 +62,14 @@ const hierarchyRows = [
   { date: "2026-07-01", year: "2026", month: "07月", day: "01", productVisitors: 100, addToCart: 10, payBuyers: 4, promotionCarts: 5, addToCartRate: 0.1, addToCartCost: 60, payAmount: 20_000, paidUnits: 6, conversionRate: 0.04, refundAmount: 2_000, refundRate: 0.1, spend: 300, subsidizedAmount: 15_300, subsidizedFeeRate: 300 / 15_300, storeRank: "10" },
   { date: "2026-07-02", year: "2026", month: "07月", day: "02", productVisitors: 50, addToCart: 5, payBuyers: 1, promotionCarts: 5, addToCartRate: 0.1, addToCartCost: 40, payAmount: 1_000, paidUnits: 1, conversionRate: 0.02, refundAmount: 100, refundRate: 0.1, spend: 200, subsidizedAmount: 765, subsidizedFeeRate: 200 / 765, storeRank: "2" },
 ];
+const multiScopeRows = [
+  ...hierarchyRows,
+  { ...hierarchyRows[0], date: "2026-06-30", month: "06月", day: "30" },
+  { ...hierarchyRows[0], date: "2027-01-01", year: "2027", month: "01月", day: "01" },
+];
+const defaultExpansion = pbixDefaultDailyCoreExpansion(multiScopeRows);
+assert([...defaultExpansion.years].join(",") === "2026", "PBIX 默认展开态只应展开保存的 2026 年节点");
+assert([...defaultExpansion.months].join(",") === "2026|07月", "PBIX 默认展开态只应展开保存的 2026/07 月节点");
 const expandedHierarchy = buildDailyCoreHierarchy(hierarchyRows, new Set(["2026"]), new Set(["2026|07月"]));
 assert(expandedHierarchy.length === 2 && expandedHierarchy.every((row) => row.hierarchyLevel === "day"), "PBIX 默认展开状态应只显示日明细，不插入年月小计行");
 assert(expandedHierarchy[0].showYear && expandedHierarchy[0].showMonth && !expandedHierarchy[1].showYear && !expandedHierarchy[1].showMonth, "Tabular 年月标签未按 PBIX 层级只在首行显示");
