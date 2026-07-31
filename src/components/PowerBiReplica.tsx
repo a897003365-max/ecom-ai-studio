@@ -9,7 +9,7 @@ import type {
   WarehouseSnapshot,
 } from "../types/integration";
 import { clsx } from "../utils/format";
-import { buildDailyCoreHierarchy, type DailyCoreHierarchyRow } from "./powerBiDailyCoreHierarchy";
+import { buildDailyCoreHierarchy, pbixDefaultDailyCoreExpansion, type DailyCoreHierarchyRow } from "./powerBiDailyCoreHierarchy";
 
 type Workspace = "overview" | "diagnosis";
 type ReplicaPage = "overall" | "promotion" | "product";
@@ -526,12 +526,16 @@ function OverallPage({ pages, start, end }: { pages: PowerBiPages; start: string
   };
   const sortedDaily = sortRows(dailyCore, dailySort.sortKey, dailySort.sortDir, dailyAccessors);
   const hierarchyScopeKey = [...new Set(dailyCore.map((row) => `${row.year}|${row.month}`))].sort().join(",");
-  const [expandedYears, setExpandedYears] = useState<Set<string>>(() => new Set(dailyCore.map((row) => row.year)));
-  const [expandedMonths, setExpandedMonths] = useState<Set<string>>(() => new Set(dailyCore.map((row) => `${row.year}|${row.month}`)));
+  const [expandedYears, setExpandedYears] = useState<Set<string>>(() => pbixDefaultDailyCoreExpansion(dailyCore).years);
+  const [expandedMonths, setExpandedMonths] = useState<Set<string>>(() => pbixDefaultDailyCoreExpansion(dailyCore).months);
   useEffect(() => {
-    const scopedMonths = hierarchyScopeKey ? hierarchyScopeKey.split(",") : [];
-    setExpandedYears(new Set(scopedMonths.map((key) => key.split("|", 1)[0])));
-    setExpandedMonths(new Set(scopedMonths));
+    const scope = hierarchyScopeKey ? hierarchyScopeKey.split(",").map((key) => {
+      const [year, month] = key.split("|");
+      return { year, month };
+    }) : [];
+    const defaultExpansion = pbixDefaultDailyCoreExpansion(scope);
+    setExpandedYears(defaultExpansion.years);
+    setExpandedMonths(defaultExpansion.months);
   }, [hierarchyScopeKey]);
   const dailyHierarchyRows = buildDailyCoreHierarchy(sortedDaily, expandedYears, expandedMonths);
   const hierarchyStateKey = `${[...expandedYears].sort().join(",")}|${[...expandedMonths].sort().join(",")}`;

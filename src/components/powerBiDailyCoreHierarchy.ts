@@ -29,6 +29,25 @@ export interface DailyCoreHierarchyRow extends DailyCoreDatum {
   showMonth: boolean;
 }
 
+export interface DailyCoreExpansion {
+  years: Set<string>;
+  months: Set<string>;
+}
+
+const PBIX_SAVED_EXPANDED_YEARS = ["2026"];
+const PBIX_SAVED_EXPANDED_MONTHS = ["2026|07月"];
+
+export function pbixDefaultDailyCoreExpansion(
+  rows: Array<Pick<DailyCoreDatum, "year" | "month">>,
+): DailyCoreExpansion {
+  const availableYears = new Set(rows.map((row) => row.year));
+  const availableMonths = new Set(rows.map((row) => `${row.year}|${row.month}`));
+  return {
+    years: new Set(PBIX_SAVED_EXPANDED_YEARS.filter((year) => availableYears.has(year))),
+    months: new Set(PBIX_SAVED_EXPANDED_MONTHS.filter((month) => availableMonths.has(month))),
+  };
+}
+
 function divide(numerator: number, denominator: number): number | null {
   return denominator ? numerator / denominator : null;
 }
