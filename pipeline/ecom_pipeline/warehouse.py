@@ -439,7 +439,64 @@ def _source_view(connection: duckdb.DuckDBPyConnection, query_name: str) -> str:
     return _quote_identifier(row[0])
 
 
-def _build_powerbi_pages(connection: duckdb.DuckDBPyConnection) -> dict[str, Any]:
+def _store_rank_text(value: Any) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, float) and value.is_integer():
+        return str(int(value))
+    text = str(value).strip()
+    return text if text and text.lower() not in {"nan", "none"} else None
+
+
+def _store_rank_sort_key(value: str) -> tuple[int, float | str]:
+    """Match the PBIX numeric MIN while retaining a deterministic text fallback."""
+
+    try:
+        return (0, float(value.replace(",", "")))
+    except ValueError:
+        return (1, value)
+
+
+def _load_pbix_store_rank_daily(paths: WarehousePaths) -> dict[str, str]:
+    """Read only PBIX 店铺排名 from excluded 00 source without creating a warehouse view.
+
+    00-月表汇总 remains excluded because DingTalk owns its overlapping business metrics.
+    店铺排名 is the one PBIX matrix field not covered by DingTalk, so it is read
+    ephemerally and never persisted with the overlapping GMV/refund/spend columns.
+    """
+
+    _, specs = load_catalog(paths.manifest)
+    spec = next((item for item in specs if item.name == "00-月表汇总"), None)
+    if spec is None:
+        raise ValueError("PBIX manifest 缺少 00-月表汇总，无法读取店铺排名")
+
+    ranks: dict[str, str] = {}
+    for source in discover_files(spec.source_paths):
+        frame = transform_source_file(read_source_file(source, spec), spec, source)
+        required = {"日期", "店铺", "渠道", "店铺排名"}
+        missing = required - set(frame.columns)
+        if missing:
+            raise ValueError(f"00-月表汇总缺少店铺排名字段：{', '.join(sorted(missing))}")
+        for row in frame.select(sorted(required)).iter_rows(named=True):
+            if str(row.get("店铺") or "").strip() != "麻大师旗舰店":
+                continue
+            if str(row.get("渠道") or "").strip() not in {"淘系", "淘宝"}:
+                continue
+            day = row.get("日期")
+            rank = _store_rank_text(row.get("店铺排名"))
+            if day is None or rank is None:
+                continue
+            day_key = day.isoformat() if isinstance(day, (date, datetime)) else str(day)[:10]
+            current = ranks.get(day_key)
+            if current is None or _store_rank_sort_key(rank) < _store_rank_sort_key(current):
+                ranks[day_key] = rank
+    return ranks
+
+
+def _build_powerbi_pages(
+    connection: duckdb.DuckDBPyConnection,
+    store_rank_daily: dict[str, str] | None = None,
+) -> dict[str, Any]:
     """Build compact daily aggregates for the three PBIX-derived website pages."""
 
     base_view = _model_view(connection, "04-旗舰店基础数据")
@@ -467,6 +524,7 @@ def _build_powerbi_pages(connection: duckdb.DuckDBPyConnection) -> dict[str, Any
             "source": "powerbi_local_logic",
             "period": None,
             "overallDaily": [],
+            "dailyCore": [],
             "productDaily": [],
             "productDailyPriorYear": [],
             "promotionSceneDaily": [],
@@ -510,6 +568,101 @@ def _build_powerbi_pages(connection: duckdb.DuckDBPyConnection) -> dict[str, Any
         """,
         [period_start, period_end],
     )
+
+    # 对齐 PBIX「天猫旗舰店整体数据 -> 每天核心数据」矩阵。
+    # 字段来源和 DAX 口径：07 商品表 + 08 推广表；店铺排名由 00 原始表仅字段补充。
+    daily_core = _records(
+        connection,
+        f"""
+        WITH product_dedup AS (
+          SELECT * EXCLUDE (_snapshot_rank) FROM (
+            SELECT *, row_number() OVER (
+              PARTITION BY try_cast("日期" AS DATE), cast("商品ID" AS VARCHAR)
+              ORDER BY "_source_mtime_ns" DESC, "_source_path" DESC
+            ) AS _snapshot_rank
+            FROM {product_view}
+            WHERE try_cast("日期" AS DATE) BETWEEN ? AND ? AND "商品ID" IS NOT NULL
+          ) WHERE _snapshot_rank = 1
+        ), product_by_date AS (
+          SELECT
+            try_cast("日期" AS DATE) AS date,
+            sum(coalesce(try_cast("商品访客数" AS DOUBLE), 0)) AS productVisitors,
+            sum(coalesce(try_cast("加购人数" AS DOUBLE), 0)) AS addToCart,
+            sum(coalesce(try_cast("支付买家数" AS DOUBLE), 0)) AS payBuyers,
+            sum(coalesce(try_cast("支付金额" AS DOUBLE), 0)) AS payAmount,
+            sum(coalesce(try_cast("退款金额" AS DOUBLE), 0)) AS refundAmount,
+            sum(
+              CASE WHEN strpos(coalesce(cast("商品名称" AS VARCHAR), ''), '差价') = 0
+                THEN coalesce(try_cast("商品支付件数" AS DOUBLE), 0)
+                ELSE 0
+              END
+            ) AS paidUnits
+          FROM product_dedup
+          GROUP BY 1
+        ), promotion_dedup AS (
+          SELECT * EXCLUDE (_snapshot_rank) FROM (
+            SELECT *, row_number() OVER (
+              PARTITION BY
+                try_cast("日期" AS DATE),
+                coalesce(cast("场景ID" AS VARCHAR), ''),
+                coalesce(cast("计划ID" AS VARCHAR), ''),
+                coalesce(cast("商品ID" AS VARCHAR), ''),
+                coalesce(cast("主体名称" AS VARCHAR), ''),
+                coalesce(cast("_source_sheet" AS VARCHAR), '')
+              ORDER BY "_source_mtime_ns" DESC, "_source_path" DESC
+            ) AS _snapshot_rank
+            FROM {promotion_view}
+            WHERE try_cast("日期" AS DATE) BETWEEN ? AND ?
+          ) WHERE _snapshot_rank = 1
+        ), promotion_by_date AS (
+          SELECT
+            try_cast("日期" AS DATE) AS date,
+            sum(coalesce(try_cast("花费（未含达人）" AS DOUBLE), try_cast("花费" AS DOUBLE), 0)) AS spend,
+            sum(coalesce(try_cast("总购物车数" AS DOUBLE), 0)) AS promotionCarts
+          FROM promotion_dedup
+          GROUP BY 1
+        ), available_dates AS (
+          SELECT date FROM product_by_date
+          UNION
+          SELECT date FROM promotion_by_date
+        )
+        SELECT
+          dates.date AS date,
+          strftime(dates.date, '%Y') AS year,
+          strftime(dates.date, '%m') || '月' AS month,
+          strftime(dates.date, '%d') AS day,
+          coalesce(product.productVisitors, 0) AS productVisitors,
+          coalesce(product.addToCart, 0) AS addToCart,
+          coalesce(product.payBuyers, 0) AS payBuyers,
+          coalesce(promotion.promotionCarts, 0) AS promotionCarts,
+          product.addToCart / nullif(product.productVisitors, 0) AS addToCartRate,
+          promotion.spend / nullif(promotion.promotionCarts, 0) AS addToCartCost,
+          coalesce(product.payAmount, 0) AS payAmount,
+          coalesce(product.paidUnits, 0) AS paidUnits,
+          product.payBuyers / nullif(product.productVisitors, 0) AS conversionRate,
+          coalesce(product.refundAmount, 0) AS refundAmount,
+          product.refundAmount / nullif(product.payAmount, 0) AS refundRate,
+          coalesce(promotion.spend, 0) AS spend,
+          (coalesce(product.payAmount, 0) - coalesce(product.refundAmount, 0)) * 0.85 AS subsidizedAmount,
+          promotion.spend / nullif(
+            (coalesce(product.payAmount, 0) - coalesce(product.refundAmount, 0)) * 0.85,
+            0
+          ) AS subsidizedFeeRate,
+          cast(NULL AS VARCHAR) AS storeRank
+        FROM available_dates AS dates
+        LEFT JOIN product_by_date AS product ON product.date = dates.date
+        LEFT JOIN promotion_by_date AS promotion ON promotion.date = dates.date
+        ORDER BY dates.date
+        """,
+        [
+            period_start,
+            period_end,
+            period_start,
+            period_end,
+        ],
+    )
+    for row in daily_core:
+        row["storeRank"] = (store_rank_daily or {}).get(str(row["date"]))
 
     product_daily = _records(
         connection,
@@ -679,6 +832,7 @@ def _build_powerbi_pages(connection: duckdb.DuckDBPyConnection) -> dict[str, Any
         "source": "powerbi_local_logic",
         "period": {"start": period_start, "end": period_end},
         "overallDaily": overall_daily,
+        "dailyCore": daily_core,
         "productDaily": product_daily,
         "productDailyPriorYear": product_daily_prior_year,
         "promotionSceneDaily": promotion_scene_daily,
@@ -1438,7 +1592,7 @@ def _build_unique_snapshot(
     failures = sum(item.get("failed", 0) for item in query_results)
     rows = sum(int(item.get("rows", 0)) for item in query_results)
     result_by_query = {item["query"]: item for item in query_results}
-    powerbi_pages = _build_powerbi_pages(connection)
+    powerbi_pages = _build_powerbi_pages(connection, _load_pbix_store_rank_daily(paths))
     product_management_pages = _build_product_management_pages(connection)
     snapshot = {
         "source": "local_warehouse",

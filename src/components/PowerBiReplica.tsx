@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { BarChart3, Database, Search, Table2 } from "lucide-react";
 import type {
+  PowerBiDailyCore,
   PowerBiOverallDaily,
   PowerBiPages,
   PowerBiProductDaily,
@@ -8,6 +9,7 @@ import type {
   WarehouseSnapshot,
 } from "../types/integration";
 import { clsx } from "../utils/format";
+import { buildDailyCoreHierarchy, type DailyCoreHierarchyRow } from "./powerBiDailyCoreHierarchy";
 
 type Workspace = "overview" | "diagnosis";
 type ReplicaPage = "overall" | "promotion" | "product";
@@ -38,6 +40,22 @@ function number(value: number) {
 
 function percent(value: number) {
   return `${((Number.isFinite(value) ? value : 0) * 100).toFixed(2)}%`;
+}
+
+function pbixInteger(value: number) {
+  return `${Math.round(value || 0)}`;
+}
+
+function pbixDecimal(value: number | null) {
+  return value == null || !Number.isFinite(value) ? "—" : value.toFixed(2);
+}
+
+function pbixPercent(value: number | null) {
+  return value == null || !Number.isFinite(value) ? "—" : `${(value * 100).toFixed(2)}%`;
+}
+
+function pbixWan(value: number) {
+  return `${((value || 0) / 10_000).toFixed(2)}万`;
 }
 
 function rate(numerator: number, denominator: number) {
@@ -454,7 +472,8 @@ function PromotionDailySpendTable({ rows, start, end }: { rows: PowerBiPromotion
 }
 
 function OverallPage({ pages, start, end }: { pages: PowerBiPages; start: string; end: string }) {
-  const daily = inPeriod(pages.overallDaily, start, end);
+  const overallDaily = inPeriod(pages.overallDaily, start, end);
+  const dailyCore = inPeriod(pages.dailyCore ?? [], start, end);
   const products = aggregateProductRows(inPeriod(pages.productDaily, start, end));
   const productsById = new Map(pages.products.map((item) => [item.productId, item]));
   const promotionProducts = aggregatePromotion(inPeriod(pages.promotionProductDaily, start, end), "productId");
@@ -473,7 +492,7 @@ function OverallPage({ pages, start, end }: { pages: PowerBiPages; start: string
     previousPromotionSpendByDate.set(row.date, (previousPromotionSpendByDate.get(row.date) || 0) + (row.spend || 0));
   });
 
-  const period = aggregateOverallDaily(daily);
+  const period = aggregateOverallDaily(overallDaily);
   const previousPeriodData = previousDaily.length ? aggregateOverallDaily(previousDaily) : null;
   const totalSpend = [...promotionSpendByDate.values()].reduce((sum, spend) => sum + spend, 0);
   const previousTotalSpend = [...previousPromotionSpendByDate.values()].reduce((sum, spend) => sum + spend, 0);
@@ -486,19 +505,43 @@ function OverallPage({ pages, start, end }: { pages: PowerBiPages; start: string
 
   const dailySort = useColumnSort("date", "desc");
   const productSort = useColumnSort("payAmount", "desc");
-  const dailyAccessors: Record<string, (row: PowerBiOverallDaily) => SortValue> = {
+  const dailyAccessors: Record<string, (row: PowerBiDailyCore) => SortValue> = {
     date: (row) => row.date,
-    visitors: (row) => row.visitors,
+    year: (row) => row.year,
+    month: (row) => row.month,
+    day: (row) => row.day,
     productVisitors: (row) => row.productVisitors,
     addToCart: (row) => row.addToCart,
-    payBuyers: (row) => row.payBuyers,
-    convRate: (row) => rate(row.payBuyers, row.visitors),
-    uvValue: (row) => rate(row.payAmount, row.visitors),
-    newShare: (row) => rate(row.newVisitors, row.newVisitors + row.returningVisitors),
-    bounceRate: (row) => row.bounceRate,
+    addToCartRate: (row) => row.addToCartRate,
+    addToCartCost: (row) => row.addToCartCost,
+    payAmount: (row) => row.payAmount,
+    paidUnits: (row) => row.paidUnits,
+    conversionRate: (row) => row.conversionRate,
+    refundAmount: (row) => row.refundAmount,
+    refundRate: (row) => row.refundRate,
+    spend: (row) => row.spend,
+    subsidizedAmount: (row) => row.subsidizedAmount,
+    subsidizedFeeRate: (row) => row.subsidizedFeeRate,
+    storeRank: (row) => row.storeRank,
   };
-  const sortedDaily = sortRows(daily, dailySort.sortKey, dailySort.sortDir, dailyAccessors);
-  const dailyPagination = usePagination(sortedDaily, `${dailySort.sortKey}-${dailySort.sortDir}`);
+  const sortedDaily = sortRows(dailyCore, dailySort.sortKey, dailySort.sortDir, dailyAccessors);
+  const hierarchyScopeKey = [...new Set(dailyCore.map((row) => `${row.year}|${row.month}`))].sort().join(",");
+  const [expandedYears, setExpandedYears] = useState<Set<string>>(() => new Set(dailyCore.map((row) => row.year)));
+  const [expandedMonths, setExpandedMonths] = useState<Set<string>>(() => new Set(dailyCore.map((row) => `${row.year}|${row.month}`)));
+  useEffect(() => {
+    const scopedMonths = hierarchyScopeKey ? hierarchyScopeKey.split(",") : [];
+    setExpandedYears(new Set(scopedMonths.map((key) => key.split("|", 1)[0])));
+    setExpandedMonths(new Set(scopedMonths));
+  }, [hierarchyScopeKey]);
+  const dailyHierarchyRows = buildDailyCoreHierarchy(sortedDaily, expandedYears, expandedMonths);
+  const hierarchyStateKey = `${[...expandedYears].sort().join(",")}|${[...expandedMonths].sort().join(",")}`;
+  const dailyPagination = usePagination(dailyHierarchyRows, `${dailySort.sortKey}-${dailySort.sortDir}-${hierarchyStateKey}`);
+  const toggleExpanded = (setter: typeof setExpandedYears, key: string) => setter((current) => {
+    const next = new Set(current);
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
+    return next;
+  });
   const productAccessors: Record<string, (row: PowerBiProductDaily) => SortValue> = {
     product: (row) => productsById.get(row.productId)?.merchantCode || row.productId || "未匹配商品",
     visitors: (row) => row.visitors,
@@ -530,7 +573,7 @@ function OverallPage({ pages, start, end }: { pages: PowerBiPages; start: string
           <KpiTile current={rate(period.payBuyers, period.visitors)} index={2} label="访客支付转化率" note="支付买家 / 访客" previous={rate(previousPeriodData?.payBuyers ?? 0, previousPeriodData?.visitors ?? 0)} value={percent(rate(period.payBuyers, period.visitors))} />
           <KpiTile current={period.addToCart} index={3} label="加购人数" note="产生加购的访客" previous={previousPeriodData?.addToCart ?? 0} value={number(period.addToCart)} />
           <KpiTile current={rate(period.addToCart, period.visitors)} index={4} label="加购率" note="加购人数 / 访客" previous={rate(previousPeriodData?.addToCart ?? 0, previousPeriodData?.visitors ?? 0)} value={percent(rate(period.addToCart, period.visitors))} />
-          <KpiTile current={totalSpend} index={5} label="细分推广花费" note="站内推广花费（不含达人）" previous={previousTotalSpend} value={moneyPrecise(totalSpend)} />
+          <KpiTile current={totalSpend} index={5} label="站内推广花费" note="站内推广花费（不含达人）" previous={previousTotalSpend} value={moneyPrecise(totalSpend)} />
         </div>
         <section className="pb-panel-title is-fee">推广费比数据 <small>按国补后金额计算</small></section>
         <div className="pb-fee-grid">
@@ -541,8 +584,8 @@ function OverallPage({ pages, start, end }: { pages: PowerBiPages; start: string
         </div>
       </div>
       <section className="pb-daily-matrix">
-        <div className="pb-panel-title">每天核心数据 <small>单位：人 / 元 · 默认按日降序</small></div>
-        <div className="pb-table-wrap pb-animated-table"><table className="pb-data-table"><thead><tr><SortHeader columnKey="date" label="日期" sort={dailySort} /><SortHeader columnKey="visitors" label="访客" sort={dailySort} /><SortHeader columnKey="productVisitors" label="商品访客" sort={dailySort} /><SortHeader columnKey="addToCart" label="加购" sort={dailySort} /><SortHeader columnKey="payBuyers" label="支付买家" sort={dailySort} /><SortHeader columnKey="convRate" label="转化率" sort={dailySort} /><SortHeader columnKey="uvValue" label="UV价值" sort={dailySort} /><SortHeader columnKey="newShare" label="新客占比" sort={dailySort} /><SortHeader columnKey="bounceRate" label="跳失率" sort={dailySort} /></tr></thead><tbody>{dailyPagination.pagedItems.map((row, index) => <tr className="pb-table-row" key={row.date} style={{ "--pb-row-delay": `${260 + Math.min(index, 12) * 28}ms` } as CSSProperties}><td>{shortDate(row.date)}</td><td>{number(row.visitors)}</td><td>{number(row.productVisitors)}</td><td>{number(row.addToCart)}</td><td>{number(row.payBuyers)}</td><td>{percent(rate(row.payBuyers, row.visitors))}</td><td>{`¥${rate(row.payAmount, row.visitors).toFixed(2)}`}</td><td>{percent(rate(row.newVisitors, row.newVisitors + row.returningVisitors))}</td><td>{percent(row.bounceRate)}</td></tr>)}</tbody></table></div>
+        <div className="pb-panel-title">每天核心数据 <small>年度 → 月份 → 日可展开折叠 · 默认按日降序</small></div>
+        <div className="pb-table-wrap pb-animated-table"><table className="pb-data-table pb-daily-core-table" data-testid="powerbi-daily-core-table"><thead><tr><SortHeader columnKey="year" label="年度" sort={dailySort} /><SortHeader columnKey="month" label="月份" sort={dailySort} /><SortHeader columnKey="day" label="日" sort={dailySort} /><SortHeader columnKey="productVisitors" label="商品访客数" sort={dailySort} /><SortHeader columnKey="addToCart" label="加购人数" sort={dailySort} /><SortHeader columnKey="addToCartRate" label="加购率" sort={dailySort} /><SortHeader columnKey="addToCartCost" label="加购成本" sort={dailySort} /><SortHeader columnKey="payAmount" label="支付金额" sort={dailySort} /><SortHeader columnKey="paidUnits" label="支付件数" sort={dailySort} /><SortHeader columnKey="conversionRate" label="访客转化率" sort={dailySort} /><SortHeader columnKey="refundAmount" label="退款金额" sort={dailySort} /><SortHeader columnKey="refundRate" label="退款率" sort={dailySort} /><SortHeader columnKey="spend" label="费额" sort={dailySort} /><SortHeader columnKey="subsidizedAmount" label="国补后金额(万)" sort={dailySort} /><SortHeader columnKey="subsidizedFeeRate" label="国补后费比" sort={dailySort} /><SortHeader columnKey="storeRank" label="店铺排名" sort={dailySort} /></tr></thead><tbody>{dailyPagination.pagedItems.map((row: DailyCoreHierarchyRow, index) => <tr className={clsx("pb-table-row", row.hierarchyLevel !== "day" && "is-hierarchy-summary")} data-hierarchy-key={row.hierarchyKey} data-hierarchy-level={row.hierarchyLevel} key={`${row.hierarchyLevel}-${row.hierarchyKey}`} style={{ "--pb-row-delay": `${260 + Math.min(index, 12) * 28}ms` } as CSSProperties}><td className="pb-hierarchy-cell">{row.showYear ? <button aria-expanded={expandedYears.has(row.year)} aria-label={`${expandedYears.has(row.year) ? "折叠" : "展开"}年度 ${row.year}`} className="pb-hierarchy-toggle" data-testid="daily-core-year-toggle" onClick={() => toggleExpanded(setExpandedYears, row.year)} type="button"><span aria-hidden="true" className="pb-hierarchy-icon">{expandedYears.has(row.year) ? "−" : "+"}</span><span>{row.year}</span></button> : null}</td><td className="pb-hierarchy-cell">{row.showMonth ? <button aria-expanded={expandedMonths.has(`${row.year}|${row.month}`)} aria-label={`${expandedMonths.has(`${row.year}|${row.month}`) ? "折叠" : "展开"}月份 ${row.month}`} className="pb-hierarchy-toggle" data-testid="daily-core-month-toggle" onClick={() => toggleExpanded(setExpandedMonths, `${row.year}|${row.month}`)} type="button"><span aria-hidden="true" className="pb-hierarchy-icon">{expandedMonths.has(`${row.year}|${row.month}`) ? "−" : "+"}</span><span>{row.month}</span></button> : null}</td><td>{row.hierarchyLevel === "day" ? row.day : ""}</td><td>{pbixInteger(row.productVisitors)}</td><td>{pbixInteger(row.addToCart)}</td><td>{pbixPercent(row.addToCartRate)}</td><td>{pbixDecimal(row.addToCartCost)}</td><td>{pbixWan(row.payAmount)}</td><td>{pbixInteger(row.paidUnits)}</td><td>{pbixPercent(row.conversionRate)}</td><td>{countFormat.format(row.refundAmount || 0)}</td><td>{pbixPercent(row.refundRate)}</td><td>{pbixWan(row.spend)}</td><td>{pbixWan(row.subsidizedAmount)}</td><td>{pbixPercent(row.subsidizedFeeRate)}</td><td>{row.storeRank || "—"}</td></tr>)}</tbody></table></div>
         <Pagination onPage={dailyPagination.setPage} page={dailyPagination.page} totalItems={dailyPagination.totalItems} totalPages={dailyPagination.totalPages} />
       </section>
       <section className="pb-product-table">

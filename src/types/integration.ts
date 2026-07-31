@@ -159,6 +159,28 @@ export interface PowerBiOverallDaily {
   bounceRate: number;
 }
 
+export interface PowerBiDailyCore {
+  date: string;
+  year: string;
+  month: string;
+  day: string;
+  productVisitors: number;
+  addToCart: number;
+  payBuyers: number;
+  promotionCarts: number;
+  addToCartRate: number | null;
+  addToCartCost: number | null;
+  payAmount: number;
+  paidUnits: number;
+  conversionRate: number | null;
+  refundAmount: number;
+  refundRate: number | null;
+  spend: number;
+  subsidizedAmount: number;
+  subsidizedFeeRate: number | null;
+  storeRank: string | null;
+}
+
 export interface PowerBiProductDaily {
   date: string;
   productId: string;
@@ -190,6 +212,7 @@ export interface PowerBiPages {
   source: "powerbi_local_logic";
   period: { start: string; end: string } | null;
   overallDaily: PowerBiOverallDaily[];
+  dailyCore: PowerBiDailyCore[];
   productDaily: PowerBiProductDaily[];
   productDailyPriorYear: Array<{ productId: string; payAmount: number; refund: number }>;
   promotionSceneDaily: PowerBiPromotionDaily[];

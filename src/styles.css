@@ -1777,6 +1777,56 @@ select option:disabled {
   font-variant-numeric: tabular-nums;
 }
 
+.pb-daily-core-table {
+  min-width: 1560px;
+}
+
+.pb-daily-core-table th:nth-child(-n + 3),
+.pb-daily-core-table td:nth-child(-n + 3) {
+  text-align: left;
+}
+
+.pb-hierarchy-cell {
+  min-width: 70px;
+}
+
+.pb-hierarchy-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 18px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.pb-hierarchy-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 13px;
+  height: 13px;
+  border: 1px solid rgba(166, 229, 54, 0.55);
+  border-radius: 2px;
+  color: var(--brand);
+  font-size: 11px;
+  line-height: 1;
+}
+
+.pb-daily-core-table tr.is-hierarchy-summary td {
+  background: rgba(166, 229, 54, 0.055);
+  font-weight: 700;
+}
+
+.pb-hierarchy-toggle:hover .pb-hierarchy-icon,
+.pb-hierarchy-toggle:focus-visible .pb-hierarchy-icon {
+  border-color: var(--brand);
+  background: var(--brand-dim);
+}
+
 .pb-data-table th,
 .pb-data-table td {
   height: 25px;
