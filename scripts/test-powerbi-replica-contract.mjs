@@ -27,6 +27,38 @@ assert(replica.includes("pb-data-bar") && replica.includes("每日推广费用")
 assert(replica.includes("useColumnSort") && replica.includes("SortHeader") && replica.includes("th-sort-arrows"), "天猫明细表格缺少升降序排序按钮");
 assert(replica.includes("usePagination") && replica.includes("PAGE_SIZE = 15") && replica.includes('data-testid="pb-pagination"'), "天猫明细表格缺少 15 行分页导航");
 assert(!replica.includes("slice(-16)") && !replica.includes("slice(0, 30)"), "天猫明细表格仍保留 16/30 行硬截断，与分页冲突");
+assert(replica.includes('data-testid="powerbi-daily-core-table"'), "每天核心数据缺少 PBIX 一比一复刻标识");
+const dailyCoreStart = replica.indexOf('data-testid="powerbi-daily-core-table"');
+const dailyCoreEnd = replica.indexOf("</table>", dailyCoreStart);
+const dailyCoreMarkup = replica.slice(dailyCoreStart, dailyCoreEnd);
+const dailyCoreColumns = [
+  "年度",
+  "月份",
+  "日",
+  "商品访客数",
+  "加购人数",
+  "加购率",
+  "加购成本",
+  "支付金额",
+  "支付件数",
+  "访客转化率",
+  "退款金额",
+  "退款率",
+  "费额",
+  "国补后金额(万)",
+  "国补后费比",
+  "店铺排名",
+];
+let previousColumnIndex = -1;
+for (const column of dailyCoreColumns) {
+  const columnIndex = dailyCoreMarkup.indexOf(`label="${column}"`);
+  assert(columnIndex > previousColumnIndex, `每天核心数据列缺失或顺序不符合 PBIX：${column}`);
+  previousColumnIndex = columnIndex;
+}
+assert(types.includes("interface PowerBiDailyCore") && types.includes("dailyCore: PowerBiDailyCore[]"), "前端类型未接入 PBIX 每天核心数据独立数据集");
+assert(warehouse.includes('summary_view = _model_view(connection, "00-月表汇总")'), "每天核心数据未引用 PBIX 店铺排名来源 00-月表汇总");
+assert(warehouse.includes('product_view = _model_view(connection, "07-旗舰店商品销售数据")'), "每天核心数据未引用 PBIX 商品指标来源 07-旗舰店商品销售数据");
+assert(warehouse.includes('promotion_view = _model_view(connection, "08-旗舰店推广花费")'), "每天核心数据未引用 PBIX 推广指标来源 08-旗舰店推广花费");
 assert(replica.includes("pb-na"), "商品经营明细同比数据不足时缺少兜底样式");
 assert(types.includes("productDailyPriorYear"), "PowerBI 页面数据类型缺少去年同期商品聚合");
 assert(warehouse.includes("product_daily_prior_year") && warehouse.includes("prior_year_start"), "数仓未生成去年同期商品聚合");
