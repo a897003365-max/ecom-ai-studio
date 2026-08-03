@@ -1018,14 +1018,33 @@ def _build_product_management_pages(
     if cur_range is None:
         months = connection.execute(
             f"""SELECT strftime('%Y-%m', "订单日期") AS month FROM {view}
-               WHERE "订单日期" IS NOT NULL GROUP BY 1 ORDER BY 1 DESC LIMIT 2"""
+               WHERE "订单日期" IS NOT NULL GROUP BY 1 ORDER BY 1 DESC LIMIT 3"""
         ).fetchall()
         if months:
+            # 校验最新月份是否完整：若该月最大日期 < 月末，回退到上一个完整月
             cur_m = months[0][0]
+            max_date_row = connection.execute(
+                f'SELECT max("订单日期") FROM {view} WHERE strftime(\'%Y-%m\', "订单日期") = ?',
+                [cur_m],
+            ).fetchone()
+            max_date = max_date_row[0] if max_date_row else None
+            if max_date is not None:
+                # 判断 max_date 是否是该月最后一天
+                import calendar as _cal
+                year, mon = map(int, cur_m.split("-"))
+                last_day = _cal.monthrange(year, mon)[1]
+                if hasattr(max_date, "day"):
+                    max_day = max_date.day
+                else:
+                    max_day = int(str(max_date)[-2:])
+                if max_day < last_day and len(months) >= 2:
+                    cur_m = months[1][0]  # 回退到上一个完整月
             cur_range = _month_to_range(cur_m)
             cur_label = cur_m
-            if len(months) >= 2:
-                prev_m = months[1][0]
+            # 上期 = 当期前一个月
+            prev_m_idx = 2 if cur_m == months[1][0] else 1
+            if len(months) > prev_m_idx:
+                prev_m = months[prev_m_idx][0]
                 prev_range = _month_to_range(prev_m)
                 prev_label = prev_m
 

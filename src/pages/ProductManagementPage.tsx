@@ -192,6 +192,7 @@ export function ProductManagementPage({ onAction }: ProductManagementPageProps) 
   const [channels, setChannels] = useState<string[]>([]);
   const [storeShortNames, setStoreShortNames] = useState<string[]>([]);
   const [fullPeriod, setFullPeriod] = useState<DateRange | null>(null);
+  const [selectedSpus, setSelectedSpus] = useState<string[]>([]);
   // 防止后台 gallery 刷新覆盖更新后的筛选结果：每次 load 自增，过期 token 的回调丢弃
   const loadTokenRef = useRef(0);
 
@@ -443,15 +444,26 @@ export function ProductManagementPage({ onAction }: ProductManagementPageProps) 
                   return <SpuTrendLineChart series={t.series} dates={t.dates} emptyHint="暂无产品分类销量趋势数据" />;
                 })()}
               </Card>
-              <SpuTrendCard data={pm.spuSalesTrend} className="mt-4" />
+              <SpuTrendCard data={pm.spuSalesTrend} className="mt-4" selectedSpus={selectedSpus} onSelectedSpusChange={setSelectedSpus} />
+              <Card title={selectedSpus.length > 0 ? `产品名称 × 渠道销量（已联动 ${selectedSpus.length} 个 SPU）` : "产品名称 × 渠道销量（Top 30）"} className="mt-4">
+                {(() => {
+                  const summaries = pm.spuSalesTrend?.summaries ?? [];
+                  const spuToProductName = new Map(summaries.map((s) => [s.spu, s.productName]));
+                  const selectedNames = selectedSpus.length > 0
+                    ? new Set(selectedSpus.map((spu) => spuToProductName.get(spu)).filter(Boolean))
+                    : null;
+                  const matrix = pm.productChannelMatrix;
+                  const filtered = selectedNames && selectedNames.size > 0
+                    ? { ...matrix, rows: matrix.rows.filter((r) => selectedNames.has(r.rowKey)) }
+                    : matrix;
+                  return <MatrixTable matrix={filtered} rowHeader="产品名称" minWidth={960} />;
+                })()}
+              </Card>
               <Card title="床垫类别 × 渠道销量" className="mt-4">
                 <MatrixTable matrix={pm.categoryChannelMatrix} rowHeader="床垫类别" minWidth={960} />
               </Card>
               <Card title="每日渠道销量 · 日期 × 渠道销售数量" className="mt-4">
                 <MatrixTable matrix={pm.dailyChannelMatrix} rowHeader="日期" minWidth={960} pageSize={15} />
-              </Card>
-                            <Card title="产品名称 × 渠道销量（Top 30）" className="mt-4">
-                <MatrixTable matrix={pm.productChannelMatrix} rowHeader="产品名称" minWidth={960} />
               </Card>
             </>
           )}
