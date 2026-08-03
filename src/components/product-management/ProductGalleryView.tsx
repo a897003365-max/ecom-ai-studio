@@ -23,7 +23,7 @@ import type {
 } from "../../types/integration";
 import "../../styles/product-gallery.css";
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 32;
 const SKU_PAGE_SIZE = 20;
 
 type ProductSort = "received" | "margin" | "units" | "growth";

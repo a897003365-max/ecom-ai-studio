@@ -544,3 +544,43 @@
     transition-duration: 1ms !important;
   }
 }
+
+/* 重点商品表 · 各渠道折叠明细 */
+.priority-channel-row td {
+  padding: 0 !important;
+  background: color-mix(in srgb, var(--bg-2, #0f1b1f) 60%, transparent);
+}
+
+.priority-channel-table {
+  width: 100%;
+  margin: 8px 0;
+  font-size: 12px;
+  border-collapse: collapse;
+}
+
+.priority-channel-table th,
+.priority-channel-table td {
+  padding: 4px 10px;
+  text-align: left;
+  border: none;
+  background: transparent;
+}
+
+.priority-channel-table th {
+  color: var(--muted, #7a8b85);
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+
+.priority-channel-table td {
+  font-variant-numeric: tabular-nums;
+}
+
+/* 商品总览 · 交叉矩阵区域 */
+.matrix-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(480px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
