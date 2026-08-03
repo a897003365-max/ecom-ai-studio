@@ -7,7 +7,7 @@ Phase 1：仅返回空结构与模块边界，4 个 builder 待 Phase 2+ 逐步�
 - q18（辅4-床垫编码）按 ``商家规编（后台）`` 是唯一 key（8055 行 0 重复 0 维度冲突）。
 - q18 LEFT JOIN 订单事实不放大订单行、销售数量、商家实收。
 - 订单行覆盖率 90.1%，超过 80% 阈值，无需降级；但模块仍返回 coverage 供 UI 展示。
-- 定制信号极弱（颜色规格定制/异形/缺角 关键词几乎为 0），定制模块标注推导降级。
+- 定制信号基于卖家备注（对齐 PBI 商家备注打标，含 定制/折叠/横折/竖折），实测命中约 9%。
 """
 from __future__ import annotations
 
@@ -48,6 +48,7 @@ def empty_size_structure() -> dict[str, Any]:
             "orderLines": 0,
             "orderLineShare": 0,
             "salesUnits": 0,
+            "salesUnitsShare": 0,
             "receivedAmount": 0,
             "receivedAmountShare": 0,
         },
@@ -77,7 +78,8 @@ def empty_customization_structure() -> dict[str, Any]:
         "categoryStructure": [],
         "tags": [],
         "topProducts": [],
-        "derivationNote": "基于颜色规格与辅4-床垫编码(q18)字段推导，不等同于 ERP 原生定制字段。",
+        "spuSummary": [],
+        "derivationNote": "是否定制 = 卖家备注含 定制/折叠/横折/竖折（对齐 PBI 商家备注打标）。",
         "quality": _empty_quality(["定制结构模块未实现"]),
     }
 
@@ -175,13 +177,26 @@ def build_price_structure(
     recv = 'try_cast(s."商家实收" AS DOUBLE)'
     qty = 'try_cast(s."销售数量" AS DOUBLE)'
     bucket_expr = _price_bucket_case(recv, qty)
+    pm_join = f'LEFT JOIN {pm_view} pm ON s."商品编码" = pm."商品编码"' if (pm_view and "商品编码" in pm_columns) else ""
+    source_columns = {row[0] for row in connection.execute(f"DESCRIBE {view}").fetchall()}
+    has_pm_name = bool(pm_view and "产品名称" in pm_columns and "商品编码" in pm_columns)
+    has_s_name = "线上商品名" in source_columns
+    if has_pm_name and has_s_name:
+        product_name_expr = "coalesce(nullif(trim(cast(pm.\"产品名称\" AS VARCHAR)), ''), cast(s.\"线上商品名\" AS VARCHAR))"
+    elif has_pm_name:
+        product_name_expr = 'cast(pm."产品名称" AS VARCHAR)'
+    elif has_s_name:
+        product_name_expr = 'cast(s."线上商品名" AS VARCHAR)'
+    else:
+        product_name_expr = "NULL::VARCHAR"
     valid_cte = f"""
       WITH valid AS (
         SELECT
           s."商品编码" AS code,
           coalesce(nullif(trim(cast(s."渠道平台" AS VARCHAR)), ''), '(未设定)') AS channel,
+          {product_name_expr} AS product_name,
           {recv} AS recv, {qty} AS qty, {bucket_expr} AS bucket
-        FROM {view} s
+        FROM {view} s {pm_join}
         WHERE {recv} > 0 AND {qty} > 0
       )
     """
@@ -203,6 +218,7 @@ def build_price_structure(
 
     bucket_map: dict[str, dict[str, Any]] = {}
     channel_cells: list[dict[str, Any]] = []
+    top_by_bucket: dict[str, list[str]] = {}
     if valid_lines > 0:
         bucket_map = {r["bucket"]: r for r in _fetch_records(
             connection,
@@ -212,6 +228,13 @@ def build_price_structure(
             connection,
             f"{valid_cte} SELECT channel AS \"rowKey\", bucket, count(*) AS n FROM valid GROUP BY 1, 2",
         )
+        top_rows = _fetch_records(
+            connection,
+            f"{valid_cte} SELECT bucket, product_name, sum(qty) AS sales FROM valid WHERE product_name IS NOT NULL AND trim(cast(product_name AS VARCHAR)) <> '' GROUP BY 1, 2 ORDER BY bucket, sales DESC",
+        )
+        for r in top_rows:
+            top_by_bucket.setdefault(r["bucket"], []).append(r["product_name"])
+    total_sales_units = sum(float(r["sales_units"] or 0) for r in bucket_map.values())
 
     buckets = []
     for code, label in PRICE_BUCKETS:
@@ -225,8 +248,10 @@ def build_price_structure(
             "orderLines": ol,
             "orderLineShare": (ol / valid_lines) if valid_lines > 0 else 0,
             "salesUnits": su,
+            "salesUnitsShare": (su / total_sales_units) if total_sales_units > 0 else 0,
             "receivedAmount": ra,
             "receivedAmountShare": (ra / total_recv) if total_recv > 0 else 0,
+            "topProducts": "、".join(top_by_bucket.get(label, [])[:3]),
         })
 
     channel_keys = sorted({c["rowKey"] for c in channel_cells})
@@ -415,8 +440,10 @@ def build_size_structure(
         main_sizes.append(v)
 
     total_recv = sum(v["receivedAmount"] for v in merged.values()) + unknown_recv
+    total_units = sum(v["salesUnits"] for v in merged.values()) + unknown_qty
     share_lines = lambda n: (n / total_lines) if total_lines > 0 else 0
     share_recv = lambda n: (n / total_recv) if total_recv > 0 else 0
+    share_units = lambda n: (n / total_units) if total_units > 0 else 0
 
     sizes_out = [
         {
@@ -425,6 +452,7 @@ def build_size_structure(
             "orderLines": v["orderLines"],
             "orderLineShare": share_lines(v["orderLines"]),
             "salesUnits": v["salesUnits"],
+            "salesUnitsShare": share_units(v["salesUnits"]),
             "receivedAmount": v["receivedAmount"],
             "receivedAmountShare": share_recv(v["receivedAmount"]),
         }
@@ -436,6 +464,7 @@ def build_size_structure(
         "orderLines": unknown_lines,
         "orderLineShare": share_lines(unknown_lines),
         "salesUnits": unknown_qty,
+        "salesUnitsShare": share_units(unknown_qty),
         "receivedAmount": unknown_recv,
         "receivedAmountShare": share_recv(unknown_recv),
     }
@@ -655,8 +684,6 @@ def build_spu_sales_trend(
     }
 
 
-CUSTOM_TAGS = ["定制缺角", "定制异形", "定制折叠", "定制尺寸", "定制厚度", "定制内材", "未填写标签"]
-
 
 def build_customization_structure(
     connection: duckdb.DuckDBPyConnection,
@@ -667,15 +694,26 @@ def build_customization_structure(
     q18_view: str | None,
     q18_columns: set[str],
 ) -> dict[str, Any]:
-    """定制结构（推导）：常规/定制对比 + 7 标签 + 类别结构 + TOP20 履约。
+    """定制结构：基于「是否定制」字段（对齐 PBI 商家备注打标）。
 
-    当前数仓无原生定制字段，仅基于颜色规格关键词推导；Phase 0 审计确认信号极弱
-   （定制/异形/缺角 关键词几乎为 0），quality 标注 degraded。毛利因成本口径复杂暂返回 null。
+    transforms.py 从聚水潭「卖家备注」推导「是否定制」（含 定制/折叠/横折/竖折）与
+    「定制备注标签」（4 类互斥：折叠 > 横折 > 竖折 > 其他定制）。本模块按是否定制做
+    常规/定制对比、标签明细、类别结构、TOP20 履约与 SPU 定制汇总。毛利因成本口径复杂暂返回 null。
     """
     has_pm = bool(pm_view and "商品编码" in pm_columns)
+    has_q18 = bool(q18_view and "SPU产品商编" in q18_columns and "商家规编（后台）" in q18_columns)
+    source_columns = {row[0] for row in connection.execute(f"DESCRIBE {view}").fetchall()}
+    has_is_custom = "是否定制" in source_columns
+    has_custom_tag = "定制备注标签" in source_columns
+    is_custom_expr = 'try_cast(s."是否定制" AS BOOLEAN)' if has_is_custom else "FALSE"
+    custom_tag_expr = 'cast(s."定制备注标签" AS VARCHAR)' if has_custom_tag else "NULL::VARCHAR"
     pm_cat_expr = 'pm."床垫类别"' if (has_pm and "床垫类别" in pm_columns) else "NULL::VARCHAR"
     pm_name_expr = 'pm."产品名称"' if (has_pm and "产品名称" in pm_columns) else "NULL::VARCHAR"
+    q18_spu_expr = 'trim(cast(q18."SPU产品商编" AS VARCHAR))' if has_q18 else "NULL::VARCHAR"
+    q18_name_expr = 'q18."产品名称"' if (has_q18 and "产品名称" in q18_columns) else "NULL::VARCHAR"
     joins = ""
+    if has_q18:
+        joins += f' LEFT JOIN {q18_view} q18 ON s."商品编码" = q18."商家规编（后台）"'
     if has_pm:
         joins += f' LEFT JOIN {pm_view} pm ON s."商品编码" = pm."商品编码"'
 
@@ -686,23 +724,15 @@ def build_customization_structure(
           try_cast(s."销售数量" AS DOUBLE) AS qty,
           cast(s."订单日期" AS DATE) AS order_date,
           cast(s."发货日期" AS DATE) AS ship_date,
-          lower(coalesce(cast(s."颜色规格" AS VARCHAR), '')) AS spec_lower,
           coalesce(nullif(trim(cast({pm_cat_expr} AS VARCHAR)), ''), '(未分类)') AS cat,
-          coalesce(nullif(trim(cast({pm_name_expr} AS VARCHAR)), ''), '(未分类)') AS product
+          coalesce(nullif(trim(cast({pm_name_expr} AS VARCHAR)), ''), '(未分类)') AS product,
+          coalesce(nullif({q18_spu_expr}, ''), '未识别 SPU') AS spu,
+          coalesce(nullif(trim(cast({q18_name_expr} AS VARCHAR)), ''), '') AS spu_product_name,
+          coalesce({is_custom_expr}, FALSE) AS is_custom,
+          {custom_tag_expr} AS custom_tag
         FROM {view} s{joins}
       )
     """
-    tag_case = (
-        "CASE "
-        "WHEN spec_lower LIKE '%缺角%' THEN '定制缺角' "
-        "WHEN spec_lower LIKE '%异形%' OR spec_lower LIKE '%圆%' OR spec_lower LIKE '%弧形%' THEN '定制异形' "
-        "WHEN spec_lower LIKE '%定制折叠%' OR spec_lower LIKE '%定做折叠%' THEN '定制折叠' "
-        "WHEN spec_lower LIKE '%定制尺寸%' OR spec_lower LIKE '%定做尺寸%' THEN '定制尺寸' "
-        "WHEN spec_lower LIKE '%定制厚度%' OR spec_lower LIKE '%定做厚度%' THEN '定制厚度' "
-        "WHEN spec_lower LIKE '%定制内材%' OR spec_lower LIKE '%定做内材%' THEN '定制内材' "
-        "WHEN spec_lower LIKE '%定制%' OR spec_lower LIKE '%定做%' OR spec_lower LIKE '%非标%' THEN '未填写标签' "
-        "ELSE NULL END"
-    )
 
     totals = _fetch_records(connection, f"SELECT count(*) AS total FROM {view}")[0]
     total_lines = int(totals["total"] or 0)
@@ -715,8 +745,9 @@ def build_customization_structure(
         connection,
         f"""{enriched}
         SELECT
-          CASE WHEN {tag_case} IS NOT NULL THEN '定制' ELSE '常规' END AS order_type,
+          CASE WHEN is_custom THEN '定制' ELSE '常规' END AS order_type,
           count(*) AS order_lines,
+          sum(qty) AS sales_units,
           sum(recv) AS recv,
           sum(CASE WHEN ship_date IS NOT NULL AND ship_date >= order_date THEN 1 ELSE 0 END) AS shipped,
           avg(CASE WHEN ship_date IS NOT NULL AND ship_date >= order_date THEN date_diff('day', order_date, ship_date) END) AS avg_days,
@@ -724,11 +755,15 @@ def build_customization_structure(
           avg(CASE WHEN ship_date IS NOT NULL AND ship_date >= order_date AND date_diff('day', order_date, ship_date) <= 15 THEN 1.0 ELSE 0 END) AS within15
         FROM enriched GROUP BY 1""",
     )
+    total_sales_units_row = _fetch_records(connection, f"""{enriched}
+    SELECT sum(qty) AS s FROM enriched""")[0]
+    total_sales_units = float(total_sales_units_row["s"] or 0)
     comp_map = {r["order_type"]: r for r in comp_rows}
     comparison = []
     for ot in ["常规", "定制"]:
         r = comp_map.get(ot)
         ol = int(r["order_lines"]) if r else 0
+        sales_units = float(r["sales_units"] or 0) if r else 0.0
         recv = float(r["recv"] or 0) if r else 0.0
         shipped = int(r["shipped"]) if r else 0
         avg_days = float(r["avg_days"]) if r and r["avg_days"] is not None else None
@@ -738,6 +773,8 @@ def build_customization_structure(
             "orderType": ot,
             "orderLines": ol,
             "orderLineShare": (ol / total_lines) if total_lines > 0 else 0,
+            "salesUnits": sales_units,
+            "salesUnitsShare": (sales_units / total_sales_units) if total_sales_units > 0 else 0,
             "receivedAmount": recv,
             "grossMargin": None,
             "shippedOrderLines": shipped,
@@ -749,35 +786,43 @@ def build_customization_structure(
     tag_rows = _fetch_records(
         connection,
         f"""{enriched}
-        SELECT {tag_case} AS tag, count(*) AS n FROM enriched WHERE {tag_case} IS NOT NULL GROUP BY 1""",
+        SELECT custom_tag AS tag, count(*) AS n FROM enriched
+        WHERE custom_tag IS NOT NULL
+        GROUP BY 1 ORDER BY 2 DESC""",
     )
-    tag_map = {r["tag"]: int(r["n"]) for r in tag_rows}
-    custom_total = sum(tag_map.values())
+    tags_total = sum(int(r["n"]) for r in tag_rows)
     tags = [
-        {"tag": t, "orderLines": tag_map.get(t, 0), "customOrderLineShare": (tag_map.get(t, 0) / custom_total) if custom_total > 0 else 0}
-        for t in CUSTOM_TAGS
+        {
+            "tag": r["tag"],
+            "orderLines": int(r["n"]),
+            "customOrderLineShare": (int(r["n"]) / tags_total) if tags_total > 0 else 0,
+        }
+        for r in tag_rows
     ]
+    # 定制订单行数（是否定制=是）用于类别/TOP20 履约的占比分母，独立于 tags_total（含更换赠品等非定制标签）
+    custom_total_row = _fetch_records(connection, f"""{enriched}
+        SELECT count(*) AS n FROM enriched WHERE is_custom""")[0]
+    custom_total = int(custom_total_row["n"] or 0)
 
     category_structure: list[dict[str, Any]] = []
     if has_pm and custom_total > 0:
         cat_rows = _fetch_records(
             connection,
             f"""{enriched}
-            SELECT cat,
+SELECT cat,
                    sum(qty) AS sales_units,
-                   sum(CASE WHEN {tag_case} IS NOT NULL THEN qty ELSE 0 END) AS custom_sales_units,
-                   count(*) AS n
+                   sum(CASE WHEN is_custom THEN qty ELSE 0 END) AS custom_sales_units,
+                   count(*) AS n,
+                   sum(CASE WHEN is_custom THEN 1 ELSE 0 END) AS custom_n
             FROM enriched GROUP BY 1 ORDER BY 2 DESC""",
-        )
-        custom_total_qty = max(float(r["custom_sales_units"] or 0) for r in cat_rows) if cat_rows else 0
         category_structure = [
             {
                 "mattressCategory": r["cat"],
                 "salesUnits": float(r["sales_units"] or 0),
                 "customSalesUnits": float(r["custom_sales_units"] or 0),
                 "customSalesShare": (float(r["custom_sales_units"] or 0) / float(r["sales_units"])) if float(r["sales_units"] or 0) > 0 else 0,
-                "customOrderLines": int(r["n"]),
-                "customOrderLineShare": (int(r["n"]) / custom_total) if custom_total > 0 else 0,
+                "customOrderLines": int(r["custom_n"]),
+                "customOrderLineShare": (int(r["custom_n"]) / custom_total) if custom_total > 0 else 0,
             }
             for r in cat_rows
         ]
@@ -787,19 +832,20 @@ def build_customization_structure(
         top_rows = _fetch_records(
             connection,
             f"""{enriched}
-            SELECT product, count(*) AS custom_lines, sum(recv) AS custom_recv,
+            SELECT product, count(*) AS custom_lines, sum(qty) AS custom_sales, sum(recv) AS custom_recv,
                    sum(CASE WHEN ship_date IS NOT NULL AND ship_date >= order_date THEN 1 ELSE 0 END) AS shipped,
                    avg(CASE WHEN ship_date IS NOT NULL AND ship_date >= order_date THEN date_diff('day', order_date, ship_date) END) AS avg_days,
                    avg(CASE WHEN ship_date IS NOT NULL AND ship_date >= order_date AND date_diff('day', order_date, ship_date) <= 7 THEN 1.0 ELSE 0 END) AS within7,
                    avg(CASE WHEN ship_date IS NOT NULL AND ship_date >= order_date AND date_diff('day', order_date, ship_date) <= 10 THEN 1.0 ELSE 0 END) AS within10,
                    avg(CASE WHEN ship_date IS NOT NULL AND ship_date >= order_date AND date_diff('day', order_date, ship_date) <= 15 THEN 1.0 ELSE 0 END) AS within15
-            FROM enriched WHERE {tag_case} IS NOT NULL GROUP BY 1 ORDER BY 2 DESC LIMIT 20""",
+            FROM enriched WHERE is_custom GROUP BY 1 ORDER BY custom_sales DESC NULLS LAST LIMIT 20""",
         )
         top_products = [
             {
                 "productName": r["product"],
                 "totalOrderLines": int(r["custom_lines"]),
                 "customOrderLines": int(r["custom_lines"]),
+                "customSalesUnits": float(r["custom_sales"] or 0),
                 "customShareWithinProduct": 1.0,
                 "customReceivedAmount": float(r["custom_recv"] or 0),
                 "shippedCustomOrderLines": int(r["shipped"]),
@@ -810,17 +856,44 @@ def build_customization_structure(
             for r in top_rows
         ]
 
-    status = "degraded"
-    warnings = ["当前数仓无原生定制字段，定制结构仅基于颜色规格关键词推导，信号极弱，不等同于参考看板口径。"]
-    if custom_total == 0:
-        warnings.append("当前筛选范围未识别到任何定制订单。")
+    spu_rows = _fetch_records(
+        connection,
+        f"""{enriched}
+        SELECT spu, any_value(spu_product_name) AS productName,
+               sum(qty) AS sales,
+               sum(CASE WHEN is_custom THEN qty ELSE 0 END) AS custom_sales
+        FROM enriched GROUP BY spu ORDER BY sales DESC""",
+    )
+    spu_summary = [
+        {
+            "spu": r["spu"],
+            "productName": r.get("productName") or "",
+            "salesUnits": float(r["sales"] or 0),
+            "customSalesUnits": float(r["custom_sales"] or 0),
+            "customRate": (float(r["custom_sales"] or 0) / float(r["sales"]))
+            if float(r["sales"] or 0) > 0
+            else 0,
+        }
+        for r in spu_rows
+    ]
+
+    if not has_is_custom:
+        status = "degraded"
+        warnings = ["数仓缺「是否定制」字段，定制结构不可用。请检查 transforms.py 是否生成该字段。"]
+    elif custom_total == 0:
+        status = "degraded"
+        warnings = ["当前筛选范围未识别到任何定制订单。"]
+    else:
+        status = "ready"
+        warnings = []
 
     return {
         "comparison": comparison,
         "categoryStructure": category_structure,
         "tags": tags,
         "topProducts": top_products,
-        "derivationNote": "基于颜色规格关键词推导，不等同于 ERP 原生定制字段。当前数仓无定制标签字段，信号极弱。",
+        "spuSummary": spu_summary,
+        "derivationNote": "是否定制 = 卖家备注含 定制/折叠/横折/竖折（对齐 PBI 商家备注打标）；定制备注标签 4 类互斥（折叠 > 横折 > 竖折 > 其他定制）。",
         "quality": {"status": status, "coverage": None, "warnings": warnings},
     }
 

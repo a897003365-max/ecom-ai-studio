@@ -248,6 +248,9 @@ export interface ProductManagementKpis {
   totalGrossProfit: number | null;
   grossMargin: number | null;
   matchedProductCount: number | null;
+  customRate: number | null;
+  pendingUnits: number | null;
+  prevPendingUnits: number | null;
 }
 
 export interface ProductOverviewItem {
@@ -262,10 +265,16 @@ export interface ProductOverviewItem {
   orderLines: number;
   collectionRate: number | null;
   refundRate: number | null;
+  grossProfit: number | null;
+  matchedReceived: number | null;
+  grossMargin: number | null;
+  prevReceivedAmount: number | null;
 }
 
 export interface ProductNameOverviewItem {
   productName: string;
+  productCode: string | null;
+  spu: string;
   category: string;
   salesUnits: number;
   salesAmount: number;
@@ -278,7 +287,8 @@ export interface ProductNameOverviewItem {
   avgUnitPrice: number | null;
   refundRate: number | null;
   grossMargin: number | null;
-  imageUrl?: string | null;
+  prevReceivedAmount: number | null;
+  imageUrl: string | null;
 }
 
 export interface ProductDailyTrendItem {
@@ -288,6 +298,9 @@ export interface ProductDailyTrendItem {
   salesAmount: number;
   refundAmount: number;
   orderLines: number;
+  grossProfit: number | null;
+  matchedReceived: number | null;
+  grossMargin: number | null;
 }
 
 export interface ProductMonthlyTrendItem {
@@ -296,6 +309,9 @@ export interface ProductMonthlyTrendItem {
   salesUnits: number;
   salesAmount: number;
   refundAmount: number;
+  refundRate: number | null;
+  grossProfit: number | null;
+  grossMargin: number | null;
   orderLines: number;
 }
 
@@ -334,6 +350,7 @@ export interface ProductMattressCategoryBreakdownItem {
   amountShare: number;
   refundRate: number | null;
   grossMargin: number | null;
+  prevReceivedAmount: number | null;
 }
 
 export interface ProductDarenBreakdownItem {
@@ -354,15 +371,12 @@ export interface ProductCategoryBreakdownItem {
 }
 
 export interface ProductReturnRankingItem {
-  productCode: string;
+  spu: string;
   productName: string;
-  refundUnits: number;
   refundAmount: number;
   receivedAmount: number;
   orderLines: number;
   refundRate: number | null;
-  refundOrderCount: number;
-  refundOrderShare: number | null;
 }
 
 export interface ProductReturnDimensionBreakdownItem {
@@ -372,6 +386,8 @@ export interface ProductReturnDimensionBreakdownItem {
   refundOrderCount: number;
   refundOrderShare: number | null;
   refundRate: number | null;
+  preShipRefundShare: number | null;
+  fullRefundShare: number | null;
   receivedAmount: number;
   orderLines: number;
 }
@@ -395,6 +411,7 @@ export interface ProductManagementPages {
   productOverview: ProductOverviewItem[];
   productNameOverview: ProductNameOverviewItem[];
   dailyTrend: ProductDailyTrendItem[];
+  previousDailyTrend: ProductDailyTrendItem[];
   monthlyTrend: ProductMonthlyTrendItem[];
   storeBreakdown: ProductStoreBreakdownItem[];
   channelBreakdown: ProductChannelBreakdownItem[];
@@ -411,6 +428,9 @@ export interface ProductManagementPages {
   categoryChannelMatrix: ProductMatrix;
   warehouseStatusMatrix: ProductMatrix;
   dailyChannelMatrix: ProductMatrix;
+  dailyWarehouseMatrix: ProductMatrix;
+  dailyCategoryMatrix: ProductMatrix;
+  dailyChannelMarginMatrix: ProductMatrix;
   dailyStatusMatrix: ProductMatrix;
   productChannelMatrix: ProductMatrix;
   productStatusMatrix: ProductMatrix;
@@ -432,14 +452,16 @@ export interface ProductManagementPages {
 export interface ProductMonthlyComparison {
   currentMonth: string;
   previousMonth: string | null;
-  current: Record<string, number>;
-  previous: Record<string, number>;
+  currentPeriod: { start: string; end: string };
+  previousPeriod: { start: string; end: string } | null;
+  current: Record<string, number | null>;
+  previous: Record<string, number | null>;
   deltas: Record<string, number | null>;
 }
 
 export interface ProductMatrix {
   columns: string[];
-  rows: Array<{ rowKey: string; values: Record<string, number>; total: number }>;
+  rows: Array<{ rowKey: string; values: Record<string, number | null>; total: number | null }>;
 }
 
 // ---- 商品管理新增四模块：价格 / 尺寸 / SPU 销量 / 定制结构（推导）----
@@ -494,8 +516,10 @@ export interface ProductPriceBucketRow {
   orderLines: number;
   orderLineShare: number;
   salesUnits: number;
+  salesUnitsShare: number;
   receivedAmount: number;
   receivedAmountShare: number;
+  topProducts: string;
 }
 
 export interface ProductPriceStructurePages {
@@ -519,6 +543,7 @@ export interface ProductSizeRow {
   orderLines: number;
   orderLineShare: number;
   salesUnits: number;
+  salesUnitsShare: number;
   receivedAmount: number;
   receivedAmountShare: number;
 }
@@ -567,20 +592,13 @@ export interface ProductSpuSalesTrendPages {
   quality: ProductModuleQuality;
 }
 
-// 定制结构（推导）
-export type ProductCustomTag =
-  | "定制尺寸"
-  | "未填写标签"
-  | "定制厚度"
-  | "定制内材"
-  | "定制折叠"
-  | "定制异形"
-  | "定制缺角";
-
+// 定制结构（对齐 PBI 商家备注打标）
 export interface ProductCustomComparisonRow {
   orderType: "常规" | "定制";
   orderLines: number;
   orderLineShare: number;
+  salesUnits: number;
+  salesUnitsShare: number;
   receivedAmount: number;
   grossMargin: number | null;
   shippedOrderLines: number;
@@ -590,7 +608,7 @@ export interface ProductCustomComparisonRow {
 }
 
 export interface ProductCustomTagRow {
-  tag: ProductCustomTag;
+  tag: string;
   orderLines: number;
   customOrderLineShare: number;
 }
@@ -608,6 +626,7 @@ export interface ProductCustomProductRow {
   productName: string;
   totalOrderLines: number;
   customOrderLines: number;
+  customSalesUnits: number;
   customShareWithinProduct: number;
   customReceivedAmount: number;
   shippedCustomOrderLines: number;
@@ -616,11 +635,20 @@ export interface ProductCustomProductRow {
   shippedWithin15DaysShare: number | null;
 }
 
+export interface ProductCustomSpuRow {
+  spu: string;
+  productName: string;
+  salesUnits: number;
+  customSalesUnits: number;
+  customRate: number;
+}
+
 export interface ProductCustomizationStructurePages {
   comparison: ProductCustomComparisonRow[];
   categoryStructure: ProductCustomCategoryRow[];
   tags: ProductCustomTagRow[];
   topProducts: ProductCustomProductRow[];
+  spuSummary: ProductCustomSpuRow[];
   derivationNote: string;
   quality: ProductModuleQuality;
 }

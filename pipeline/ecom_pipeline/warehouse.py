@@ -842,6 +842,14 @@ def _build_powerbi_pages(
     }
 
 
+def _month_to_range(month: str) -> tuple[str, str]:
+    """自然月字符串 'YYYY-MM' -> (首日, 月末) ISO 日期元组。"""
+    y, m = int(month[:4]), int(month[5:7])
+    first = date(y, m, 1)
+    last = date(y + (m // 12), (m % 12) + 1, 1) - timedelta(days=1)
+    return (first.isoformat(), last.isoformat())
+
+
 def _build_product_management_pages(
     connection: duckdb.DuckDBPyConnection,
     start: str | None = None,
@@ -868,6 +876,7 @@ def _build_product_management_pages(
             "productOverview": [],
             "productNameOverview": [],
             "dailyTrend": [],
+            "previousDailyTrend": [],
             "monthlyTrend": [],
             "storeBreakdown": [],
             "channelBreakdown": [],
@@ -884,6 +893,9 @@ def _build_product_management_pages(
             "categoryChannelMatrix": {"columns": [], "rows": []},
             "warehouseStatusMatrix": {"columns": [], "rows": []},
             "dailyChannelMatrix": {"columns": [], "rows": []},
+            "dailyWarehouseMatrix": {"columns": [], "rows": []},
+            "dailyCategoryMatrix": {"columns": [], "rows": []},
+            "dailyChannelMarginMatrix": {"columns": [], "rows": []},
             "dailyStatusMatrix": {"columns": [], "rows": []},
             "productChannelMatrix": {"columns": [], "rows": []},
             "productStatusMatrix": {"columns": [], "rows": []},
@@ -937,30 +949,43 @@ def _build_product_management_pages(
     available_store_short_names = _available_dimension_values(store_short_column)
 
     # 切片器过滤：日期范围 + 订单状态 + 渠道平台 + 店铺简称，创建临时视图替换 base_view。
+    # 上期数据可能落在日期范围之外（如仅选本月时上月为上期），因此单独保留一份
+    # 不带日期过滤、但保留其他维度过滤的视图 _jt_filtered_other，供上期查询使用。
     date_filter = None
-    conds: list[str] = []
+    date_conds: list[str] = []
+    other_conds: list[str] = []
     if start and end and _re.fullmatch(r"\d{4}-\d{2}-\d{2}", start) and _re.fullmatch(r"\d{4}-\d{2}-\d{2}", end):
-        conds.append(f'"订单日期" >= DATE \'{start}\' AND "订单日期" <= DATE \'{end}\'')
+        date_conds.append(f'"订单日期" >= DATE \'{start}\' AND "订单日期" <= DATE \'{end}\'')
         date_filter = (start, end)
     if statuses:
         escaped = ",".join("'" + s.replace("'", "''") + "'" for s in statuses if s)
         if escaped:
-            conds.append(f'"订单状态明细" IN ({escaped})')
+            other_conds.append(f'"订单状态明细" IN ({escaped})')
     if channels and "渠道平台" in source_columns:
         channel_filter = _in_filter("渠道平台", channels)
         if channel_filter:
-            conds.append(channel_filter)
+            other_conds.append(channel_filter)
     if store_short_names and store_short_column:
         store_filter = _in_filter(store_short_column, store_short_names)
         if store_filter:
-            conds.append(store_filter)
-    if conds:
+            other_conds.append(store_filter)
+
+    all_conds = date_conds + other_conds
+    if all_conds:
         connection.execute(
-            f'CREATE OR REPLACE TEMP VIEW _jt_filtered AS SELECT * FROM {base_view} WHERE {" AND ".join(conds)}'
+            f'CREATE OR REPLACE TEMP VIEW _jt_filtered AS SELECT * FROM {base_view} WHERE {" AND ".join(all_conds)}'
         )
         view = "_jt_filtered"
     else:
         view = base_view
+
+    if other_conds:
+        connection.execute(
+            f'CREATE OR REPLACE TEMP VIEW _jt_filtered_other AS SELECT * FROM {base_view} WHERE {" AND ".join(other_conds)}'
+        )
+        prev_view = "_jt_filtered_other"
+    else:
+        prev_view = base_view
 
     if date_filter:
         period = (start, end)
@@ -968,6 +993,41 @@ def _build_product_management_pages(
         period = connection.execute(
             f'SELECT min("订单日期"), max("订单日期") FROM {view} WHERE "订单日期" IS NOT NULL'
         ).fetchone()
+
+    # 期间对比窗口：当期 = 所选日期范围（x 天），上期 = 所选范围前一段等长窗口（x 天）。
+    # 例：选 2026-07-01~07-31（31 天），上期 = 2026-05-31~06-30（31 天）。
+    # 未选日期时回退到数据中最后两个自然月（首日~月末），保持默认看板行为。
+    cur_range: tuple[str, str] | None = None
+    prev_range: tuple[str, str] | None = None
+    cur_label: str | None = None
+    prev_label: str | None = None
+    if date_filter:
+        try:
+            start_d = date.fromisoformat(start)
+            end_d = date.fromisoformat(end)
+            span = (end_d - start_d).days + 1  # 含首尾天数
+            if span > 0:
+                cur_range = (start, end)
+                cur_label = f"{start_d.strftime('%m.%d')}-{end_d.strftime('%m.%d')}"
+                prev_end_d = start_d - timedelta(days=1)
+                prev_start_d = prev_end_d - timedelta(days=span - 1)
+                prev_range = (prev_start_d.isoformat(), prev_end_d.isoformat())
+                prev_label = f"{prev_start_d.strftime('%m.%d')}-{prev_end_d.strftime('%m.%d')}"
+        except (ValueError, TypeError):
+            cur_range = None
+    if cur_range is None:
+        months = connection.execute(
+            f"""SELECT strftime('%Y-%m', "订单日期") AS month FROM {view}
+               WHERE "订单日期" IS NOT NULL GROUP BY 1 ORDER BY 1 DESC LIMIT 2"""
+        ).fetchall()
+        if months:
+            cur_m = months[0][0]
+            cur_range = _month_to_range(cur_m)
+            cur_label = cur_m
+            if len(months) >= 2:
+                prev_m = months[1][0]
+                prev_range = _month_to_range(prev_m)
+                prev_label = prev_m
 
     # 产品主表（提供产品名称、成本、床垫类别），join 聚水潭计算毛利率与各产品分析。
     try:
@@ -1113,6 +1173,26 @@ def _build_product_management_pages(
         f'SELECT count(DISTINCT "商品编码") FROM {view} WHERE "商品编码" IS NOT NULL'
     ).fetchone()[0] or 0
     order_lines = connection.execute(f"SELECT count(*) FROM {view}").fetchone()[0] or 0
+    # 定制率 = 定制销量 / 总销量（是否定制由 transforms.py 从卖家备注推导，对齐 PBI）。
+    custom_rate = None
+    if "是否定制" in source_columns and total_sales_units:
+        custom_sales_units = float(
+            connection.execute(
+                f'SELECT sum(coalesce(try_cast("销售数量" AS DOUBLE), 0)) FROM {view} '
+                f'WHERE coalesce(try_cast("是否定制" AS BOOLEAN), FALSE)'
+            ).fetchone()[0]
+            or 0
+        )
+        custom_rate = round(custom_sales_units / total_sales_units, 4)
+    # 待发货件数 = 订单状态明细含「待发货」的销售数量合计（当前过滤期）。上期值在 prev_m 确定后回填。
+    pending_units = float(
+        connection.execute(
+            f"""SELECT sum(coalesce(try_cast(s."销售数量" AS DOUBLE), 0))
+                FROM {view} s
+                WHERE cast(s."订单状态明细" AS VARCHAR) LIKE '%待发货%'"""
+        ).fetchone()[0]
+        or 0
+    )
     # 商品管理统一使用商家实收作为金额口径；回款率 = 商家实收 / 销售金额。
     # 0.01 链接、礼品袋等已在转换层按 PBIX M 规则置零并过滤，销售数量可安全用于销量口径。
     kpis = {
@@ -1131,7 +1211,19 @@ def _build_product_management_pages(
         "totalGrossProfit": gross_profit if has_master else None,
         "grossMargin": round(gross_profit / matched_received, 4) if has_master and matched_received else None,
         "matchedProductCount": matched_codes if has_master else None,
+        "customRate": custom_rate,
+        "pendingUnits": int(pending_units) if pending_units else 0,
+        "prevPendingUnits": None,
     }
+
+    # 毛利列片段：毛利额 = 商家实收 - 成本 × 销售数量（与 PBIX 15 查询口径一致）。
+    # SKU、趋势和各维度明细统一复用，保证汇总可以从 SKU 逐项复核。
+    margin_select = (
+        "sum(CASE WHEN pm.\"成本\" IS NOT NULL THEN coalesce(try_cast(s.\"商家实收\" AS DOUBLE),0) "
+        "- coalesce(try_cast(pm.\"成本\" AS DOUBLE),0)*coalesce(try_cast(s.\"销售数量\" AS DOUBLE),0) ELSE 0 END) AS grossProfit, "
+        "sum(CASE WHEN pm.\"成本\" IS NOT NULL THEN coalesce(try_cast(s.\"商家实收\" AS DOUBLE),0) ELSE 0 END) AS matchedReceived, "
+        if has_master else "0 AS grossProfit, 0 AS matchedReceived, "
+    )
 
     product_overview = _records(
         connection,
@@ -1144,6 +1236,7 @@ def _build_product_management_pages(
                sum(coalesce(try_cast(s."商家实收" AS DOUBLE),0)) AS receivedAmount,
                sum(coalesce(try_cast(s."销售金额" AS DOUBLE),0)) AS salesAmount,
                sum(coalesce(try_cast(s."退货金额" AS DOUBLE),0)) AS refundAmount,
+               {margin_select}
                count(*) AS orderLines
         FROM {view} s {pm_join}
         WHERE s."商品编码" IS NOT NULL
@@ -1153,24 +1246,66 @@ def _build_product_management_pages(
     for row in product_overview:
         sales = row.get("salesAmount") or 0
         received = row.get("receivedAmount") or 0
+        matched = row.get("matchedReceived") or 0
+        gross_profit_row = row.get("grossProfit") or 0
         row["collectionRate"] = round(received / sales, 4) if sales else None
         row["refundRate"] = round(row["refundAmount"] / received, 4) if received else None
+        row["grossProfit"] = gross_profit_row if has_master else None
+        row["matchedReceived"] = matched if has_master else None
+        row["grossMargin"] = round(gross_profit_row / matched, 4) if (has_master and matched > 0) else None
+        row["prevReceivedAmount"] = None
 
     daily_trend = _records(
         connection,
         f"""
-        SELECT "订单日期" AS date,
-               sum(coalesce(try_cast("商家实收" AS DOUBLE),0)) AS receivedAmount,
-               sum(coalesce(try_cast("销售数量" AS DOUBLE),0)) AS salesUnits,
-               sum(coalesce(try_cast("销售金额" AS DOUBLE),0)) AS salesAmount,
-               sum(coalesce(try_cast("退货金额" AS DOUBLE),0)) AS refundAmount,
+        SELECT s."订单日期" AS date,
+               sum(coalesce(try_cast(s."商家实收" AS DOUBLE),0)) AS receivedAmount,
+               sum(coalesce(try_cast(s."销售数量" AS DOUBLE),0)) AS salesUnits,
+               sum(coalesce(try_cast(s."销售金额" AS DOUBLE),0)) AS salesAmount,
+               sum(coalesce(try_cast(s."退货金额" AS DOUBLE),0)) AS refundAmount,
+               {margin_select}
                count(*) AS orderLines
-        FROM {view}
-        WHERE "订单日期" IS NOT NULL
-          AND "订单日期" >= (SELECT max("订单日期") - INTERVAL 400 DAY FROM {view})
+        FROM {view} s {pm_join}
+        WHERE s."订单日期" IS NOT NULL
+          AND s."订单日期" >= (SELECT max("订单日期") - INTERVAL 400 DAY FROM {view})
         GROUP BY 1 ORDER BY 1
         """,
     )
+    for _row in daily_trend:
+        _matched = _row.get("matchedReceived") or 0
+        _gp = _row.get("grossProfit") or 0
+        _row["grossProfit"] = _gp if has_master else None
+        _row["matchedReceived"] = _matched if has_master else None
+        _row["grossMargin"] = round(_gp / _matched, 4) if (has_master and _matched > 0) else None
+
+    # 上期每日趋势：取自不带日期过滤的 prev_view，限制到 prev_range，
+    # 供总览趋势图按日序对齐上期（第 1 天对第 1 天）。
+    if prev_range:
+        previous_daily_trend = _records(
+            connection,
+            f"""
+            SELECT s."订单日期" AS date,
+                   sum(coalesce(try_cast(s."商家实收" AS DOUBLE),0)) AS receivedAmount,
+                   sum(coalesce(try_cast(s."销售数量" AS DOUBLE),0)) AS salesUnits,
+                   sum(coalesce(try_cast(s."销售金额" AS DOUBLE),0)) AS salesAmount,
+                   sum(coalesce(try_cast(s."退货金额" AS DOUBLE),0)) AS refundAmount,
+                   {margin_select}
+                   count(*) AS orderLines
+            FROM {prev_view} s {pm_join}
+            WHERE s."订单日期" IS NOT NULL
+              AND s."订单日期" >= CAST(? AS DATE) AND s."订单日期" <= CAST(? AS DATE)
+            GROUP BY 1 ORDER BY 1
+            """,
+            [prev_range[0], prev_range[1]],
+        )
+        for _row in previous_daily_trend:
+            _matched = _row.get("matchedReceived") or 0
+            _gp = _row.get("grossProfit") or 0
+            _row["grossProfit"] = _gp if has_master else None
+            _row["matchedReceived"] = _matched if has_master else None
+            _row["grossMargin"] = round(_gp / _matched, 4) if (has_master and _matched > 0) else None
+    else:
+        previous_daily_trend = []
 
     store_breakdown = _records(
         connection,
@@ -1215,30 +1350,55 @@ def _build_product_management_pages(
         """,
     )
 
+    q18_join = (
+        f' LEFT JOIN {q18_view} q18 ON s."商品编码" = q18."商家规编（后台）"'
+        if q18_view and "SPU产品商编" in q18_columns and "商家规编（后台）" in q18_columns
+        else ""
+    )
+    spu_expr = (
+        "coalesce(nullif(trim(cast(q18.\"SPU产品商编\" AS VARCHAR)), ''), '未识别 SPU')"
+        if q18_join
+        else "'未识别 SPU'"
+    )
+    # 重点商品表用去重后的 SPU 子查询，避免 q18 一对多 JOIN 放大 product_name_overview 的金额汇总。
+    q18_spu_join = (
+        f' LEFT JOIN (SELECT "商家规编（后台）" AS _sku, any_value("SPU产品商编") AS _spu '
+        f'FROM {q18_view} WHERE "商家规编（后台）" IS NOT NULL GROUP BY 1) q18s '
+        f'ON s."商品编码" = q18s._sku'
+        if q18_view and "SPU产品商编" in q18_columns and "商家规编（后台）" in q18_columns
+        else ""
+    )
+    spu_col_expr = (
+        "coalesce(nullif(trim(cast(q18s._spu AS VARCHAR)), ''), '未识别 SPU')"
+        if q18_spu_join
+        else "'未识别 SPU'"
+    )
     return_ranking = _records(
         connection,
         f"""
-        SELECT s."商品编码" AS productCode,
-               any_value({product_name_expr}) AS productName,
-               sum(coalesce(try_cast(s."退货数量" AS DOUBLE),0)) AS refundUnits,
+        SELECT any_value({spu_expr}) AS spu,
+               {product_name_expr} AS productName,
                sum(coalesce(try_cast(s."退货金额" AS DOUBLE),0)) AS refundAmount,
                sum(coalesce(try_cast(s."商家实收" AS DOUBLE),0)) AS receivedAmount,
-               sum(CASE WHEN cast(s."订单状态明细" AS VARCHAR) LIKE '%交易关闭%' THEN 1 ELSE 0 END) AS refundOrderCount,
                count(*) AS orderLines
-        FROM {view} s {pm_join}
-        WHERE s."商品编码" IS NOT NULL
-        GROUP BY 1 ORDER BY refundAmount DESC NULLS LAST LIMIT 5000
+        FROM {view} s {pm_join}{q18_join}
+        WHERE {product_name_expr} IS NOT NULL
+        GROUP BY 2 ORDER BY refundAmount DESC NULLS LAST LIMIT 5000
         """,
     )
     for row in return_ranking:
         received = row.get("receivedAmount") or 0
-        order_lines = row.get("orderLines") or 0
         row["refundRate"] = round(row["refundAmount"] / received, 4) if received else None
-        row["refundOrderShare"] = round(row["refundOrderCount"] / order_lines, 4) if order_lines else None
 
     # 退货维度拆分：渠道/店铺/达人/床垫类别。退款订单 = 订单状态明细含「交易关闭」
     # （仅退款 + 退货退款两个子类，合计贡献 100% 退货金额）。
     # 退货率 = 退货金额/商家实收；退款订单占比 = 交易关闭订单数/订单行。
+    has_ship_date = "发货日期" in source_columns
+    pre_ship_case = (
+        "sum(CASE WHEN coalesce(try_cast(s.\"退货金额\" AS DOUBLE),0) > 0 AND s.\"发货日期\" IS NULL "
+        "THEN coalesce(try_cast(s.\"销售数量\" AS DOUBLE),0) ELSE 0 END) AS preShipRefundUnits"
+        if has_ship_date else "0 AS preShipRefundUnits"
+    )
     def _return_breakdown(dim_expr: str, where: str, join: str = "", limit: int = 50) -> list[dict]:
         rows = _records(
             connection,
@@ -1248,6 +1408,13 @@ def _build_product_management_pages(
                    sum(coalesce(try_cast(s."退货数量" AS DOUBLE),0)) AS refundUnits,
                    sum(CASE WHEN cast(s."订单状态明细" AS VARCHAR) LIKE '%交易关闭%' THEN 1 ELSE 0 END) AS refundOrderCount,
                    sum(coalesce(try_cast(s."商家实收" AS DOUBLE),0)) AS receivedAmount,
+                   sum(coalesce(try_cast(s."销售数量" AS DOUBLE),0)) AS salesUnits,
+                   sum(CASE WHEN coalesce(try_cast(s."退货金额" AS DOUBLE),0) > 0
+                            THEN coalesce(try_cast(s."销售数量" AS DOUBLE),0) ELSE 0 END) AS refundSalesUnits,
+                   {pre_ship_case},
+                   sum(CASE WHEN coalesce(try_cast(s."退货金额" AS DOUBLE),0) > 0
+                            AND coalesce(try_cast(s."退货金额" AS DOUBLE),0) >= coalesce(try_cast(s."商家实收" AS DOUBLE),0)
+                            THEN coalesce(try_cast(s."销售数量" AS DOUBLE),0) ELSE 0 END) AS fullRefundUnits,
                    count(*) AS orderLines
             FROM {view} s {join}
             WHERE {where}
@@ -1257,8 +1424,11 @@ def _build_product_management_pages(
         for row in rows:
             received = row.get("receivedAmount") or 0
             order_lines = row.get("orderLines") or 0
+            refund_sales_units = row.get("refundSalesUnits") or 0
             row["refundRate"] = round(row["refundAmount"] / received, 4) if received else None
             row["refundOrderShare"] = round(row["refundOrderCount"] / order_lines, 4) if order_lines else None
+            row["preShipRefundShare"] = round(row["preShipRefundUnits"] / refund_sales_units, 4) if refund_sales_units else None
+            row["fullRefundShare"] = round(row["fullRefundUnits"] / refund_sales_units, 4) if refund_sales_units else None
         return rows
 
     daren_dim_expr = f"coalesce({_nonempty_text('s', '达人名称')}, '(无达人)')"
@@ -1316,16 +1486,13 @@ def _build_product_management_pages(
     )
 
     # 单品明细分析表按产品主数据的产品名称聚合；未匹配时才回退到订单商品简称。
-    margin_select = (
-        "sum(CASE WHEN pm.\"成本\" IS NOT NULL THEN coalesce(try_cast(s.\"商家实收\" AS DOUBLE),0) "
-        "- coalesce(try_cast(pm.\"成本\" AS DOUBLE),0)*coalesce(try_cast(s.\"销售数量\" AS DOUBLE),0) ELSE 0 END) AS grossProfit, "
-        "sum(CASE WHEN pm.\"成本\" IS NOT NULL THEN coalesce(try_cast(s.\"商家实收\" AS DOUBLE),0) ELSE 0 END) AS matchedReceived, "
-        if has_master else "0 AS grossProfit, 0 AS matchedReceived, "
-    )
     product_name_overview = _records(
         connection,
         f"""
         SELECT {product_name_expr} AS productName,
+               any_value(s."商品编码") AS productCode,
+               any_value({spu_col_expr}) AS spu,
+               count(DISTINCT {spu_col_expr}) AS _spuCount,
                any_value(s."产品分类") AS category,
                sum(coalesce(try_cast(s."销售数量" AS DOUBLE),0)) AS salesUnits,
                sum(coalesce(try_cast(s."销售金额" AS DOUBLE),0)) AS salesAmount,
@@ -1333,7 +1500,7 @@ def _build_product_management_pages(
                sum(coalesce(try_cast(s."商家实收" AS DOUBLE),0)) AS receivedAmount,
                {margin_select}
                count(*) AS orderLines
-        FROM {view} s {pm_join}
+        FROM {view} s {pm_join}{q18_spu_join}
         WHERE {product_name_expr} <> '(未命名)'
         GROUP BY 1 ORDER BY receivedAmount DESC NULLS LAST LIMIT 500000
         """,
@@ -1347,6 +1514,50 @@ def _build_product_management_pages(
         row["avgUnitPrice"] = round(row["receivedAmount"] / units, 2) if units else None  # 件单件
         row["refundRate"] = round(row["refundAmount"] / received, 4) if received else None
         row["grossMargin"] = round(row["grossProfit"] / matched, 4) if matched else None  # 毛利率
+        row["prevReceivedAmount"] = None  # 上期商家实收，在 prev_m 确定后回填
+        row["imageUrl"] = None
+
+    # 商品画册只接受「单一 SPU -> 单一白名单图片 URL」映射。
+    # 商家编码可能是“产品名/SPU”组合，因此只按完整值或明确分隔段匹配；任何多图候选都留空。
+    try:
+        image_catalog_view = _model_view(connection, "05-旗舰店ID对照表")
+        image_catalog_columns = {row[0] for row in connection.execute(f"DESCRIBE {image_catalog_view}").fetchall()}
+    except ValueError:
+        image_catalog_view = None
+        image_catalog_columns = set()
+    if image_catalog_view and {"商家编码", "商品图片"}.issubset(image_catalog_columns):
+        image_rows = _records(
+            connection,
+            f"""
+            SELECT cast("商家编码" AS VARCHAR) AS merchantCode,
+                   cast("商品图片" AS VARCHAR) AS imageUrl
+            FROM {image_catalog_view}
+            WHERE "商家编码" IS NOT NULL AND "商品图片" IS NOT NULL
+            """,
+        )
+        images_by_code: dict[str, set[str]] = {}
+        for image_row in image_rows:
+            safe_url = _safe_product_image(image_row.get("imageUrl"))
+            merchant_code = str(image_row.get("merchantCode") or "").strip()
+            if not safe_url or not merchant_code:
+                continue
+            segments = {merchant_code.casefold()}
+            segments.update(
+                segment.strip().casefold()
+                for segment in _re.split(r"[/\\|,，;；\s]+", merchant_code)
+                if segment.strip()
+            )
+            for segment in segments:
+                images_by_code.setdefault(segment, set()).add(safe_url)
+        for row in product_name_overview:
+            spu = str(row.get("spu") or "").strip().casefold()
+            candidates = images_by_code.get(spu, set()) if row.get("_spuCount") == 1 and spu != "未识别 spu" else set()
+            if len(candidates) == 1:
+                row["imageUrl"] = next(iter(candidates))
+            row.pop("_spuCount", None)
+    else:
+        for row in product_name_overview:
+            row.pop("_spuCount", None)
 
     # 商品图匹配：按产品名称从 05-旗舰店ID对照表 匹配 imageUrl
     product_name_catalog = _source_view(connection, "05-旗舰店ID对照表")
@@ -1423,16 +1634,29 @@ def _build_product_management_pages(
     monthly_trend = _records(
         connection,
         f"""
-        SELECT strftime('%Y-%m', "订单日期") AS month,
-               sum(coalesce(try_cast("商家实收" AS DOUBLE),0)) AS receivedAmount,
-               sum(coalesce(try_cast("销售数量" AS DOUBLE),0)) AS salesUnits,
-               sum(coalesce(try_cast("销售金额" AS DOUBLE),0)) AS salesAmount,
-               sum(coalesce(try_cast("退货金额" AS DOUBLE),0)) AS refundAmount,
+        SELECT strftime('%Y-%m', s."订单日期") AS month,
+               sum(coalesce(try_cast(s."商家实收" AS DOUBLE),0)) AS receivedAmount,
+               sum(coalesce(try_cast(s."销售数量" AS DOUBLE),0)) AS salesUnits,
+               sum(coalesce(try_cast(s."销售金额" AS DOUBLE),0)) AS salesAmount,
+               sum(coalesce(try_cast(s."退货金额" AS DOUBLE),0)) AS refundAmount,
+               {margin_select}
                count(*) AS orderLines
-        FROM {view} WHERE "订单日期" IS NOT NULL
+        FROM {view} s {pm_join}
+        WHERE s."订单日期" IS NOT NULL
         GROUP BY 1 ORDER BY 1
         """,
     )
+    for row in monthly_trend:
+        received = row.get("receivedAmount") or 0
+        matched = row.get("matchedReceived") or 0
+        gross_profit = row.get("grossProfit") or 0
+        row["refundRate"] = round(row["refundAmount"] / received, 4) if received else None
+        if has_master and matched:
+            row["grossProfit"] = gross_profit
+            row["grossMargin"] = round(gross_profit / matched, 4)
+        else:
+            row["grossProfit"] = None
+            row["grossMargin"] = None
 
     # 床垫类别销售分析表（join 产品主表，对齐参考看板「床垫类别销售分析表」）
     if has_master:
@@ -1458,20 +1682,23 @@ def _build_product_management_pages(
             row["amountShare"] = round(received / cat_total, 4)
             row["refundRate"] = round(row["refundAmount"] / received, 4) if received else None
             row["grossMargin"] = round(row["grossProfit"] / matched, 4) if matched else None
+            row["prevReceivedAmount"] = None  # 上期商家实收，在 prev_m 确定后回填
     else:
         mattress_category_breakdown = []
 
-    # 月环比（对齐参考看板「整体经营总览」：本月 vs 上月）
-    months = connection.execute(
-        f"""SELECT strftime('%Y-%m', "订单日期") AS month FROM {view}
-           WHERE "订单日期" IS NOT NULL GROUP BY 1 ORDER BY 1 DESC LIMIT 2"""
-    ).fetchall()
+    # 期间对比：当期 = cur_range（所选范围或最后完整月），上期 = prev_range（等长前序窗口）。
+    # currentPeriod/previousPeriod 暴露精确日期，供前端趋势图按日序对齐。
     monthly_comparison = None
-    if len(months) >= 1:
-        cur_m, prev_m = months[0][0], (months[1][0] if len(months) >= 2 else None)
+    if cur_range:
 
-        def _month_totals(month: str | None) -> dict[str, Any]:
-            if not month:
+        has_is_custom_month = "是否定制" in source_columns
+        custom_sales_col = (
+            "sum(CASE WHEN coalesce(try_cast(s.\"是否定制\" AS BOOLEAN), FALSE) "
+            "THEN coalesce(try_cast(s.\"销售数量\" AS DOUBLE),0) ELSE 0 END) AS customSales"
+            if has_is_custom_month else "0 AS customSales"
+        )
+        def _range_totals(rng: tuple[str, str] | None, query_view: str) -> dict[str, Any]:
+            if not rng:
                 return {}
             row = connection.execute(
                 f"""
@@ -1479,26 +1706,110 @@ def _build_product_management_pages(
                   sum(coalesce(try_cast(s."商家实收" AS DOUBLE),0)) AS receivedAmount,
                   sum(coalesce(try_cast(s."销售金额" AS DOUBLE),0)) AS salesAmount,
                   sum(coalesce(try_cast(s."退货金额" AS DOUBLE),0)) AS refundAmount,
-                  count(*) AS orderLines
-                FROM {view} s WHERE strftime('%Y-%m', s."订单日期") = ?
+                  sum(coalesce(try_cast(s."销售数量" AS DOUBLE),0)) AS salesUnits,
+                  count(*) AS orderLines,
+                  {margin_select}
+                  {custom_sales_col}
+                FROM {query_view} s {pm_join}
+                WHERE s."订单日期" >= CAST(? AS DATE) AND s."订单日期" <= CAST(? AS DATE)
                 """,
-                [month],
+                [rng[0], rng[1]],
             ).fetchone()
-            return {"receivedAmount": float(row[0] or 0), "salesAmount": float(row[1] or 0),
-                    "refundAmount": float(row[2] or 0), "orderLines": int(row[3] or 0)}
+            received = float(row[0] or 0)
+            refund = float(row[2] or 0)
+            sales_units = float(row[3] or 0)
+            gross_profit = float(row[5] or 0)
+            matched = float(row[6] or 0)
+            custom_sales = float(row[7] or 0)
+            return {
+                "receivedAmount": received,
+                "salesAmount": float(row[1] or 0),
+                "refundAmount": refund,
+                "salesUnits": sales_units,
+                "orderLines": int(row[4] or 0),
+                "netSales": received - refund,
+                "grossProfit": gross_profit if has_master else None,
+                "grossMargin": round(gross_profit / matched, 4) if (has_master and matched > 0) else None,
+                "avgUnitPrice": round(received / sales_units, 2) if sales_units > 0 else None,
+                "customRate": round(custom_sales / sales_units, 4) if (has_is_custom_month and sales_units > 0) else None,
+                "refundRate": round(refund / received, 4) if received > 0 else None,
+            }
 
-        cur = _month_totals(cur_m)
-        prev = _month_totals(prev_m)
+        cur = _range_totals(cur_range, view)
+        prev = _range_totals(prev_range, prev_view)
         if cur:
             def _delta(key: str) -> float | None:
-                if not prev or not prev.get(key) or prev[key] == 0:
+                if not prev or prev.get(key) is None or prev[key] == 0 or cur.get(key) is None:
                     return None
                 return round((cur[key] - prev[key]) / prev[key], 4)
             monthly_comparison = {
-                "currentMonth": cur_m, "previousMonth": prev_m,
+                "currentMonth": cur_label, "previousMonth": prev_label,
+                "currentPeriod": {"start": cur_range[0], "end": cur_range[1]},
+                "previousPeriod": {"start": prev_range[0], "end": prev_range[1]} if prev_range else None,
                 "current": cur, "previous": prev,
                 "deltas": {k: _delta(k) for k in cur},
             }
+
+    # 上期补充字段：待发货件数上期、床垫类别/重点商品的上期商家实收。
+    # 复用 monthlyComparison 的 prev_range 等长窗口口径，保证筛选视图下上期同口径。
+    if prev_range:
+        prev_pending_row = connection.execute(
+            f"""SELECT sum(coalesce(try_cast(s."销售数量" AS DOUBLE), 0)) AS pendingUnits
+                FROM {prev_view} s
+                WHERE cast(s."订单状态明细" AS VARCHAR) LIKE '%待发货%'
+                  AND s."订单日期" >= CAST(? AS DATE) AND s."订单日期" <= CAST(? AS DATE)""",
+            [prev_range[0], prev_range[1]],
+        ).fetchone()
+        prev_pending_val = float(prev_pending_row[0] or 0) if prev_pending_row else 0.0
+        kpis["prevPendingUnits"] = int(prev_pending_val) if prev_pending_val else 0
+
+        if product_overview:
+            sku_prev_rows = _records(
+                connection,
+                f"""SELECT s."商品编码" AS productCode,
+                       sum(coalesce(try_cast(s."商家实收" AS DOUBLE), 0)) AS prevReceivedAmount
+                FROM {prev_view} s
+                WHERE s."商品编码" IS NOT NULL
+                  AND s."订单日期" >= CAST(? AS DATE) AND s."订单日期" <= CAST(? AS DATE)
+                GROUP BY 1""",
+                [prev_range[0], prev_range[1]],
+            )
+            sku_prev_map = {
+                row["productCode"]: float(row.get("prevReceivedAmount") or 0)
+                for row in sku_prev_rows
+            }
+            for row in product_overview:
+                row["prevReceivedAmount"] = sku_prev_map.get(row["productCode"])
+
+        if has_master and mattress_category_breakdown:
+            cat_prev_rows = _records(
+                connection,
+                f"""SELECT pm."床垫类别" AS category,
+                       sum(coalesce(try_cast(s."商家实收" AS DOUBLE), 0)) AS prevReceivedAmount
+                FROM {prev_view} s {pm_join}
+                WHERE pm."床垫类别" IS NOT NULL AND trim(cast(pm."床垫类别" AS VARCHAR)) <> ''
+                  AND s."订单日期" >= CAST(? AS DATE) AND s."订单日期" <= CAST(? AS DATE)
+                GROUP BY 1""",
+                [prev_range[0], prev_range[1]],
+            )
+            cat_prev_map = {row["category"]: float(row.get("prevReceivedAmount") or 0) for row in cat_prev_rows}
+            for row in mattress_category_breakdown:
+                row["prevReceivedAmount"] = cat_prev_map.get(row["category"])
+
+        if product_name_overview:
+            name_prev_rows = _records(
+                connection,
+                f"""SELECT {product_name_expr} AS productName,
+                       sum(coalesce(try_cast(s."商家实收" AS DOUBLE), 0)) AS prevReceivedAmount
+                FROM {prev_view} s {pm_join}
+                WHERE {product_name_expr} <> '(未命名)'
+                  AND s."订单日期" >= CAST(? AS DATE) AND s."订单日期" <= CAST(? AS DATE)
+                GROUP BY 1""",
+                [prev_range[0], prev_range[1]],
+            )
+            name_prev_map = {row["productName"]: float(row.get("prevReceivedAmount") or 0) for row in name_prev_rows}
+            for row in product_name_overview:
+                row["prevReceivedAmount"] = name_prev_map.get(row["productName"])
 
     # 交叉矩阵统一使用已清洗的销售数量。
     if has_master:
@@ -1561,6 +1872,92 @@ def _build_product_management_pages(
         """,
         "row",
     )
+
+    # 每日 × 发货仓销量（用于每日经营趋势下方的折线图）
+    if "发货仓" in source_columns:
+        daily_warehouse_matrix = _matrix(
+            connection,
+            f"""
+            PIVOT (
+              SELECT cast(s."订单日期" AS VARCHAR) AS row,
+                      coalesce(cast(s."发货仓" AS VARCHAR), '(未设定)') AS warehouse,
+                      coalesce(try_cast(s."销售数量" AS DOUBLE),0) AS units
+              FROM {view} s
+              WHERE s."订单日期" IS NOT NULL
+                {daily_window}
+            ) ON warehouse USING sum(units) ORDER BY row
+            """,
+            "row",
+        )
+    else:
+        daily_warehouse_matrix = {"columns": [], "rows": []}
+
+    # 每日 × 床垫类别销量（用于产品分类分布时间序列折线图，空白归"其他"）
+    # 床垫类别取自辅4-床垫编码(q18)的大类（弹簧床垫/黄麻薄垫等），与 size_structure 优先级一致
+    if q18_view and "床垫类别" in q18_columns:
+        daily_category_matrix = _matrix(
+            connection,
+            f"""
+            PIVOT (
+              SELECT cast(s."订单日期" AS VARCHAR) AS row,
+                      coalesce(nullif(trim(cast(q18."床垫类别" AS VARCHAR)), ''), '其他') AS category,
+                      coalesce(try_cast(s."销售数量" AS DOUBLE),0) AS units
+              FROM {view} s LEFT JOIN {q18_view} q18 ON s."商品编码" = q18."商家规编（后台）"
+              WHERE s."订单日期" IS NOT NULL
+                {daily_window}
+            ) ON category USING sum(units) ORDER BY row
+            """,
+            "row",
+        )
+    else:
+        daily_category_matrix = {"columns": [], "rows": []}
+
+    # 每日 × 渠道毛利率（毛利额/匹配行商家实收，对齐 margin_select 口径）
+    if has_master and "渠道平台" in source_columns:
+        gp_matrix = _matrix(
+            connection,
+            f"""
+            PIVOT (
+              SELECT cast(s."订单日期" AS VARCHAR) AS row, {channel_expr} AS channel,
+                     CASE WHEN pm."成本" IS NOT NULL THEN coalesce(try_cast(s."商家实收" AS DOUBLE),0)
+                          - coalesce(try_cast(pm."成本" AS DOUBLE),0)*coalesce(try_cast(s."销售数量" AS DOUBLE),0) ELSE 0 END AS v
+              FROM {view} s {pm_join}
+              WHERE s."订单日期" IS NOT NULL {daily_window}
+            ) ON channel USING sum(v) ORDER BY row
+            """,
+            "row",
+        )
+        mr_matrix = _matrix(
+            connection,
+            f"""
+            PIVOT (
+              SELECT cast(s."订单日期" AS VARCHAR) AS row, {channel_expr} AS channel,
+                     CASE WHEN pm."成本" IS NOT NULL THEN coalesce(try_cast(s."商家实收" AS DOUBLE),0) ELSE 0 END AS v
+              FROM {view} s {pm_join}
+              WHERE s."订单日期" IS NOT NULL {daily_window}
+            ) ON channel USING sum(v) ORDER BY row
+            """,
+            "row",
+        )
+        gp_by_row = {r["rowKey"]: r for r in gp_matrix["rows"]}
+        margin_rows: list[dict[str, Any]] = []
+        for mr_row in mr_matrix["rows"]:
+            gp_row = gp_by_row.get(mr_row["rowKey"], {"values": {}, "total": 0})
+            values: dict[str, Any] = {}
+            for col in mr_matrix["columns"]:
+                gp = gp_row["values"].get(col, 0)
+                mr = mr_row["values"].get(col, 0)
+                values[col] = round(gp / mr, 4) if mr > 0 else None
+            total_gp = gp_row["total"]
+            total_mr = mr_row["total"]
+            margin_rows.append({
+                "rowKey": mr_row["rowKey"],
+                "values": values,
+                "total": round(total_gp / total_mr, 4) if total_mr > 0 else None,
+            })
+        daily_channel_margin_matrix = {"columns": mr_matrix["columns"], "rows": margin_rows}
+    else:
+        daily_channel_margin_matrix = {"columns": [], "rows": []}
 
     # 产品名称 × 渠道销量（产品主数据口径，Top 30）
     product_channel_matrix = _matrix(
@@ -1690,6 +2087,7 @@ def _build_product_management_pages(
         "productOverview": product_overview,
         "productNameOverview": product_name_overview,
         "dailyTrend": daily_trend,
+        "previousDailyTrend": previous_daily_trend,
         "monthlyTrend": monthly_trend,
         "storeBreakdown": store_breakdown,
         "channelBreakdown": channel_breakdown,
@@ -1706,6 +2104,9 @@ def _build_product_management_pages(
         "categoryChannelMatrix": category_channel_matrix,
         "warehouseStatusMatrix": warehouse_status_matrix,
         "dailyChannelMatrix": daily_channel_matrix,
+        "dailyWarehouseMatrix": daily_warehouse_matrix,
+        "dailyCategoryMatrix": daily_category_matrix,
+        "dailyChannelMarginMatrix": daily_channel_margin_matrix,
         "dailyStatusMatrix": daily_status_matrix,
         "productChannelMatrix": product_channel_matrix,
         "productStatusMatrix": product_status_matrix,

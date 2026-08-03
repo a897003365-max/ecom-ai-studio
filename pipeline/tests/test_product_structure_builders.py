@@ -67,7 +67,8 @@ class EmptyStructureSchemaTests(unittest.TestCase):
         self.assertEqual(result["tags"], [])
         self.assertEqual(result["topProducts"], [])
         self.assertEqual(result["categoryStructure"], [])
-        self.assertIn("推导", result["derivationNote"])
+        self.assertEqual(result["spuSummary"], [])
+        self.assertIn("卖家备注", result["derivationNote"])
         self.assertEqual(result["quality"]["status"], "unavailable")
 
 
@@ -342,6 +343,9 @@ class SizeStructureTests(unittest.TestCase):
             self.assertEqual(result["unknownSize"]["orderLines"], 1)
             total_share = sum(s["orderLineShare"] for s in result["sizes"]) + result["unknownSize"]["orderLineShare"]
             self.assertAlmostEqual(total_share, 1.0, places=6)
+            # 销量占比与订单行占比同口径：分母含未填写尺寸，加总为 1
+            total_units_share = sum(s["salesUnitsShare"] for s in result["sizes"]) + result["unknownSize"]["salesUnitsShare"]
+            self.assertAlmostEqual(total_units_share, 1.0, places=6)
         finally:
             con.close()
 
@@ -467,9 +471,9 @@ class SpuSalesTrendTests(unittest.TestCase):
 
 
 class CustomizationStructureTests(unittest.TestCase):
-    """Phase 5 定制结构（推导降级版）：常规不入标签、泛化信号归未填写、优先级、7 标签固定。"""
+    """定制结构：基于「是否定制」字段（对齐 PBI 商家备注打标），4 类标签互斥（折叠 > 横折 > 竖折 > 其他定制）。"""
 
-    def _make_connection(self, frame: pl.DataFrame, pm_frame: pl.DataFrame | None = None):
+    def _make_connection(self, frame: pl.DataFrame, pm_frame: pl.DataFrame | None = None, q18_frame: pl.DataFrame | None = None):
         con = duckdb.connect()
         con.register("jt_rows", frame.to_arrow())
         con.execute("CREATE VIEW jt_view AS SELECT * FROM jt_rows")
@@ -480,7 +484,14 @@ class CustomizationStructureTests(unittest.TestCase):
             con.execute('CREATE VIEW pm_view AS SELECT * FROM pm_rows')
             pm_view = '"pm_view"'
             pm_cols = set(pm_frame.columns)
-        return con, pm_view, pm_cols
+        q18_view: str | None = None
+        q18_cols: set[str] = set()
+        if q18_frame is not None:
+            con.register("q18_rows", q18_frame.to_arrow())
+            con.execute('CREATE VIEW q18_view AS SELECT * FROM q18_rows')
+            q18_view = '"q18_view"'
+            q18_cols = set(q18_frame.columns)
+        return con, pm_view, pm_cols, q18_view, q18_cols
 
     def test_custom_regular_not_tagged(self) -> None:
         frame = pl.DataFrame(
@@ -491,11 +502,13 @@ class CustomizationStructureTests(unittest.TestCase):
                 "订单日期": ["2026-07-01"],
                 "发货日期": ["2026-07-03"],
                 "颜色规格": ["标准款-20cm=针织面料,1800MM*2000MM"],
+                "是否定制": [False],
+                "定制备注标签": [None],
             }
         )
-        con, pm_view, pm_cols = self._make_connection(frame)
+        con, pm_view, pm_cols, q18_view, q18_cols = self._make_connection(frame)
         try:
-            result = build_customization_structure(con, "jt_view", "jt_view", pm_view, pm_cols, None, set())
+            result = build_customization_structure(con, "jt_view", "jt_view", pm_view, pm_cols, q18_view, q18_cols)
             regular = next(c for c in result["comparison"] if c["orderType"] == "常规")
             self.assertEqual(regular["orderLines"], 1)
             custom = next(c for c in result["comparison"] if c["orderType"] == "定制")
@@ -505,7 +518,7 @@ class CustomizationStructureTests(unittest.TestCase):
         finally:
             con.close()
 
-    def test_custom_generic_signal_goes_to_missing_label(self) -> None:
+    def test_custom_other_tag_from_remark(self) -> None:
         frame = pl.DataFrame(
             {
                 "商品编码": ["A"],
@@ -514,40 +527,23 @@ class CustomizationStructureTests(unittest.TestCase):
                 "订单日期": ["2026-07-01"],
                 "发货日期": [None],
                 "颜色规格": ["定制款-20cm"],
+                "是否定制": [True],
+                "定制备注标签": ["其他定制"],
             }
         )
-        con, pm_view, pm_cols = self._make_connection(frame)
+        con, pm_view, pm_cols, q18_view, q18_cols = self._make_connection(frame)
         try:
-            result = build_customization_structure(con, "jt_view", "jt_view", pm_view, pm_cols, None, set())
-            missing = next(t for t in result["tags"] if t["tag"] == "未填写标签")
-            self.assertEqual(missing["orderLines"], 1)
+            result = build_customization_structure(con, "jt_view", "jt_view", pm_view, pm_cols, q18_view, q18_cols)
+            other = next(t for t in result["tags"] if t["tag"] == "其他定制")
+            self.assertEqual(other["orderLines"], 1)
             custom = next(c for c in result["comparison"] if c["orderType"] == "定制")
             self.assertEqual(custom["orderLines"], 1)
         finally:
             con.close()
 
-    def test_custom_priority_corner_over_shape(self) -> None:
-        frame = pl.DataFrame(
-            {
-                "商品编码": ["A"],
-                "商家实收": [1000.0],
-                "销售数量": [1.0],
-                "订单日期": ["2026-07-01"],
-                "发货日期": [None],
-                "颜色规格": ["异形缺角定制"],
-            }
-        )
-        con, pm_view, pm_cols = self._make_connection(frame)
-        try:
-            result = build_customization_structure(con, "jt_view", "jt_view", pm_view, pm_cols, None, set())
-            corner = next(t for t in result["tags"] if t["tag"] == "定制缺角")
-            shape = next(t for t in result["tags"] if t["tag"] == "定制异形")
-            self.assertEqual(corner["orderLines"], 1)
-            self.assertEqual(shape["orderLines"], 0)
-        finally:
-            con.close()
-
-    def test_custom_seven_tags_always_present(self) -> None:
+    def test_custom_tag_reads_custom_remark_tag_column(self) -> None:
+        # 优先级（折叠 > 横折 > 竖折 > 其他定制）在 transforms.py 推导；本测试验证
+        # build_customization_structure 直接读取「定制备注标签」列做分类。
         frame = pl.DataFrame(
             {
                 "商品编码": ["A"],
@@ -556,16 +552,95 @@ class CustomizationStructureTests(unittest.TestCase):
                 "订单日期": ["2026-07-01"],
                 "发货日期": [None],
                 "颜色规格": ["标准款"],
+                "是否定制": [True],
+                "定制备注标签": ["定制折叠"],
             }
         )
-        con, pm_view, pm_cols = self._make_connection(frame)
+        con, pm_view, pm_cols, q18_view, q18_cols = self._make_connection(frame)
         try:
-            result = build_customization_structure(con, "jt_view", "jt_view", pm_view, pm_cols, None, set())
-            self.assertEqual(len(result["tags"]), 7)
-            self.assertEqual(
-                {t["tag"] for t in result["tags"]},
-                {"定制尺寸", "未填写标签", "定制厚度", "定制内材", "定制折叠", "定制异形", "定制缺角"},
-            )
+            result = build_customization_structure(con, "jt_view", "jt_view", pm_view, pm_cols, q18_view, q18_cols)
+            fold = next(t for t in result["tags"] if t["tag"] == "定制折叠")
+            self.assertEqual(fold["orderLines"], 1)
+            others = sum(t["orderLines"] for t in result["tags"] if t["tag"] != "定制折叠")
+            self.assertEqual(others, 0)
+        finally:
+            con.close()
+
+    def test_custom_non_custom_excluded_from_tags(self) -> None:
+        frame = pl.DataFrame(
+            {
+                "商品编码": ["A"],
+                "商家实收": [1000.0],
+                "销售数量": [1.0],
+                "订单日期": ["2026-07-01"],
+                "发货日期": [None],
+                "颜色规格": ["标准款"],
+                "是否定制": [False],
+                "定制备注标签": [None],
+            }
+        )
+        con, pm_view, pm_cols, q18_view, q18_cols = self._make_connection(frame)
+        try:
+            result = build_customization_structure(con, "jt_view", "jt_view", pm_view, pm_cols, q18_view, q18_cols)
+            self.assertEqual(len(result["tags"]), 0)
+        finally:
+            con.close()
+
+    def test_custom_spu_summary_sales_and_rate(self) -> None:
+        frame = pl.DataFrame(
+            {
+                "商品编码": ["A", "A", "B", "B"],
+                "商家实收": [1000.0, 1000.0, 2000.0, 2000.0],
+                "销售数量": [2.0, 3.0, 5.0, 1.0],
+                "订单日期": ["2026-07-01", "2026-07-01", "2026-07-01", "2026-07-01"],
+                "发货日期": [None, None, None, None],
+                "颜色规格": ["定制尺寸1500", "标准款", "定制厚度20cm", "标准款"],
+                "是否定制": [True, False, True, False],
+                "定制备注标签": ["其他定制", None, "其他定制", None],
+            }
+        )
+        q18 = pl.DataFrame(
+            {
+                "商家规编（后台）": ["A", "B"],
+                "SPU产品商编": ["SPU-A", "SPU-B"],
+                "产品名称": ["产品A", "产品B"],
+            }
+        )
+        con, pm_view, pm_cols, q18_view, q18_cols = self._make_connection(frame, q18_frame=q18)
+        try:
+            result = build_customization_structure(con, "jt_view", "jt_view", pm_view, pm_cols, q18_view, q18_cols)
+            by_spu = {r["spu"]: r for r in result["spuSummary"]}
+            self.assertEqual(by_spu["SPU-A"]["productName"], "产品A")
+            self.assertEqual(by_spu["SPU-A"]["salesUnits"], 5.0)  # 2 + 3
+            self.assertEqual(by_spu["SPU-A"]["customSalesUnits"], 2.0)  # 第1行 是否定制=True（销量2）
+            self.assertAlmostEqual(by_spu["SPU-A"]["customRate"], 2.0 / 5.0, places=6)
+            self.assertEqual(by_spu["SPU-B"]["salesUnits"], 6.0)  # 5 + 1
+            self.assertEqual(by_spu["SPU-B"]["customSalesUnits"], 5.0)  # 第3行 是否定制=True（销量5）
+            self.assertAlmostEqual(by_spu["SPU-B"]["customRate"], 5.0 / 6.0, places=6)
+        finally:
+            con.close()
+
+    def test_custom_spu_summary_without_q18_falls_back_to_unknown(self) -> None:
+        frame = pl.DataFrame(
+            {
+                "商品编码": ["A"],
+                "商家实收": [1000.0],
+                "销售数量": [2.0],
+                "订单日期": ["2026-07-01"],
+                "发货日期": [None],
+                "颜色规格": ["标准款"],
+                "是否定制": [False],
+                "定制备注标签": [None],
+            }
+        )
+        con, pm_view, pm_cols, q18_view, q18_cols = self._make_connection(frame)
+        try:
+            result = build_customization_structure(con, "jt_view", "jt_view", pm_view, pm_cols, q18_view, q18_cols)
+            self.assertEqual(len(result["spuSummary"]), 1)
+            self.assertEqual(result["spuSummary"][0]["spu"], "未识别 SPU")
+            self.assertEqual(result["spuSummary"][0]["salesUnits"], 2.0)
+            self.assertEqual(result["spuSummary"][0]["customSalesUnits"], 0.0)
+            self.assertEqual(result["spuSummary"][0]["customRate"], 0)
         finally:
             con.close()
 
