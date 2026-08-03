@@ -256,6 +256,7 @@ export interface ProductManagementKpis {
 export interface ProductOverviewItem {
   productCode: string;
   productName: string;
+  subName: string;
   category: string;
   brand: string;
   salesUnits: number;

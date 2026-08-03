@@ -582,9 +582,69 @@ def _transform_jushuitan(frame: pl.DataFrame, path: Path) -> pl.DataFrame:
         .then(pl.lit("已发"))
         .otherwise(pl.lit("未付款或交易关闭"))
     )
+
+    # 是否定制（对齐 PBI 商家备注打标）：卖家备注含 定制/折叠/横折/竖折 即为定制。
+    # 备注原文不进入最终数据集（见上方 line 456 注释），仅保留是否定制标记与分类标签。
+    if "卖家备注" in frame.columns:
+        seller_remark_text = pl.col("卖家备注").cast(pl.String, strict=False).fill_null("")
+        is_custom_order = (
+            seller_remark_text.str.contains("定制", literal=True)
+            | seller_remark_text.str.contains("折叠", literal=True)
+            | seller_remark_text.str.contains("横折", literal=True)
+            | seller_remark_text.str.contains("竖折", literal=True)
+        )
+        custom_tag_value = (
+            pl.when(
+                seller_remark_text.str.contains("定制尺寸/缺角/折叠/内材", literal=True)
+                | seller_remark_text.str.contains("定制异形", literal=True)
+            )
+            .then(pl.lit("定制异形"))
+            .when(seller_remark_text.str.contains("定制尺寸", literal=True))
+            .then(pl.lit("定制尺寸"))
+            .when(seller_remark_text.str.contains("定制内材", literal=True))
+            .then(pl.lit("定制内材"))
+            .when(seller_remark_text.str.contains("定制厚度", literal=True))
+            .then(pl.lit("定制厚度"))
+            .when(seller_remark_text.str.contains("定制折叠", literal=True))
+            .then(pl.lit("定制折叠"))
+            .when(seller_remark_text.str.contains("定制缺角", literal=True))
+            .then(pl.lit("定制缺角"))
+            .when(seller_remark_text.str.contains("更换赠品", literal=True))
+            .then(pl.lit("更换赠品"))
+            .otherwise(None)
+        )
+    else:
+        is_custom_order = pl.lit(False)
+        custom_tag_value = pl.lit(None, dtype=pl.String)
+
+    # 退款分类:无退款/未发货退款/已发货退款(基于退货金额 + 发货状态)
+    # 退款程度:无退款/小额打款/部分退款/全部退款(退款率=退货金额/商家实收,<0.5 小额,>=1 全部)
+    if "退货金额" in frame.columns and "发货日期" in frame.columns:
+        _refund = pl.col("退货金额").cast(pl.Float64, strict=False).fill_null(0)
+        _received = pl.col("商家实收").cast(pl.Float64, strict=False).fill_null(0) if "商家实收" in frame.columns else pl.lit(0.0)
+        _rate = pl.when(_received > 0).then(_refund / _received).otherwise(pl.lit(0.0))
+        refund_class = (
+            pl.when(_refund <= 0).then(pl.lit("无退款"))
+            .when(pl.col("发货日期").is_null()).then(pl.lit("未发货退款"))
+            .otherwise(pl.lit("已发货退款"))
+        )
+        refund_degree = (
+            pl.when(_refund <= 0).then(pl.lit("无退款"))
+            .when(_refund >= _received).then(pl.lit("全部退款"))
+            .when(_rate < 0.5).then(pl.lit("小额打款"))
+            .otherwise(pl.lit("部分退款"))
+        )
+    else:
+        refund_class = pl.lit("无退款")
+        refund_degree = pl.lit("无退款")
+
     frame = frame.with_columns(
         status_detail.alias("订单状态明细"),
         status_summary.alias("订单状态汇总"),
+        is_custom_order.alias("是否定制"),
+        custom_tag_value.alias("定制备注标签"),
+        refund_class.alias("退款分类"),
+        refund_degree.alias("退款程度"),
     )
 
     # Keep line identifiers so the warehouse can apply the PBIX Table.Distinct
@@ -593,7 +653,7 @@ def _transform_jushuitan(frame: pl.DataFrame, path: Path) -> pl.DataFrame:
         "线上订单号", "线上子订单编号", "内部订单号", "线上商品名", "店铺商品编码", "商品编码", "商品简称", "产品名称",
         "SPU产品商编", "子名称", "颜色规格", "商品id", "产品分类", "床垫类别", "品牌", "供应商",
         "店铺", "店铺简称", "店铺简称（结算店铺）", "渠道平台", "订单来源", "订单状态", "订单状态明细",
-        "订单状态汇总", "达人名称", "业务员", "省", "发货仓", "是否定制", "定制备注标签", "厚度", "尺寸",
+        "订单状态汇总", "达人名称", "业务员", "省", "发货仓", "是否定制", "定制备注标签", "退款分类", "退款程度", "厚度", "尺寸",
         "订单日期", "付款日期", "发货日期", "确认收货日期", "年月", "销售数量", "实发数量", "实发金额",
         "销售金额", "成本价", "基本售价", "销售成本", "销售毛利", "退货数量", "退货金额", "实退金额",
         "买家实付", "商家实收", "平台补贴金额", "优惠金额", "运费收入", "运费支出",
@@ -643,6 +703,7 @@ def _transform_product_master(frame: pl.DataFrame) -> pl.DataFrame:
         pl.coalesce([pl.col(c).cast(pl.Float64, strict=False) for c in cost_present]) if cost_present else None
     )
     size_expr = _coalesce_str(["尺寸", "规格"])
+    sub_name_expr = _coalesce_str(["子名称"])
 
     exprs = []
     if code_expr is not None:
@@ -657,10 +718,12 @@ def _transform_product_master(frame: pl.DataFrame) -> pl.DataFrame:
         exprs.append(cost_expr.alias("成本"))
     if size_expr is not None:
         exprs.append(size_expr.alias("尺寸"))
+    if sub_name_expr is not None:
+        exprs.append(sub_name_expr.alias("子名称"))
     if exprs:
         frame = frame.with_columns(exprs)
 
-    keep = [c for c in ["商品编码", "商品ID", "产品名称", "床垫类别", "成本", "尺寸"] if c in frame.columns]
+    keep = [c for c in ["商品编码", "商品ID", "产品名称", "床垫类别", "成本", "尺寸", "子名称"] if c in frame.columns]
     frame = frame.select(keep)
     if "商品编码" in frame.columns:
         frame = frame.filter(pl.col("商品编码").is_not_null() & (pl.col("商品编码") != ""))

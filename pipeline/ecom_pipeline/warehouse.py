@@ -1225,11 +1225,17 @@ def _build_product_management_pages(
         if has_master else "0 AS grossProfit, 0 AS matchedReceived, "
     )
 
+    sub_name_select = (
+        'any_value(coalesce(cast(pm."子名称" AS VARCHAR), \'\')) AS subName'
+        if has_master and "子名称" in master_columns
+        else "'' AS subName"
+    )
     product_overview = _records(
         connection,
         f"""
         SELECT s."商品编码" AS productCode,
                any_value({product_name_expr}) AS productName,
+               {sub_name_select},
                any_value(s."产品分类") AS category,
                any_value(s."品牌") AS brand,
                sum(coalesce(try_cast(s."销售数量" AS DOUBLE),0)) AS salesUnits,
@@ -1517,8 +1523,9 @@ def _build_product_management_pages(
         row["prevReceivedAmount"] = None  # 上期商家实收，在 prev_m 确定后回填
         row["imageUrl"] = None
 
-    # 商品画册只接受「单一 SPU -> 单一白名单图片 URL」映射。
-    # 商家编码可能是“产品名/SPU”组合，因此只按完整值或明确分隔段匹配；任何多图候选都留空。
+    # 商品图匹配：从 05-旗舰店ID对照表 按「商家编码」模糊匹配产品 SPU 或产品名称。
+    # 商家编码可能是"产品名/SPU"组合，按完整值及分隔段建索引；
+    # 对每个产品依次尝试 SPU -> 产品名称完整值 -> 产品名称分词段，任一命中唯一候选即写入。
     try:
         image_catalog_view = _model_view(connection, "05-旗舰店ID对照表")
         image_catalog_columns = {row[0] for row in connection.execute(f"DESCRIBE {image_catalog_view}").fetchall()}
@@ -1550,61 +1557,36 @@ def _build_product_management_pages(
             for segment in segments:
                 images_by_code.setdefault(segment, set()).add(safe_url)
         for row in product_name_overview:
+            candidates: set[str] = set()
+            # 1) 按 SPU 匹配（仅单一 SPU 时）
             spu = str(row.get("spu") or "").strip().casefold()
-            candidates = images_by_code.get(spu, set()) if row.get("_spuCount") == 1 and spu != "未识别 spu" else set()
+            if row.get("_spuCount") == 1 and spu and spu != "未识别 spu":
+                spu_candidates = images_by_code.get(spu, set())
+                if len(spu_candidates) == 1:
+                    candidates = spu_candidates
+            # 2) SPU 未命中时，按产品名称完整值匹配
+            if len(candidates) != 1:
+                pn = str(row.get("productName") or "").strip().casefold()
+                if pn:
+                    name_candidates = images_by_code.get(pn, set())
+                    if len(name_candidates) == 1:
+                        candidates = name_candidates
+                    else:
+                        # 3) 按产品名称分词段匹配
+                        for segment in _re.split(r"[/\\|,，;；\s]+", pn):
+                            seg = segment.strip()
+                            if not seg:
+                                continue
+                            seg_candidates = images_by_code.get(seg, set())
+                            if len(seg_candidates) == 1:
+                                candidates = seg_candidates
+                                break
             if len(candidates) == 1:
                 row["imageUrl"] = next(iter(candidates))
             row.pop("_spuCount", None)
     else:
         for row in product_name_overview:
             row.pop("_spuCount", None)
-
-    # 商品图匹配：按产品名称从 05-旗舰店ID对照表 匹配 imageUrl
-    product_name_catalog = _source_view(connection, "05-旗舰店ID对照表")
-    if product_name_catalog:
-        image_rows = _records(
-            connection,
-            f"""
-            SELECT any_value("商家编码") AS merchantCode,
-                   any_value(nullif(trim(cast("商品图片" AS VARCHAR)), '')) AS imageUrl
-            FROM {product_name_catalog}
-            WHERE "商品图片" IS NOT NULL AND trim(cast("商品图片" AS VARCHAR)) <> ''
-            GROUP BY "商家编码"
-            """,
-        )
-        images_by_code: dict[str, set[str]] = {}
-        for ir in image_rows:
-            code = str(ir.get("merchantCode") or "").strip().casefold()
-            img = _safe_product_image(ir.get("imageUrl"))
-            if not code or not img:
-                continue
-            segments = _re.split(r"[/\\|,，;；\s]+", code)
-            for seg in segments:
-                seg = seg.strip()
-                if not seg:
-                    continue
-                s = images_by_code.setdefault(seg, set())
-                s.add(img)
-        for row in product_name_overview:
-            pn = str(row.get("productName") or "").strip().casefold()
-            candidates: set[str] = set()
-            if pn:
-                # 按产品名称完整值查找
-                name_candidates = images_by_code.get(pn, set())
-                if len(name_candidates) == 1:
-                    candidates = name_candidates
-                else:
-                    # 按产品名分词段查找
-                    for segment in _re.split(r"[/\\|,，;；\s]+", pn):
-                        seg = segment.strip()
-                        if not seg:
-                            continue
-                        seg_candidates = images_by_code.get(seg, set())
-                        if len(seg_candidates) == 1:
-                            candidates = seg_candidates
-                            break
-            if len(candidates) == 1:
-                row["imageUrl"] = next(iter(candidates))
 
     # 渠道销售明细表直接使用 PBIX 从商店站点标准化后的渠道平台。
     channel_breakdown = _records(

@@ -27,7 +27,21 @@ const PAGE_SIZE = 32;
 const SKU_PAGE_SIZE = 20;
 
 type ProductSort = "received" | "margin" | "units" | "growth";
-type SkuSort = "received" | "growth" | "margin" | "units" | "code";
+type SkuSort = "received" | "growth" | "margin" | "units" | "name";
+
+interface SubNameAgg {
+  subName: string;
+  salesUnits: number;
+  receivedAmount: number;
+  salesAmount: number;
+  refundAmount: number;
+  orderLines: number;
+  grossProfit: number | null;
+  matchedReceived: number | null;
+  grossMargin: number | null;
+  prevReceivedAmount: number | null;
+  skuCount: number;
+}
 
 const compactMoney = new Intl.NumberFormat("zh-CN", {
   style: "currency",
@@ -175,18 +189,53 @@ export function ProductGalleryView({ pm }: { pm: ProductManagementPages }) {
     if (page !== productPage) setPage(productPage);
   }, [page, productPage]);
 
+  const subNamesByProduct = useMemo(() => {
+    const result = new Map<string, SubNameAgg[]>();
+    for (const sku of pm.productOverview ?? []) {
+      const list = result.get(sku.productName) ?? [];
+      const subName = sku.subName || sku.productCode || "未命名";
+      let agg = list.find((a) => a.subName === subName);
+      if (!agg) {
+        agg = {
+          subName, salesUnits: 0, receivedAmount: 0, salesAmount: 0, refundAmount: 0,
+          orderLines: 0, grossProfit: null, matchedReceived: null, grossMargin: null,
+          prevReceivedAmount: null, skuCount: 0,
+        };
+        list.push(agg);
+        result.set(sku.productName, list);
+      }
+      agg.salesUnits += Number(sku.salesUnits) || 0;
+      agg.receivedAmount += Number(sku.receivedAmount) || 0;
+      agg.salesAmount += Number(sku.salesAmount) || 0;
+      agg.refundAmount += Number(sku.refundAmount) || 0;
+      agg.orderLines += Number(sku.orderLines) || 0;
+      agg.skuCount += 1;
+      if (sku.grossProfit != null) agg.grossProfit = (agg.grossProfit ?? 0) + sku.grossProfit;
+      if (sku.matchedReceived != null) agg.matchedReceived = (agg.matchedReceived ?? 0) + sku.matchedReceived;
+      if (sku.prevReceivedAmount != null) agg.prevReceivedAmount = (agg.prevReceivedAmount ?? 0) + sku.prevReceivedAmount;
+    }
+    for (const list of result.values()) {
+      for (const agg of list) {
+        agg.grossMargin = (agg.grossProfit != null && agg.matchedReceived && agg.matchedReceived > 0)
+          ? agg.grossProfit / agg.matchedReceived
+          : null;
+      }
+    }
+    return result;
+  }, [pm.productOverview]);
+
   const selectedSkus = useMemo(() => {
     if (!selected) return [];
     const normalized = skuQuery.trim().toLocaleLowerCase("zh-CN");
-    const rows = (skusByProduct.get(selected.productName) ?? []).filter((sku) =>
-      !normalized || String(sku.productCode || "").toLocaleLowerCase("zh-CN").includes(normalized),
+    const rows = (subNamesByProduct.get(selected.productName) ?? []).filter((a) =>
+      !normalized || a.subName.toLocaleLowerCase("zh-CN").includes(normalized),
     );
-    const score = (sku: ProductOverviewItem): number | string => {
-      if (skuSort === "received") return Number(sku.receivedAmount) || 0;
-      if (skuSort === "growth") return growth(sku.receivedAmount, sku.prevReceivedAmount) ?? Number.NEGATIVE_INFINITY;
-      if (skuSort === "margin") return sku.grossMargin ?? Number.NEGATIVE_INFINITY;
-      if (skuSort === "units") return Number(sku.salesUnits) || 0;
-      return String(sku.productCode || "");
+    const score = (a: SubNameAgg): number | string => {
+      if (skuSort === "received") return a.receivedAmount;
+      if (skuSort === "growth") return growth(a.receivedAmount, a.prevReceivedAmount) ?? Number.NEGATIVE_INFINITY;
+      if (skuSort === "margin") return a.grossMargin ?? Number.NEGATIVE_INFINITY;
+      if (skuSort === "units") return a.salesUnits;
+      return a.subName;
     };
     return rows.sort((a, b) => {
       const aValue = score(a);
@@ -194,7 +243,7 @@ export function ProductGalleryView({ pm }: { pm: ProductManagementPages }) {
       if (typeof aValue === "string" && typeof bValue === "string") return aValue.localeCompare(bValue, "zh-CN");
       return Number(bValue) - Number(aValue);
     });
-  }, [selected, skuQuery, skuSort, skusByProduct]);
+  }, [selected, skuQuery, skuSort, subNamesByProduct]);
 
   const skuPageCount = Math.max(1, Math.ceil(selectedSkus.length / SKU_PAGE_SIZE));
   const currentSkuPage = safePage(skuPage, skuPageCount);
@@ -381,7 +430,7 @@ export function ProductGalleryView({ pm }: { pm: ProductManagementPages }) {
                 <div>
                   <span className="product-gallery-eyebrow">Product Detail</span>
                   <h2 id="product-gallery-detail-title">{selected.productName}</h2>
-                  <p>{selected.spu || "未识别 SPU"} · {(skusByProduct.get(selected.productName) ?? []).length.toLocaleString()} 个 SKU</p>
+                  <p>{selected.spu || "未识别 SPU"} · {(subNamesByProduct.get(selected.productName) ?? []).length.toLocaleString()} 个子名称</p>
                   <small>{pm.period ? `${pm.period.start} ~ ${pm.period.end}` : "当前筛选周期"}</small>
                 </div>
               </div>
@@ -408,34 +457,34 @@ export function ProductGalleryView({ pm }: { pm: ProductManagementPages }) {
                 </div>
               </section>
 
-              <section className="product-gallery-sku-section" aria-label="SKU 数据">
+              <section className="product-gallery-sku-section" aria-label="子名称数据">
                 <div className="product-gallery-sku-heading">
                   <div>
-                    <span className="product-gallery-eyebrow">SKU Breakdown</span>
-                    <h3>SKU 对应数据</h3>
-                    <p>产品总数据可由下列 SKU 逐项求和复核；毛利率按各 SKU 成本覆盖实收重算。</p>
+                    <span className="product-gallery-eyebrow">Sub-Name Breakdown</span>
+                    <h3>子名称聚合数据</h3>
+                    <p>产品总数据可由下列子名称逐项求和复核；毛利率按各子名称成本覆盖实收重算。</p>
                   </div>
-                  <strong>{selectedSkus.length.toLocaleString()} SKU</strong>
+                  <strong>{selectedSkus.length.toLocaleString()} 个子名称</strong>
                 </div>
                 <div className="product-gallery-sku-toolbar">
                   <label>
                     <Search aria-hidden="true" size={14} />
-                    <span>搜索 SKU</span>
-                    <input aria-label="搜索 SKU 编码" onChange={(event) => setSkuQuery(event.target.value)} placeholder="搜索 SKU 编码" type="search" value={skuQuery} />
+                    <span>搜索子名称</span>
+                    <input aria-label="搜索子名称" onChange={(event) => setSkuQuery(event.target.value)} placeholder="搜索子名称" type="search" value={skuQuery} />
                   </label>
-                  <select aria-label="SKU 排序" onChange={(event) => setSkuSort(event.target.value as SkuSort)} value={skuSort}>
+                  <select aria-label="子名称排序" onChange={(event) => setSkuSort(event.target.value as SkuSort)} value={skuSort}>
                     <option value="received">商家实收</option>
                     <option value="growth">较上期</option>
                     <option value="margin">毛利率</option>
                     <option value="units">销量</option>
-                    <option value="code">SKU 编码</option>
+                    <option value="name">子名称</option>
                   </select>
                 </div>
                 <div className="product-gallery-sku-table-wrap">
                   <table data-testid="product-sku-table">
                     <thead>
                       <tr>
-                        <th>SKU</th>
+                        <th>子名称</th>
                         <th>商家实收</th>
                         <th>较上期</th>
                         <th>毛利率</th>
@@ -447,8 +496,8 @@ export function ProductGalleryView({ pm }: { pm: ProductManagementPages }) {
                       {visibleSkus.length ? visibleSkus.map((sku) => {
                         const share = selected.receivedAmount > 0 ? sku.receivedAmount / selected.receivedAmount : 0;
                         return (
-                          <tr key={sku.productCode}>
-                            <td><strong>{sku.productCode}</strong><small>{sku.brand || sku.category || "未分类"}</small></td>
+                          <tr key={sku.subName}>
+                            <td><strong>{sku.subName}</strong><small>{sku.skuCount} SKU</small></td>
                             <td className="is-received">{money(sku.receivedAmount, false)}</td>
                             <td><TrendValue compact value={growth(sku.receivedAmount, sku.prevReceivedAmount)} /></td>
                             <td className={sku.grossMargin == null ? "is-muted" : "is-margin"}>{percent(sku.grossMargin)}</td>
@@ -457,7 +506,7 @@ export function ProductGalleryView({ pm }: { pm: ProductManagementPages }) {
                           </tr>
                         );
                       }) : (
-                        <tr><td className="product-gallery-sku-empty" colSpan={6}>没有匹配的 SKU 编码</td></tr>
+                        <tr><td className="product-gallery-sku-empty" colSpan={6}>没有匹配的子名称</td></tr>
                       )}
                     </tbody>
                   </table>
