@@ -482,9 +482,9 @@
 .product-command td { border-bottom: 1px solid var(--border); padding: 10px 12px; text-align: right; white-space: nowrap; }
 .product-command th { color: var(--muted); background: rgba(255, 255, 255, 0.02); font-size: 10px; font-weight: 750; }
 .product-command th:first-child,
-.product-command td:first-child,
+.product-command td:first-child { width: 36px; text-align: center; padding: 10px 4px; }
 .product-command th:nth-child(2),
-.product-command td:nth-child(2) { text-align: left; }
+.product-command td:nth-child(2) { width: 44px; text-align: center; padding: 10px 4px; }
 .product-command tbody tr { transition: background 150ms ease; }
 .product-command tbody tr:hover { background: rgba(166, 229, 54, 0.035); }
 .product-command .product-name { display: grid; gap: 3px; min-width: 150px; color: var(--text); font-weight: 800; }
