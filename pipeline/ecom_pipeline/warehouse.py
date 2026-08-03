@@ -887,6 +887,11 @@ def _build_product_management_pages(
             "dailyStatusMatrix": {"columns": [], "rows": []},
             "productChannelMatrix": {"columns": [], "rows": []},
             "productStatusMatrix": {"columns": [], "rows": []},
+            "productChannelRevenueMatrix": {"columns": [], "rows": []},
+            "productChannelRefundMatrix": {"columns": [], "rows": []},
+            "channelStatusMatrix": {"columns": [], "rows": []},
+            "channelWarehouseMatrix": {"columns": [], "rows": []},
+            "channelCategoryMatrix": {"columns": [], "rows": []},
             "availableStatuses": [],
             "availableChannels": [],
             "availableStoreShortNames": [],
@@ -1343,6 +1348,53 @@ def _build_product_management_pages(
         row["refundRate"] = round(row["refundAmount"] / received, 4) if received else None
         row["grossMargin"] = round(row["grossProfit"] / matched, 4) if matched else None  # 毛利率
 
+    # 商品图匹配：按产品名称从 05-旗舰店ID对照表 匹配 imageUrl
+    product_name_catalog = _source_view(connection, "05-旗舰店ID对照表")
+    if product_name_catalog:
+        image_rows = _records(
+            connection,
+            f"""
+            SELECT any_value("商家编码") AS merchantCode,
+                   any_value(nullif(trim(cast("商品图片" AS VARCHAR)), '')) AS imageUrl
+            FROM {product_name_catalog}
+            WHERE "商品图片" IS NOT NULL AND trim(cast("商品图片" AS VARCHAR)) <> ''
+            GROUP BY "商家编码"
+            """,
+        )
+        images_by_code: dict[str, set[str]] = {}
+        for ir in image_rows:
+            code = str(ir.get("merchantCode") or "").strip().casefold()
+            img = _safe_product_image(ir.get("imageUrl"))
+            if not code or not img:
+                continue
+            segments = _re.split(r"[/\\|,，;；\s]+", code)
+            for seg in segments:
+                seg = seg.strip()
+                if not seg:
+                    continue
+                s = images_by_code.setdefault(seg, set())
+                s.add(img)
+        for row in product_name_overview:
+            pn = str(row.get("productName") or "").strip().casefold()
+            candidates: set[str] = set()
+            if pn:
+                # 按产品名称完整值查找
+                name_candidates = images_by_code.get(pn, set())
+                if len(name_candidates) == 1:
+                    candidates = name_candidates
+                else:
+                    # 按产品名分词段查找
+                    for segment in _re.split(r"[/\\|,，;；\s]+", pn):
+                        seg = segment.strip()
+                        if not seg:
+                            continue
+                        seg_candidates = images_by_code.get(seg, set())
+                        if len(seg_candidates) == 1:
+                            candidates = seg_candidates
+                            break
+            if len(candidates) == 1:
+                row["imageUrl"] = next(iter(candidates))
+
     # 渠道销售明细表直接使用 PBIX 从商店站点标准化后的渠道平台。
     channel_breakdown = _records(
         connection,
@@ -1528,6 +1580,42 @@ def _build_product_management_pages(
         "row",
     )
 
+    # 产品名称 × 渠道商家实收（产品主数据口径，Top 30）
+    product_channel_revenue_matrix = _matrix(
+        connection,
+        f"""
+        PIVOT (
+          SELECT {product_name_expr} AS row, {channel_expr} AS channel,
+                 coalesce(try_cast(s."商家实收" AS DOUBLE),0) AS v
+          FROM {view} s {pm_join}
+          WHERE {product_name_expr} IN (
+            SELECT {product_name_expr} FROM {view} s {pm_join}
+            WHERE {product_name_expr} <> '(未命名)'
+            GROUP BY 1 ORDER BY sum(coalesce(try_cast("销售数量" AS DOUBLE),0)) DESC LIMIT 30
+          )
+        ) ON channel USING sum(v) ORDER BY row
+        """,
+        "row",
+    )
+
+    # 产品名称 × 渠道退货金额（产品主数据口径，Top 30）
+    product_channel_refund_matrix = _matrix(
+        connection,
+        f"""
+        PIVOT (
+          SELECT {product_name_expr} AS row, {channel_expr} AS channel,
+                 coalesce(try_cast(s."退货金额" AS DOUBLE),0) AS v
+          FROM {view} s {pm_join}
+          WHERE {product_name_expr} IN (
+            SELECT {product_name_expr} FROM {view} s {pm_join}
+            WHERE {product_name_expr} <> '(未命名)'
+            GROUP BY 1 ORDER BY sum(coalesce(try_cast("销售数量" AS DOUBLE),0)) DESC LIMIT 30
+          )
+        ) ON channel USING sum(v) ORDER BY row
+        """,
+        "row",
+    )
+
     # 产品名称 × 订单状态（产品主数据口径，Top 30）
     product_status_matrix = _matrix(
         connection,
@@ -1546,6 +1634,54 @@ def _build_product_management_pages(
         """,
         "row",
     )
+
+    # 渠道平台 × 订单状态明细（销售数量）
+    channel_status_matrix = _matrix(
+        connection,
+        f"""
+        PIVOT (
+          SELECT {channel_expr} AS row,
+                 coalesce(cast(s."订单状态明细" AS VARCHAR), '(未知)') AS status,
+                 coalesce(try_cast(s."销售数量" AS DOUBLE),0) AS units
+          FROM {view} s
+          WHERE s."渠道平台" IS NOT NULL OR s."订单状态明细" IS NOT NULL
+        ) ON status USING sum(units) ORDER BY row
+        """,
+        "row",
+    )
+
+    # 渠道平台 × 发货仓（销售数量）
+    channel_warehouse_matrix = _matrix(
+        connection,
+        f"""
+        PIVOT (
+          SELECT {channel_expr} AS row,
+                 coalesce(cast(s."发货仓" AS VARCHAR), '(未设定)') AS warehouse,
+                 coalesce(try_cast(s."销售数量" AS DOUBLE),0) AS units
+          FROM {view} s
+          WHERE s."发货仓" IS NOT NULL
+        ) ON warehouse USING sum(units) ORDER BY row
+        """,
+        "row",
+    )
+
+    # 渠道平台 × 床垫类别（销售数量，复用 product-master 口径）
+    if has_master:
+        channel_category_matrix = _matrix(
+            connection,
+            f"""
+            PIVOT (
+              SELECT {channel_expr} AS row,
+                     pm."床垫类别" AS category,
+                     coalesce(try_cast(s."销售数量" AS DOUBLE),0) AS units
+              FROM {view} s {pm_join}
+              WHERE pm."床垫类别" IS NOT NULL AND trim(cast(pm."床垫类别" AS VARCHAR)) <> ''
+            ) ON category USING sum(units) ORDER BY row
+            """,
+            "row",
+        )
+    else:
+        channel_category_matrix = {"columns": [], "rows": []}
 
     return {
         "source": "jushuitan_local_logic",
@@ -1573,6 +1709,11 @@ def _build_product_management_pages(
         "dailyStatusMatrix": daily_status_matrix,
         "productChannelMatrix": product_channel_matrix,
         "productStatusMatrix": product_status_matrix,
+        "productChannelRevenueMatrix": product_channel_revenue_matrix,
+        "productChannelRefundMatrix": product_channel_refund_matrix,
+        "channelStatusMatrix": channel_status_matrix,
+        "channelWarehouseMatrix": channel_warehouse_matrix,
+        "channelCategoryMatrix": channel_category_matrix,
         "availableStatuses": available_statuses,
         "availableChannels": available_channels,
         "availableStoreShortNames": available_store_short_names,

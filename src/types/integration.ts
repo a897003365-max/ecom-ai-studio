@@ -278,6 +278,7 @@ export interface ProductNameOverviewItem {
   avgUnitPrice: number | null;
   refundRate: number | null;
   grossMargin: number | null;
+  imageUrl?: string | null;
 }
 
 export interface ProductDailyTrendItem {
@@ -413,6 +414,11 @@ export interface ProductManagementPages {
   dailyStatusMatrix: ProductMatrix;
   productChannelMatrix: ProductMatrix;
   productStatusMatrix: ProductMatrix;
+  productChannelRevenueMatrix: ProductMatrix;
+  productChannelRefundMatrix: ProductMatrix;
+  channelStatusMatrix: ProductMatrix;
+  channelWarehouseMatrix: ProductMatrix;
+  channelCategoryMatrix: ProductMatrix;
   availableStatuses: string[];
   availableChannels: string[];
   availableStoreShortNames: string[];
@@ -591,6 +597,9 @@ export interface ProductCustomTagRow {
 
 export interface ProductCustomCategoryRow {
   mattressCategory: string;
+  salesUnits: number;
+  customSalesUnits: number;
+  customSalesShare: number;
   customOrderLines: number;
   customOrderLineShare: number;
 }

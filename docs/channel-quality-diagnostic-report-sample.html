@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>渠道质量月度诊断报告 · 示例</title>
+<style>
+  :root {
+    --bg: #f7f7f5;
+    --surface: #ffffff;
+    --border: #e4e2db;
+    --text: #1f1f1d;
+    --muted: #6b6a64;
+    --faint: #9c9a92;
+    --teal: #0f6e56;
+    --teal-bg: #e1f5ee;
+    --blue: #185fa5;
+    --blue-bg: #e6f1fb;
+    --amber: #854f0b;
+    --amber-bg: #faeeda;
+    --red: #a32d2d;
+    --red-bg: #fcebeb;
+    --green: #3b6d11;
+    --green-bg: #eaf3de;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.65;
+    font-size: 14px;
+    padding: 32px 20px 64px;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; }
+  .report-head {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px 28px;
+    margin-bottom: 20px;
+  }
+  .report-head h1 { font-size: 20px; font-weight: 600; margin-bottom: 6px; }
+  .report-head .sub { color: var(--muted); font-size: 13px; margin-bottom: 14px; }
+  .meta { display: flex; flex-wrap: wrap; gap: 20px; font-size: 12px; color: var(--muted); }
+  .meta b { color: var(--text); font-weight: 500; }
+  .badge {
+    display: inline-block; padding: 2px 10px; border-radius: 99px;
+    font-size: 11px; font-weight: 500;
+  }
+  .badge-high { background: var(--green-bg); color: var(--green); }
+  .badge-mid { background: var(--amber-bg); color: var(--amber); }
+  .badge-low { background: var(--red-bg); color: var(--red); }
+
+  section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px 28px;
+    margin-bottom: 16px;
+  }
+  section h2 {
+    font-size: 15px; font-weight: 600; margin-bottom: 4px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .sec-num {
+    width: 24px; height: 24px; border-radius: 6px;
+    background: var(--blue-bg); color: var(--blue);
+    font-size: 12px; font-weight: 600;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .sec-desc { color: var(--muted); font-size: 12px; margin-bottom: 16px; padding-left: 34px; }
+
+  .lead {
+    font-size: 15px; line-height: 1.75; padding: 14px 16px;
+    background: var(--blue-bg); border-left: 3px solid var(--blue);
+    border-radius: 0 8px 8px 0; margin-bottom: 14px;
+  }
+  .lead b { color: var(--blue); }
+  .evidence { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 14px; }
+  .ev-card { background: var(--bg); border-radius: 8px; padding: 12px 14px; }
+  .ev-card .k { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+  .ev-card .v { font-size: 18px; font-weight: 600; }
+  .ev-card .d { font-size: 11px; color: var(--faint); margin-top: 2px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { padding: 9px 10px; text-align: left; border-bottom: 1px solid var(--border); }
+  th { font-size: 11px; color: var(--muted); font-weight: 500; text-transform: none; background: var(--bg); }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  tr.total td { font-weight: 600; border-top: 2px solid var(--text); border-bottom: none; }
+
+  .grade { display: inline-block; width: 22px; height: 22px; border-radius: 5px; color: #fff; font-size: 12px; font-weight: 600; text-align: center; line-height: 22px; }
+  .g-A { background: var(--green); }
+  .g-B { background: var(--blue); }
+  .g-C { background: var(--amber); }
+  .g-D { background: var(--red); }
+
+  .risk-row td { vertical-align: top; }
+  .prio { display: inline-block; padding: 1px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+  .p0 { background: var(--red-bg); color: var(--red); }
+  .p1 { background: var(--amber-bg); color: var(--amber); }
+  .p2 { background: var(--blue-bg); color: var(--blue); }
+
+  .reco-list { list-style: none; }
+  .reco-list li {
+    padding: 12px 0; border-bottom: 1px solid var(--border);
+    display: grid; grid-template-columns: 36px 1fr 120px; gap: 12px; align-items: start;
+  }
+  .reco-list li:last-child { border-bottom: none; }
+  .reco-list .rprio { font-size: 11px; font-weight: 600; }
+  .reco-list .rbody { font-size: 13px; }
+  .reco-list .rbody b { font-weight: 600; }
+  .reco-list .rconf { font-size: 11px; color: var(--muted); text-align: right; }
+
+  .foot { font-size: 11px; color: var(--faint); margin-top: 20px; padding: 16px 28px; line-height: 1.7; }
+  .foot hr { border: none; border-top: 1px solid var(--border); margin-bottom: 12px; }
+  .pill { display: inline-block; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 1px 7px; font-size: 11px; color: var(--muted); margin-right: 6px; }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  @media (max-width: 720px) { .evidence { grid-template-columns: 1fr; } .two-col { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="report-head">
+    <h1>渠道质量月度诊断报告</h1>
+    <div class="sub">L2 诊断层 · 示例报告（数据来源：钉钉渠道经营口径 dt-channel-metrics）</div>
+    <div class="meta">
+      <span>报告期间：<b>2026-05-01 至 2026-05-31</b></span>
+      <span>生成时间：<b>2026-06-03 10:30</b></span>
+      <span>数据置信度：<span class="badge badge-high">高</span></span>
+      <span>渠道覆盖：<b>6 个</b>（天猫 / 抖音 / 京东 / 拼多多 / 唯品 / 小红书）</span>
+    </div>
+  </div>
+
+  <section>
+    <h2><span class="sec-num">1</span>执行摘要</h2>
+    <div class="sec-desc">一句话主结论 + 关键证据 + 头部建议，3 分钟内可读完。</div>
+    <div class="lead">
+      全渠道月度 GMV <b>2,823 万</b>，达成月目标 <b>116%</b>；但<b>退款侵蚀严重</b>——全渠道退款 890 万、退款率 31.5%，其中抖音（46%）、拼多多（43.8%）、天猫（33.9%）三渠道退款率均突破 15% 红线。<b>京东是唯一零退款且超额达成 133% 的渠道，为全渠道最健康资产，应优先追加预算。</b>
+    </div>
+    <div class="evidence">
+      <div class="ev-card">
+        <div class="k">全渠道 GMV</div>
+        <div class="v">2,823 万</div>
+        <div class="d">达成月目标 116% · 较上月 +8.2%</div>
+      </div>
+      <div class="ev-card">
+        <div class="k">全渠道退款率</div>
+        <div class="v">31.5%</div>
+        <div class="d">退款 890 万 · 3 渠道超红线</div>
+      </div>
+      <div class="ev-card">
+        <div class="k">最健康渠道</div>
+        <div class="v">京东</div>
+        <div class="d">评级 B · 零退款 · 达成 133%</div>
+      </div>
+    </div>
+    <table>
+      <thead>
+        <tr><th>优先级</th><th>建议动作</th><th class="num">预期月增量毛利</th><th>置信度</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><span class="prio p0">P0</span></td><td>抖音退款率 46% 立即归因，预计集中在特定 SKU；本周下架复核质检</td><td class="num">+120 万</td><td><span class="badge badge-mid">中</span> 待 SKU 归因验证</td></tr>
+        <tr><td><span class="prio p0">P0</span></td><td>唯品渠道边际 ROI=0，收缩预算迁移至京东</td><td class="num">+10 万</td><td><span class="badge badge-high">高</span></td></tr>
+        <tr><td><span class="prio p1">P1</span></td><td>京东追加预算 20%（spend +15 万），边际 ROI 8.5 仍有空间</td><td class="num">+60 万</td><td><span class="badge badge-high">高</span></td></tr>
+        <tr><td><span class="prio p2">P2</span></td><td>天猫退款率 33.9% 需品类归因，锁定退款集中的床垫类别</td><td class="num">+30 万</td><td><span class="badge badge-low">低</span> 需品类×SKU 交叉</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2><span class="sec-num">2</span>健康度总览</h2>
+    <div class="sec-desc">5 维度加权评分 → 总分 → A/B/C/D 评级。评分是诊断入口，非黑箱，每个评级可下钻到子指标。</div>
+    <table>
+      <thead>
+        <tr>
+          <th>渠道</th>
+          <th class="num">产出力 25%</th>
+          <th class="num">盈利力 25%</th>
+          <th class="num">效率力 20%</th>
+          <th class="num">增长力 15%</th>
+          <th class="num">风险力 15%</th>
+          <th class="num">总分</th>
+          <th>评级</th>
+          <th>关键短板</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>天猫</td>
+          <td class="num">92</td><td class="num">65</td><td class="num">60</td><td class="num">50</td><td class="num">25</td>
+          <td class="num"><b>63</b></td>
+          <td><span class="grade g-C">C</span></td>
+          <td>风险力 25 · 退款率 33.9%</td>
+        </tr>
+        <tr>
+          <td>抖音</td>
+          <td class="num">58</td><td class="num">75</td><td class="num">92</td><td class="num">70</td><td class="num">15</td>
+          <td class="num"><b>64</b></td>
+          <td><span class="grade g-C">C</span></td>
+          <td>风险力 15 · 退款率 46%</td>
+        </tr>
+        <tr>
+          <td>京东</td>
+          <td class="num">58</td><td class="num">90</td><td class="num">70</td><td class="num">78</td><td class="num">95</td>
+          <td class="num"><b>77</b></td>
+          <td><span class="grade g-B">B</span></td>
+          <td>产出力待提升（量级偏小）</td>
+        </tr>
+        <tr>
+          <td>拼多多</td>
+          <td class="num">48</td><td class="num">55</td><td class="num">80</td><td class="num">65</td><td class="num">30</td>
+          <td class="num"><b>56</b></td>
+          <td><span class="grade g-C">C</span></td>
+          <td>风险力 30 · 退款率 43.8%</td>
+        </tr>
+        <tr>
+          <td>唯品</td>
+          <td class="num">5</td><td class="num">15</td><td class="num">0</td><td class="num">5</td><td class="num">60</td>
+          <td class="num"><b>15</b></td>
+          <td><span class="grade g-D">D</span></td>
+          <td>效率力 0 · 边际 ROI=0</td>
+        </tr>
+        <tr>
+          <td>小红书</td>
+          <td class="num">0</td><td class="num">0</td><td class="num">0</td><td class="num">0</td><td class="num">50</td>
+          <td class="num"><b>—</b></td>
+          <td><span class="grade g-D">D</span></td>
+          <td>无经营数据，待启动或关停</td>
+        </tr>
+      </tbody>
+    </table>
+    <p style="font-size:12px;color:var(--muted);margin-top:10px;">评分逻辑：各维度 0–100，按权重加权。产出力=GMV/渠道均值；盈利力=毛利率 vs 中位数 + 贡献占比；效率力=ROI vs 阈值 8（ROI&lt;1 直接低分）；增长力=环比正且加速；风险力=退款率超 15% 阈值扣分且恶化加倍扣。</p>
+  </section>
+
+  <section>
+    <h2><span class="sec-num">3</span>驱动因素拆解 · 投入产出漏斗</h2>
+    <div class="sec-desc">把"赚多少"拆回"花多少→流量→成交→回款→退款"全链路，定位瓶颈环节。</div>
+    <table>
+      <thead>
+        <tr>
+          <th>渠道</th>
+          <th class="num">投入 spend</th>
+          <th class="num">费比</th>
+          <th class="num">GMV</th>
+          <th class="num">ROI</th>
+          <th class="num">回款 netRev</th>
+          <th class="num">回款率</th>
+          <th class="num">退款率</th>
+          <th class="num">达成率</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>天猫</td><td class="num">221.6 万</td><td class="num">26.6%</td><td class="num">1,477.6 万</td><td class="num">6.67</td><td class="num">830.5 万</td><td class="num">56.2%</td><td class="num" style="color:var(--red);font-weight:600">33.9%</td><td class="num">92.4%</td></tr>
+        <tr><td>抖音</td><td class="num">30.3 万</td><td class="num">11.7%</td><td class="num">478.4 万</td><td class="num" style="color:var(--green);font-weight:600">15.79</td><td class="num">258.2 万</td><td class="num">54.0%</td><td class="num" style="color:var(--red);font-weight:600">46.0%</td><td class="num">140.8%</td></tr>
+        <tr><td>京东</td><td class="num">73.5 万</td><td class="num">15.4%</td><td class="num">477.6 万</td><td class="num">6.50</td><td class="num">477.6 万</td><td class="num" style="color:var(--green);font-weight:600">100%</td><td class="num" style="color:var(--green);font-weight:600">0%</td><td class="num">132.7%</td></tr>
+        <tr><td>拼多多</td><td class="num">47.3 万</td><td class="num">21.8%</td><td class="num">386.1 万</td><td class="num">8.16</td><td class="num">216.8 万</td><td class="num">56.2%</td><td class="num" style="color:var(--red);font-weight:600">43.8%</td><td class="num">297.0%</td></tr>
+        <tr><td>唯品</td><td class="num">0</td><td class="num">—</td><td class="num">2.9 万</td><td class="num">0</td><td class="num">0</td><td class="num">0%</td><td class="num">0%</td><td class="num">—</td></tr>
+        <tr class="total"><td>全渠道</td><td class="num">372.7 万</td><td class="num">20.9%</td><td class="num">2,822.6 万</td><td class="num">7.57</td><td class="num">1,783.1 万</td><td class="num">63.2%</td><td class="num">31.5%</td><td class="num">116.2%</td></tr>
+      </tbody>
+    </table>
+    <div class="two-col" style="margin-top:16px;">
+      <div>
+        <div style="font-size:13px;font-weight:600;margin-bottom:8px;">天猫：量大利薄，退款侵蚀回款</div>
+        <p style="font-size:12px;color:var(--muted);">GMV 占全渠道 52.4% 但回款率仅 56.2%，退款率 33.9% 直接吃掉 501 万。费比 26.6% 偏高（高于京东 15.4%），ROI 6.67 低于全渠道均值。<b>诊断方向：退款归因（品类/SKU）+ 费比优化</b>。</p>
+      </div>
+      <div>
+        <div style="font-size:13px;font-weight:600;margin-bottom:8px;">抖音：高 ROI 但退款是致命伤</div>
+        <p style="font-size:12px;color:var(--muted);">ROI 15.79 全渠道最高，费比仅 11.7%，但退款率 46% 意味着每成交 100 元退 46 元。<b>若退款率压到 25%，回款可从 258 万提至 359 万（+101 万）</b>。根因待 SKU 归因，疑似直播冲动消费退货。</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="sec-num">4</span>机会量化 · 预算重分配</h2>
+    <div class="sec-desc">基于边际 ROI 测算每个优化机会的预期增量毛利，避免"建议关注"式空话。</div>
+    <table>
+      <thead>
+        <tr>
+          <th>渠道</th>
+          <th class="num">当前 spend</th>
+          <th class="num">边际 ROI</th>
+          <th>建议动作</th>
+          <th class="num">预算调整</th>
+          <th class="num">预期增量毛利</th>
+          <th>优先级</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>京东</td><td class="num">73.5 万</td><td class="num" style="color:var(--green)">8.5</td><td>追加预算，扩量复制</td><td class="num">+15 万 (+20%)</td><td class="num">+60 万</td><td><span class="prio p1">P1</span></td></tr>
+        <tr><td>抖音</td><td class="num">30.3 万</td><td class="num" style="color:var(--green)">11.0</td><td>加预算 +15%，<b>前提先控退款</b></td><td class="num">+4.5 万 (+15%)</td><td class="num">+50 万</td><td><span class="prio p1">P1</span></td></tr>
+        <tr><td>天猫</td><td class="num">221.6 万</td><td class="num" style="color:var(--amber)">4.0</td><td>高投入递减，收缩费比</td><td class="num">-18 万 (-8%)</td><td class="num">+30 万</td><td><span class="prio p2">P2</span></td></tr>
+        <tr><td>拼多多</td><td class="num">47.3 万</td><td class="num" style="color:var(--amber)">5.5</td><td>边际递减，小幅收缩</td><td class="num">-5 万 (-10%)</td><td class="num">+15 万</td><td><span class="prio p2">P2</span></td></tr>
+        <tr><td>唯品</td><td class="num">0</td><td class="num" style="color:var(--red)">0</td><td>边际 ROI=0，关停迁移</td><td class="num">迁移至京东</td><td class="num">+10 万</td><td><span class="prio p0">P0</span></td></tr>
+        <tr class="total"><td>合计</td><td class="num">372.7 万</td><td class="num">—</td><td>净调整 -3.5 万（结构优化）</td><td class="num">—</td><td class="num">+165 万</td><td>—</td></tr>
+      </tbody>
+    </table>
+    <p style="font-size:12px;color:var(--muted);margin-top:10px;">边际 ROI = ΔGMV / ΔSpend，反映"再投 1 元还能赚多少"。阈值：&gt;8 加投、5–8 维持、&lt;5 收缩、&lt;1 关停。预期增量毛利 = 预算调整 × 边际 ROI × 毛利率（按渠道毛利率折算）。唯品因 spend=0 无法算边际，按 ROI=0 处理。</p>
+  </section>
+
+  <section>
+    <h2><span class="sec-num">5</span>风险清单</h2>
+    <div class="sec-desc">按优先级排序，每条风险附指标值、阈值、趋势、建议动作。</div>
+    <table>
+      <thead>
+        <tr><th>优先级</th><th>渠道</th><th>风险类型</th><th class="num">当前值</th><th class="num">阈值</th><th>趋势</th><th>建议动作</th></tr>
+      </thead>
+      <tbody>
+        <tr class="risk-row"><td><span class="prio p0">P0</span></td><td>抖音</td><td>退款率过高</td><td class="num">46.0%</td><td class="num">15%</td><td style="color:var(--red)">↑ 偏高</td><td>本周完成 SKU 级退款归因，锁定 Top3 退款单品下架复核</td></tr>
+        <tr class="risk-row"><td><span class="prio p0">P0</span></td><td>拼多多</td><td>退款率过高</td><td class="num">43.8%</td><td class="num">15%</td><td style="color:var(--red)">↑ 偏高</td><td>复核拼多多渠道质检与物流破损率，对比京东零退款差异</td></tr>
+        <tr class="risk-row"><td><span class="prio p0">P0</span></td><td>天猫</td><td>退款率过高</td><td class="num">33.9%</td><td class="num">15%</td><td style="color:var(--red)">↑ 偏高</td><td>按床垫类别拆分退款，定位退款集中类目</td></tr>
+        <tr class="risk-row"><td><span class="prio p0">P0</span></td><td>唯品</td><td>边际 ROI 为 0</td><td class="num">0</td><td class="num">1</td><td style="color:var(--faint)">→ 持平</td><td>关停渠道，资源迁移至京东</td></tr>
+        <tr class="risk-row"><td><span class="prio p1">P1</span></td><td>天猫</td><td>目标达成落后</td><td class="num">92.4%</td><td class="num">100%</td><td style="color:var(--amber)">↓ 落后</td><td>缺口 122 万，评估下半月是否追投或下调目标</td></tr>
+        <tr class="risk-row"><td><span class="prio p2">P2</span></td><td>天猫</td><td>费比偏高</td><td class="num">26.6%</td><td class="num">20%</td><td style="color:var(--amber)">↑ 偏高</td><td>拆解站内费用结构，识别低效推广计划</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2><span class="sec-num">6</span>建议与置信度</h2>
+    <div class="sec-desc">每条建议附预期收益、置信度、待验证假设，明确"该信几分、还缺什么"。</div>
+    <ul class="reco-list">
+      <li>
+        <span class="rprio"><span class="prio p0">P0</span></span>
+        <div class="rbody">
+          <b>抖音退款归因 + Top3 SKU 下架</b>：退款率 46% 远超阈值，若压至 25% 可释放回款 +101 万。先做 SKU 级退款归因，锁定退款集中单品本周下架并复核质检。
+          <div style="font-size:11px;color:var(--faint);margin-top:4px;">待验证假设：退款集中在直播冲动消费 SKU；若分散则转向物流/质检归因。</div>
+        </div>
+        <div class="rconf">预期 +120 万<br>置信度 <span class="badge badge-mid">中</span></div>
+      </li>
+      <li>
+        <span class="rprio"><span class="prio p0">P0</span></span>
+        <div class="rbody">
+          <b>唯品关停迁移至京东</b>：唯品边际 ROI=0、GMV 仅 2.9 万，占用运营精力但不产出。关停后将预算与人力迁移至京东（边际 ROI 8.5）。
+        </div>
+        <div class="rconf">预期 +10 万<br>置信度 <span class="badge badge-high">高</span></div>
+      </li>
+      <li>
+        <span class="rprio"><span class="prio p1">P1</span></span>
+        <div class="rbody">
+          <b>京东追加预算 20%</b>：京东零退款、达成 133%、边际 ROI 8.5 仍有空间，是全渠道最健康资产。追加 spend 15 万，按 ROI 8.5 测算增量 GMV 127 万、增量毛利约 60 万。
+          <div style="font-size:11px;color:var(--faint);margin-top:4px;">待验证假设：京东流量供给充足，加投不稀释 ROI；需监控加投后 2 周边际 ROI 是否下滑。</div>
+        </div>
+        <div class="rconf">预期 +60 万<br>置信度 <span class="badge badge-high">高</span></div>
+      </li>
+      <li>
+        <span class="rprio"><span class="prio p2">P2</span></span>
+        <div class="rbody">
+          <b>天猫退款品类归因</b>：天猫退款率 33.9% 但体量大（退款 501 万），需按床垫类别×SKU 交叉定位退款集中点，再决定下架或质检动作。当前缺品类级退款明细，置信度低。
+          <div style="font-size:11px;color:var(--faint);margin-top:4px;">前置依赖：后端补 mattressCategoryBreakdown 的退款率字段（现部分为 null）。</div>
+        </div>
+        <div class="rconf">预期 +30 万<br>置信度 <span class="badge badge-low">低</span></div>
+      </li>
+    </ul>
+  </section>
+
+  <div class="foot">
+    <hr>
+    <div><span class="pill">数据源</span> 钉钉渠道经营口径（dt-channel-metrics）：GMV / netRev / spend / roi / refund / addToCart / target，权威口径遵循 AGENTS.md。</div>
+    <div><span class="pill">口径</span> 回款率 = netRev / GMV；费比 = spend / netRev；退款率 = refund / GMV；达成率 = GMV / target；边际 ROI = ΔGMV / ΔSpend（基于历史弹性估算，标注为假设值）。</div>
+    <div><span class="pill">置信度</span> 高=数据完整且口径一致可直接决策；中=需补充验证假设；低=缺关键数据需先补采。</div>
+    <div><span class="pill">生成</span> 本报告为 L2 诊断层示例，由渠道质量数据分析报告体系自动生成模板渲染。下一版将接入时间序列，补充环比/趋势列。</div>
+    <div style="margin-top:10px;color:var(--faint);">数妙妙（Phoebe）· DataAnalyticsReporter · 2026-08-03</div>
+  </div>
+
+</div>
+</body>
+</html>

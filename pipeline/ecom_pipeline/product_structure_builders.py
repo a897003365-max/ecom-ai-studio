@@ -763,10 +763,22 @@ def build_customization_structure(
         cat_rows = _fetch_records(
             connection,
             f"""{enriched}
-            SELECT cat, count(*) AS n FROM enriched WHERE {tag_case} IS NOT NULL GROUP BY 1 ORDER BY 2 DESC""",
+            SELECT cat,
+                   sum(qty) AS sales_units,
+                   sum(CASE WHEN {tag_case} IS NOT NULL THEN qty ELSE 0 END) AS custom_sales_units,
+                   count(*) AS n
+            FROM enriched GROUP BY 1 ORDER BY 2 DESC""",
         )
+        custom_total_qty = max(float(r["custom_sales_units"] or 0) for r in cat_rows) if cat_rows else 0
         category_structure = [
-            {"mattressCategory": r["cat"], "customOrderLines": int(r["n"]), "customOrderLineShare": (int(r["n"]) / custom_total) if custom_total > 0 else 0}
+            {
+                "mattressCategory": r["cat"],
+                "salesUnits": float(r["sales_units"] or 0),
+                "customSalesUnits": float(r["custom_sales_units"] or 0),
+                "customSalesShare": (float(r["custom_sales_units"] or 0) / float(r["sales_units"])) if float(r["sales_units"] or 0) > 0 else 0,
+                "customOrderLines": int(r["n"]),
+                "customOrderLineShare": (int(r["n"]) / custom_total) if custom_total > 0 else 0,
+            }
             for r in cat_rows
         ]
 
