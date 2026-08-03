@@ -815,6 +815,7 @@ SELECT cat,
                    count(*) AS n,
                    sum(CASE WHEN is_custom THEN 1 ELSE 0 END) AS custom_n
             FROM enriched GROUP BY 1 ORDER BY 2 DESC""",
+        )
         category_structure = [
             {
                 "mattressCategory": r["cat"],
