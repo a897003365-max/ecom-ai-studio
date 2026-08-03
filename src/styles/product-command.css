@@ -503,6 +503,65 @@
 .product-command .status-good { color: var(--green); }
 .product-command .status-risk { color: var(--red); }
 
+/* 重点商品表 · 主表格列宽（scope 到 .priority-products-table，避免污染子表格与其他面板表格） */
+.product-command .priority-products-table th:first-child,
+.product-command .priority-products-table td:first-child {
+  width: 48px;
+  text-align: center;
+  padding: 10px 4px;
+}
+.product-command .priority-products-table th:nth-child(2),
+.product-command .priority-products-table td:nth-child(2) {
+  width: auto;
+  text-align: left;
+  padding: 10px 12px;
+}
+
+/* 重点商品表 · 层级折叠按钮（参考 PowerBiReplica pb-hierarchy 风格） */
+.priority-hierarchy-toggle,
+.priority-hierarchy-leaf {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+.priority-hierarchy-toggle {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  transition: color 120ms ease;
+}
+.priority-hierarchy-toggle:hover .product-name,
+.priority-hierarchy-toggle:focus-visible .product-name {
+  color: var(--brand);
+}
+.priority-hierarchy-icon,
+.priority-hierarchy-spacer {
+  display: inline-grid;
+  place-items: center;
+  width: 15px;
+  height: 15px;
+  border: 1px solid rgba(166, 229, 54, 0.55);
+  border-radius: 3px;
+  color: var(--brand);
+  font-size: 12px;
+  line-height: 1;
+  flex-shrink: 0;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+.priority-hierarchy-spacer {
+  border-color: transparent;
+  visibility: hidden;
+}
+.priority-hierarchy-toggle:hover .priority-hierarchy-icon,
+.priority-hierarchy-toggle:focus-visible .priority-hierarchy-icon {
+  border-color: var(--brand);
+  background: var(--brand-dim);
+}
+
 @keyframes pc-rise-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes pc-fade-in { to { opacity: 1; } }
 @keyframes pc-line-draw { to { stroke-dashoffset: 0; } }
@@ -545,36 +604,52 @@
   }
 }
 
-/* 重点商品表 · 各渠道折叠明细 */
+/* 重点商品表 · 各渠道折叠明细（融入主表格层级风格，参考 PowerBiReplica is-hierarchy-summary） */
 .priority-channel-row td {
   padding: 0 !important;
-  background: color-mix(in srgb, var(--bg-2, #0f1b1f) 60%, transparent);
+  background: rgba(166, 229, 54, 0.055);
+  border-bottom: 1px solid var(--border) !important;
 }
-
 .priority-channel-table {
   width: 100%;
-  margin: 8px 0;
-  font-size: 12px;
+  margin: 0;
+  font-size: 11px;
   border-collapse: collapse;
 }
-
 .priority-channel-table th,
 .priority-channel-table td {
-  padding: 4px 10px;
-  text-align: left;
+  padding: 5px 12px;
+  text-align: right;
   border: none;
   background: transparent;
+  font-variant-numeric: tabular-nums;
+  font-size: 10.5px;
 }
-
+/* 显式覆盖 .product-command 通用首/次列宽规则，避免渠道平台列被压成 36/44px */
+.product-command .priority-channel-table th:first-child,
+.product-command .priority-channel-table td:first-child {
+  width: auto;
+  text-align: left;
+  padding-left: 44px;
+  padding-right: 12px;
+}
+.product-command .priority-channel-table th:nth-child(2),
+.product-command .priority-channel-table td:nth-child(2) {
+  width: auto;
+  text-align: right;
+  padding: 5px 12px;
+}
 .priority-channel-table th {
-  color: var(--muted, #7a8b85);
+  color: var(--muted-2);
   font-weight: 600;
-  font-size: 11px;
+  font-size: 10px;
   letter-spacing: 0.04em;
 }
-
-.priority-channel-table td {
-  font-variant-numeric: tabular-nums;
+.priority-channel-table tbody tr {
+  transition: background 120ms ease;
+}
+.priority-channel-table tbody tr:hover {
+  background: rgba(166, 229, 54, 0.04);
 }
 
 /* 商品总览 · 交叉矩阵区域 */

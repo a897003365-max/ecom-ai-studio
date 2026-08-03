@@ -1,6 +1,6 @@
 // 商品变化指挥中心 · 重点商品数据表
 import { Fragment, useMemo, useState } from "react";
-import { ChevronDown, ChevronRight, ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 import { money, percent, count } from "./useProductSummary";
 import type { ProductRow } from "./useProductSummary";
 import type { ProductMatrix } from "../../types/integration";
@@ -137,10 +137,9 @@ export function PriorityProductsTable({
         <span className="mini-chip">{rows.length} 个商品</span>
       </header>
       <div className="table-wrap">
-        <table aria-label="重点商品数据明细">
+        <table className="priority-products-table" aria-label="重点商品数据明细">
           <thead>
             <tr>
-              <th />
               <th>#</th>
               {COLUMNS.map((col) => {
                 const active = sortKey === col.key;
@@ -158,7 +157,7 @@ export function PriorityProductsTable({
           </thead>
           <tbody>
             {visible.length === 0 ? (
-              <tr><td colSpan={COLUMNS.length + 2} style={{ textAlign: "center", color: "var(--muted)", padding: "32px" }}>当前筛选下暂无重点商品</td></tr>
+              <tr><td colSpan={COLUMNS.length + 1} style={{ textAlign: "center", color: "var(--muted)", padding: "32px" }}>当前筛选下暂无重点商品</td></tr>
             ) : visible.map((row, index) => {
               const refundGood = row.refundRate == null ? null : row.refundRate < 0.1;
               const isExpanded = expanded.has(row.name);
@@ -169,15 +168,20 @@ export function PriorityProductsTable({
               return (
                 <Fragment key={`${row.name}-${baseIndex + index}`}>
                   <tr>
+                    <td>{baseIndex + index + 1}</td>
                     <td>
-                      {hasChannelData && (
-                        <button type="button" className="inline-flex items-center justify-center w-5 h-5 text-[var(--muted)] hover:text-[var(--text)]" onClick={() => toggleExpanded(row.name)} aria-label={isExpanded ? "收起渠道数据" : "展开渠道数据"}>
-                          {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                      {hasChannelData ? (
+                        <button type="button" className="priority-hierarchy-toggle" onClick={() => toggleExpanded(row.name)} aria-label={isExpanded ? "收起渠道数据" : "展开渠道数据"} aria-expanded={isExpanded}>
+                          <span aria-hidden="true" className="priority-hierarchy-icon">{isExpanded ? "−" : "+"}</span>
+                          <span className="product-name">{row.name}<small>{row.spu}</small></span>
                         </button>
+                      ) : (
+                        <span className="priority-hierarchy-leaf">
+                          <span aria-hidden="true" className="priority-hierarchy-spacer" />
+                          <span className="product-name">{row.name}<small>{row.spu}</small></span>
+                        </span>
                       )}
                     </td>
-                    <td>{baseIndex + index + 1}</td>
-                    <td><span className="product-name">{row.name}<small>{row.spu}</small></span></td>
                     <td><span className="platform-badge">{row.channel}</span></td>
                     <td className="amount">{money(row.received)}</td>
                     <td className="amount">{row.prev != null ? money(row.prev) : "-"}</td>
@@ -194,7 +198,7 @@ export function PriorityProductsTable({
                   </tr>
                   {isExpanded && hasChannelData && (
                     <tr className="priority-channel-row">
-                      <td colSpan={COLUMNS.length + 2} style={{ padding: 0 }}>
+                      <td colSpan={COLUMNS.length + 1} style={{ padding: 0 }}>
                         <table className="priority-channel-table">
                           <thead>
                             <tr>
