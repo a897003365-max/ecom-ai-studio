@@ -611,8 +611,9 @@
   border-bottom: 1px solid var(--border) !important;
 }
 .priority-channel-table {
-  width: 100%;
-  margin: 0;
+  width: fit-content;
+  max-width: 92%;
+  margin: 6px auto;
   font-size: 11px;
   border-collapse: collapse;
 }
