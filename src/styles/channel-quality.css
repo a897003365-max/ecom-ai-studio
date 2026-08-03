@@ -1,0 +1,50 @@
+/* 渠道质量模块 · 1:1 复刻参考看板（渠道毛利率对比条形 + 结论 callout + 三张明细表） */
+.channel-quality { display: flex; flex-direction: column; gap: 16px; }
+
+/* 顶部：分组条形图(1.35fr) + 结论 callout(0.65fr)，对齐参考 .layout 网格 */
+.channel-quality-top { display: grid; grid-template-columns: 1.35fr 0.65fr; gap: 16px; align-items: stretch; }
+@media (max-width: 920px) { .channel-quality-top { grid-template-columns: 1fr; } }
+
+/* 分组条形图：每渠道一组，含毛利率 + 商家实收两行 */
+.cq-groups { display: grid; gap: 14px; }
+.cq-group { display: grid; gap: 5px; }
+.cq-group-name { font-size: 13px; font-weight: 700; color: var(--text); }
+.cq-bar {
+  display: grid;
+  grid-template-columns: 64px minmax(60px, 1fr) 78px;
+  align-items: center;
+  gap: 10px;
+  font-size: 12.5px;
+}
+.cq-bar-label { color: var(--muted); white-space: nowrap; }
+.cq-track { height: 10px; background: var(--bg-elevated); border-radius: 99px; overflow: hidden; }
+.cq-fill { display: block; height: 100%; min-width: 2px; background: var(--green); border-radius: 99px; transition: width .25s ease; }
+.cq-fill--blue { background: var(--blue); }
+.cq-bar-value { color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
+@media (max-width: 480px) { .cq-bar { grid-template-columns: 56px minmax(60px, 1fr) 64px; } }
+
+/* 结论 callout：右侧，左侧橙色边 + 暖色底，对齐参考 .callout */
+.cq-callout {
+  border-left: 4px solid var(--orange);
+  background: var(--orange-bg);
+  border-radius: 10px;
+  padding: 15px 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.cq-callout h3 { margin: 0 0 7px; font-size: 15px; color: var(--text); font-weight: 700; }
+.cq-callout p { margin: 0; line-height: 1.6; color: var(--text); font-size: 13.5px; }
+
+.cq-note { color: var(--muted); font-size: 12px; margin: 10px 0 0; line-height: 1.5; }
+
+/* 长列头（如「毛利销售金额贡献占比」）允许换行，避免在窄视口被截断 */
+.channel-quality .data-table th {
+  white-space: normal;
+  line-height: 1.35;
+  vertical-align: bottom;
+}
+
+/* 总计行强调 */
+.cq-total-row td { font-weight: 750; border-top: 2px solid var(--border-2); background: var(--bg-elevated); }
+.cq-empty { padding: 24px 0; color: var(--muted); font-size: 13px; text-align: center; }
