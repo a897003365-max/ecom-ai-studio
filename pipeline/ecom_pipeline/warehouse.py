@@ -1601,6 +1601,7 @@ def _build_product_management_pages(
         for row in product_name_overview:
             pn = str(row.get("productName") or "").strip().casefold()
             spu = str(row.get("spu") or "").strip().casefold()
+            pcode = str(row.get("productCode") or "").strip().casefold()
             scored: dict[str, list[float]] = {}  # url -> [best confidence, match_len]
 
             def _add(url: str, conf: float, mlen: int = 0) -> None:
@@ -1612,6 +1613,11 @@ def _build_product_management_pages(
             if row.get("_spuCount") == 1 and spu and spu != "未识别 spu":
                 for url in images_by_code.get(spu, set()):
                     _add(url, 1.0, len(spu))
+            # 1b) MD->M 前缀替换：纯编码产品名 MD5301 -> M5301
+            if pn.startswith("md") and pn[2:].isdigit():
+                m_variant = "m" + pn[2:]
+                for url in images_by_code.get(m_variant, set()):
+                    _add(url, 1.0, len(m_variant))
             # 2) 产品名称精确匹配 (1.0)
             if pn:
                 for url in images_by_code.get(pn, set()):
@@ -1645,6 +1651,27 @@ def _build_product_management_pages(
                     if lcs >= max(2, min_len * 0.5):
                         coverage = lcs / max(len(seg), len(pn), 1)
                         _add(url, 0.7 * coverage, lcs)
+
+                # 6) productCode 匹配：从商品编码提取 SPU/SKU 段做精确和子串匹配
+                if pcode:
+                    # 完整 productCode 精确匹配
+                    for url in images_by_code.get(pcode, set()):
+                        _add(url, 0.95, len(pcode))
+                    # 从 productCode 提取编码段（字母前缀+数字，如 M521、S506）
+                    code_segs = _re.findall(r'[a-z]+\d+', pcode)
+                    for cs in code_segs:
+                        if len(cs) < 2:
+                            continue
+                        # 精确匹配
+                        for url in images_by_code.get(cs, set()):
+                            _add(url, 0.92, len(cs))
+                        # 子串匹配
+                        for seg, url in all_segments:
+                            if len(seg) < 2:
+                                continue
+                            if seg in cs or cs in seg:
+                                ratio = min(len(seg), len(cs)) / max(len(seg), len(cs), 1)
+                                _add(url, 0.82 * ratio, min(len(seg), len(cs)))
 
             # 选择最佳候选：按 (置信度, 匹配段长度) 降序排序
             # 唯一候选直接采纳；多候选时置信度 >=0.85 直接采纳，或 >=0.7 且与次高差距 >=0.05
