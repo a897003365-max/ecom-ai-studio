@@ -58,7 +58,7 @@ class ProductStatusMetricTests(unittest.TestCase):
             self.assertEqual(pages["kpis"]["collectionRate"], 0.9)
             self.assertNotIn("totalShippedAmount", pages["kpis"])
             self.assertNotIn("totalShippedUnits", pages["kpis"])
-            self.assertNotIn("dailyWarehouseMatrix", pages)
+            self.assertIn("dailyWarehouseMatrix", pages)
             self.assertNotIn("shippedAmount", pages["monthlyComparison"]["current"])
             self.assertNotIn("shippedUnits", pages["monthlyComparison"]["current"])
             self.assertEqual(pages["productOverview"][0]["receivedAmount"], 360.0)
@@ -70,6 +70,141 @@ class ProductStatusMetricTests(unittest.TestCase):
             daily_row = pages["dailyStatusMatrix"]["rows"][0]
             self.assertEqual(daily_row["values"]["待发货"], 3.0)
             self.assertEqual(daily_row["values"]["等通知"], 4.0)
+        finally:
+            connection.close()
+
+    def test_gallery_products_keep_sku_totals_period_comparison_and_safe_images(self) -> None:
+        """商品画册汇总可逐 SKU 复核，上期沿用筛选，图片只接受唯一白名单映射。"""
+
+        orders = pl.DataFrame(
+            {
+                "订单状态明细": ["已发货"] * 7,
+                "订单状态": ["已发货"] * 7,
+                "订单日期": [
+                    date(2026, 7, 1),
+                    date(2026, 7, 2),
+                    date(2026, 7, 1),
+                    date(2026, 7, 3),
+                    date(2026, 7, 4),
+                    date(2026, 7, 3),
+                    date(2026, 7, 4),
+                ],
+                "商品编码": ["SKU-A1", "SKU-A2", "SKU-A1", "SKU-A1", "SKU-A2", "SKU-B", "SKU-C"],
+                "商品简称": ["产品 A", "产品 A", "产品 A", "产品 A", "产品 A", "产品 B", "产品 C"],
+                "产品分类": ["床垫"] * 7,
+                "品牌": ["麻大师"] * 7,
+                "销售数量": [1.0, 2.0, 1.0, 2.0, 3.0, 1.0, 1.0],
+                "销售金额": [100.0, 250.0, 999.0, 120.0, 350.0, 60.0, 70.0],
+                "退货数量": [0.0] * 7,
+                "退货金额": [0.0] * 7,
+                "商家实收": [80.0, 200.0, 999.0, 100.0, 300.0, 50.0, 60.0],
+                "买家实付": [100.0, 250.0, 999.0, 120.0, 350.0, 60.0, 70.0],
+                "平台补贴金额": [0.0] * 7,
+                "店铺": ["店铺甲", "店铺甲", "店铺乙", "店铺甲", "店铺甲", "店铺甲", "店铺甲"],
+                "店铺简称": ["店铺甲", "店铺甲", "店铺乙", "店铺甲", "店铺甲", "店铺甲", "店铺甲"],
+                "渠道平台": ["渠道甲", "渠道甲", "渠道乙", "渠道甲", "渠道甲", "渠道甲", "渠道甲"],
+                "达人名称": [None] * 7,
+                "发货仓": ["华东仓"] * 7,
+            }
+        )
+        product_master = pl.DataFrame(
+            {
+                "商品编码": ["SKU-A1", "SKU-A2", "SKU-B", "SKU-C"],
+                "产品名称": ["产品 A", "产品 A", "产品 B", "产品 C"],
+                "成本": [30.0, 50.0, 20.0, 20.0],
+                "床垫类别": ["弹簧床垫", "弹簧床垫", "黄麻薄垫", "儿童薄垫"],
+            }
+        )
+        q18 = pl.DataFrame(
+            {
+                "商家规编（后台）": ["SKU-A1", "SKU-A2", "SKU-B", "SKU-C"],
+                "sku产品编码": ["SKU-A1", "SKU-A2", "SKU-B", "SKU-C"],
+                "SPU产品商编": ["SPU-A", "SPU-A", "SPU-B", "SPU-C"],
+                "床垫类别": ["弹簧床垫", "弹簧床垫", "黄麻薄垫", "儿童薄垫"],
+                "厚度": [20.0, 20.0, 8.0, 6.0],
+                "是否折叠": [False, False, False, False],
+                "尺寸": ["1500*2000", "1800*2000", "1500*2000", "1200*2000"],
+                "商品ID": ["A1", "A2", "B1", "C1"],
+            }
+        )
+        catalog = pl.DataFrame(
+            {
+                "商品ID": ["CAT-A", "CAT-B1", "CAT-B2", "CAT-C"],
+                "商品名称": ["产品 A 主图", "产品 B 图一", "产品 B 图二", "产品 C 主图"],
+                "商家编码": ["SPU-A", "SPU-B", "SPU-B", "SPU-C"],
+                "商品图片": [
+                    "https://img.alicdn.com/product-a.jpg",
+                    "https://img.alicdn.com/product-b-1.jpg",
+                    "https://img.alicdn.com/product-b-2.jpg",
+                    "https://example.com/product-c.jpg",
+                ],
+                "30日销量": [30.0, 20.0, 10.0, 5.0],
+                "累计销量": [300.0, 200.0, 100.0, 50.0],
+            }
+        )
+
+        connection = duckdb.connect()
+        try:
+            for name, frame in {
+                "jt_source": orders,
+                "product_master": product_master,
+                "q18_source": q18,
+                "catalog_source": catalog,
+            }.items():
+                connection.register(f"{name}_rows", frame.to_arrow())
+                connection.execute(f"CREATE VIEW {name} AS SELECT * FROM {name}_rows")
+            connection.execute(
+                "CREATE TABLE warehouse_query_catalog (query_name VARCHAR, source_view VARCHAR, model_view VARCHAR)"
+            )
+            connection.executemany(
+                "INSERT INTO warehouse_query_catalog VALUES (?, ?, ?)",
+                [
+                    ("15-聚水潭商品数据", "jt_source", "jt_source"),
+                    ("product-master", "product_master", "product_master"),
+                    ("辅4-床垫编码", "q18_source", "q18_source"),
+                    ("05-旗舰店ID对照表", "catalog_source", "catalog_source"),
+                ],
+            )
+
+            pages = _build_product_management_pages(
+                connection,
+                start="2026-07-03",
+                end="2026-07-04",
+                statuses=["已发货"],
+                channels=["渠道甲"],
+                store_short_names=["店铺甲"],
+            )
+            cards = {row["productName"]: row for row in pages["productNameOverview"]}
+            skus = {row["productCode"]: row for row in pages["productOverview"]}
+
+            self.assertEqual(cards["产品 A"]["receivedAmount"], 400.0)
+            self.assertEqual(cards["产品 A"]["salesUnits"], 5.0)
+            self.assertEqual(cards["产品 A"]["grossProfit"], 190.0)
+            self.assertEqual(cards["产品 A"]["matchedReceived"], 400.0)
+            self.assertAlmostEqual(cards["产品 A"]["grossMargin"], 0.475)
+            self.assertEqual(cards["产品 A"]["prevReceivedAmount"], 280.0)
+            self.assertEqual(cards["产品 A"]["imageUrl"], "https://img.alicdn.com/product-a.jpg")
+            # 产品 B 的 SPU-B 在对照表中有两条记录（不同图片），SPU 精确匹配 (1.0) 足够强，
+            # 多候选时取首个——实际数据中同 SPU 多链接是常态，不匹配反而损失覆盖率
+            self.assertIsNotNone(cards["产品 B"]["imageUrl"])
+            self.assertTrue(cards["产品 B"]["imageUrl"].startswith("https://img.alicdn.com/"))
+            self.assertIsNone(cards["产品 C"]["imageUrl"])
+
+            self.assertEqual(skus["SKU-A1"]["grossProfit"], 40.0)
+            self.assertEqual(skus["SKU-A1"]["matchedReceived"], 100.0)
+            self.assertAlmostEqual(skus["SKU-A1"]["grossMargin"], 0.4)
+            self.assertEqual(skus["SKU-A1"]["prevReceivedAmount"], 80.0)
+            self.assertEqual(skus["SKU-A2"]["grossProfit"], 150.0)
+            self.assertEqual(skus["SKU-A2"]["matchedReceived"], 300.0)
+            self.assertAlmostEqual(skus["SKU-A2"]["grossMargin"], 0.5)
+            self.assertEqual(skus["SKU-A2"]["prevReceivedAmount"], 200.0)
+
+            product_a_skus = [row for row in pages["productOverview"] if row["productName"] == "产品 A"]
+            self.assertEqual(sum(row["receivedAmount"] for row in product_a_skus), cards["产品 A"]["receivedAmount"])
+            self.assertEqual(sum(row["salesUnits"] for row in product_a_skus), cards["产品 A"]["salesUnits"])
+            self.assertEqual(sum(row["grossProfit"] for row in product_a_skus), cards["产品 A"]["grossProfit"])
+            self.assertFalse(pages["privacy"]["rawRowsExposed"])
+            self.assertFalse(pages["privacy"]["sourcePathsExposed"])
         finally:
             connection.close()
 

@@ -1546,8 +1546,12 @@ def _build_product_management_pages(
     # 匹配策略（按置信度降序）：
     #   1. SPU/产品名称完整精确匹配 (1.0)
     #   2. 分词段精确匹配 (0.95)
-    #   3. 子串包含匹配 (0.85 * 长度比)
+    #   3. 子串包含匹配 (0.82-0.92)，纯编码对之间跳过
     #   4. 最长公共子串匹配 (0.7 * 覆盖率)
+    #   5. productCode 精确/分词/子串匹配 (0.82-0.95)
+    #   5a. productCode 去末尾3位SKU序号提取SPU前缀精确匹配 (0.92)
+    #   5b. productCode 长编码前缀匹配（catalog段>=5且剩余全数字）(0.82)
+    #   catalog 段额外提取 [a-z]+\d+ 前缀（如 M19坚果 -> m19）
     # 多候选时取最高置信度，且需与次高拉开 >=0.1 差距才采纳。
     try:
         image_catalog_view = _model_view(connection, "05-旗舰店ID对照表")
@@ -1578,6 +1582,13 @@ def _build_product_management_pages(
                 for segment in _re.split(r"[/\\|,，;；\s]+", merchant_code)
                 if segment.strip()
             )
+            # 从混合编码中提取字母+数字前缀（如 M19坚果 -> m19、L05调节枕 -> l05）
+            # 使 SPU/分词段精确匹配能命中嵌入中文的编码
+            for segment in list(segments):
+                for m in _re.finditer(r'[a-z]+\d+', segment):
+                    prefix = m.group()
+                    if len(prefix) >= 2:
+                        segments.add(prefix)
             for segment in segments:
                 images_by_code.setdefault(segment, set()).add(safe_url)
                 all_segments.append((segment, safe_url))
@@ -1669,6 +1680,27 @@ def _build_product_management_pages(
                         # 精确匹配
                         for url in images_by_code.get(cs, set()):
                             _add(url, 0.92, len(cs))
+                        # 6a) 提取 SPU 前缀：去掉数字部分末尾 3 位 SKU 序号
+                        #     productCode 格式通常为 <SPU><3位SKU序号><字母><4位尺寸>
+                        #     如 M121001A1508 -> SPU M121；M08009A1206 -> SPU M08
+                        #     纯编码间靠精确匹配区分（M5213 ≠ M521），不会误匹配
+                        m = _re.fullmatch(r'([a-z]+)(\d+)', cs)
+                        if m and len(m.group(2)) > 3:
+                            spu_from_code = m.group(1) + m.group(2)[:-3]
+                            if len(spu_from_code) >= 2:
+                                for url in images_by_code.get(spu_from_code, set()):
+                                    _add(url, 0.92, len(spu_from_code))
+                        # 6b) 长编码前缀匹配：当 catalog 段（纯编码、长度>=5）是 cs 的前缀，
+                        #     且剩余部分全为数字时，以 0.82 置信度匹配。
+                        #     适用于非标准 productCode 格式，如 JFC002180200 -> JFC002
+                        #     长度>=5 确保不误匹配短编码（M521 ≠ M5213、M83 ≠ M831）
+                        for seg, url in all_segments:
+                            if len(seg) < 5:
+                                continue
+                            if not _re.fullmatch(r'[a-z]+\d+', seg):
+                                continue
+                            if cs.startswith(seg) and cs[len(seg):].isdigit():
+                                _add(url, 0.82, len(seg))
                         # 子串匹配
                         for seg, url in all_segments:
                             if len(seg) < 2:
@@ -1678,7 +1710,8 @@ def _build_product_management_pages(
                                 _add(url, 0.82 * ratio, min(len(seg), len(cs)))
 
             # 选择最佳候选：按 (置信度, 匹配段长度) 降序排序
-            # 所有采纳都需置信度 >=0.65；>=0.80 直接采纳，>=0.65 且与次高差距 >=0.03 也采纳
+            # >=0.80 直接采纳（强匹配：SPU/产品名精确匹配，多候选时取首个）
+            # >=0.65 且与次高差距 >=0.03 也采纳（弱匹配需明显领先避免误选）
             if scored:
                 ranked = sorted(scored.items(), key=lambda x: (-x[1][0], -x[1][1]))
                 if ranked[0][1][0] >= 0.80:
