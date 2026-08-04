@@ -417,6 +417,11 @@ def _safe_product_image(value: Any) -> str | None:
     return text if text.lower().startswith("https://img.alicdn.com/") else None
 
 
+def _has_cjk(text: str) -> bool:
+    """是否包含中文字符（用于区分中文名称核心词与其他匹配）。"""
+    return any("一" <= ch <= "鿿" for ch in text)
+
+
 def _model_view(connection: duckdb.DuckDBPyConnection, query_name: str) -> str:
     row = connection.execute(
         "SELECT model_view FROM warehouse_query_catalog WHERE query_name = ?",
@@ -1658,14 +1663,27 @@ def _build_product_management_pages(
                         ratio = len(pn) / max(len(seg), 1)
                         _add(url, 0.8 * ratio, len(pn))
                 # 5) 最长公共子串匹配 (0.7 * 覆盖率)
+                #    中文名称核心词：当产品名与商家编码段共享较长公共子串时，
+                #    用「产品名覆盖率 pn_cov = lcs/len(pn)」+「短串覆盖率 core_cov = lcs/min_len」
+                #    区分真匹配与泛化描述词。
+                #    例：草本苦荞健康睡眠枕 与 草本苦荞枕 -> lc=4, pn_cov=0.44, core_cov=0.80 -> 0.85
+                #    长名称（如 麻大师天然黄麻椰棕榈床垫...）pn_cov~0.1，不会命中泛化词。
                 for seg, url in all_segments:
                     if len(seg) < 2 or len(pn) < 2:
                         continue
                     lcs = _lcs_len(seg, pn)
                     min_len = min(len(seg), len(pn))
                     if lcs >= max(2, min_len * 0.5):
-                        coverage = lcs / max(len(seg), len(pn), 1)
-                        _add(url, 0.7 * coverage, lcs)
+                        if _has_cjk(pn) and _has_cjk(seg) and lcs >= 3:
+                            pn_cov = lcs / max(len(pn), 1)
+                            core_cov = lcs / max(min_len, 1)
+                            if pn_cov >= 0.4 and core_cov >= 0.6:
+                                _add(url, 0.85, lcs)
+                            elif pn_cov >= 0.4 and core_cov >= 0.5:
+                                _add(url, 0.75, lcs)
+                        else:
+                            coverage = lcs / max(len(seg), len(pn), 1)
+                            _add(url, 0.7 * coverage, lcs)
 
                 # 6) productCode 匹配：从商品编码提取 SPU/SKU 段做精确和子串匹配
                 if pcode:
