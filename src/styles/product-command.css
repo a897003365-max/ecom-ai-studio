@@ -630,9 +630,8 @@
 .product-command .priority-channel-table th:first-child,
 .product-command .priority-channel-table td:first-child {
   width: auto;
-  text-align: left;
-  padding-left: 44px;
-  padding-right: 12px;
+  text-align: center;
+  padding: 5px 12px;
 }
 .product-command .priority-channel-table th:nth-child(2),
 .product-command .priority-channel-table td:nth-child(2) {
