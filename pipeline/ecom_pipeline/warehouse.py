@@ -1542,9 +1542,13 @@ def _build_product_management_pages(
         row["prevReceivedAmount"] = None  # 上期商家实收，在 prev_m 确定后回填
         row["imageUrl"] = None
 
-    # 商品图匹配：从 05-旗舰店ID对照表 按「商家编码」模糊匹配产品 SPU 或产品名称。
-    # 商家编码可能是"产品名/SPU"组合，按完整值及分隔段建索引；
-    # 对每个产品依次尝试 SPU -> 产品名称完整值 -> 产品名称分词段，任一命中唯一候选即写入。
+    # 商品图匹配：从 05-旗舰店ID照表 按「商家编码」模糊匹配产品 SPU 或产品名称。
+    # 匹配策略（按置信度降序）：
+    #   1. SPU/产品名称完整精确匹配 (1.0)
+    #   2. 分词段精确匹配 (0.95)
+    #   3. 子串包含匹配 (0.85 * 长度比)
+    #   4. 最长公共子串匹配 (0.7 * 覆盖率)
+    # 多候选时取最高置信度，且需与次高拉开 >=0.1 差距才采纳。
     try:
         image_catalog_view = _model_view(connection, "05-旗舰店ID对照表")
         image_catalog_columns = {row[0] for row in connection.execute(f"DESCRIBE {image_catalog_view}").fetchall()}
@@ -1562,6 +1566,7 @@ def _build_product_management_pages(
             """,
         )
         images_by_code: dict[str, set[str]] = {}
+        all_segments: list[tuple[str, str]] = []  # (segment, url) 用于模糊匹配
         for image_row in image_rows:
             safe_url = _safe_product_image(image_row.get("imageUrl"))
             merchant_code = str(image_row.get("merchantCode") or "").strip()
@@ -1575,33 +1580,82 @@ def _build_product_management_pages(
             )
             for segment in segments:
                 images_by_code.setdefault(segment, set()).add(safe_url)
+                all_segments.append((segment, safe_url))
+
+        def _lcs_len(a: str, b: str) -> int:
+            """最长公共子串长度。"""
+            if not a or not b:
+                return 0
+            prev = [0] * (len(b) + 1)
+            best = 0
+            for i in range(1, len(a) + 1):
+                cur = [0] * (len(b) + 1)
+                for j in range(1, len(b) + 1):
+                    if a[i - 1] == b[j - 1]:
+                        cur[j] = prev[j - 1] + 1
+                        if cur[j] > best:
+                            best = cur[j]
+                prev = cur
+            return best
+
         for row in product_name_overview:
-            candidates: set[str] = set()
-            # 1) 按 SPU 匹配（仅单一 SPU 时）
+            pn = str(row.get("productName") or "").strip().casefold()
             spu = str(row.get("spu") or "").strip().casefold()
+            scored: dict[str, list[float]] = {}  # url -> [best confidence, match_len]
+
+            def _add(url: str, conf: float, mlen: int = 0) -> None:
+                cur = scored.get(url)
+                if cur is None or conf > cur[0] or (conf == cur[0] and mlen > cur[1]):
+                    scored[url] = [conf, mlen]
+
+            # 1) SPU 精确匹配 (1.0)
             if row.get("_spuCount") == 1 and spu and spu != "未识别 spu":
-                spu_candidates = images_by_code.get(spu, set())
-                if len(spu_candidates) == 1:
-                    candidates = spu_candidates
-            # 2) SPU 未命中时，按产品名称完整值匹配
-            if len(candidates) != 1:
-                pn = str(row.get("productName") or "").strip().casefold()
-                if pn:
-                    name_candidates = images_by_code.get(pn, set())
-                    if len(name_candidates) == 1:
-                        candidates = name_candidates
-                    else:
-                        # 3) 按产品名称分词段匹配
-                        for segment in _re.split(r"[/\\|,，;；\s]+", pn):
-                            seg = segment.strip()
-                            if not seg:
-                                continue
-                            seg_candidates = images_by_code.get(seg, set())
-                            if len(seg_candidates) == 1:
-                                candidates = seg_candidates
-                                break
-            if len(candidates) == 1:
-                row["imageUrl"] = next(iter(candidates))
+                for url in images_by_code.get(spu, set()):
+                    _add(url, 1.0, len(spu))
+            # 2) 产品名称精确匹配 (1.0)
+            if pn:
+                for url in images_by_code.get(pn, set()):
+                    _add(url, 1.0, len(pn))
+                # 3) 分词段精确匹配 (0.95)
+                for segment in _re.split(r"[/\\|,，;；\s]+", pn):
+                    seg = segment.strip()
+                    if not seg or len(seg) < 2:
+                        continue
+                    for url in images_by_code.get(seg, set()):
+                        _add(url, 0.95, len(seg))
+                # 4) 子串包含匹配
+                #    商家编码段完全出现在产品名称中（seg in pn）：高置信度，不稀释
+                #    产品名称完全出现在商家编码段中（pn in seg）：按长度比稀释
+                for seg, url in all_segments:
+                    if len(seg) < 2:
+                        continue
+                    if seg in pn:
+                        # 商家编码段是产品名称的子串 -- 核心词匹配
+                        conf = 0.92 if len(seg) >= 4 else 0.82
+                        _add(url, conf, len(seg))
+                    elif pn in seg:
+                        ratio = len(pn) / max(len(seg), 1)
+                        _add(url, 0.8 * ratio, len(pn))
+                # 5) 最长公共子串匹配 (0.7 * 覆盖率)
+                for seg, url in all_segments:
+                    if len(seg) < 2 or len(pn) < 2:
+                        continue
+                    lcs = _lcs_len(seg, pn)
+                    min_len = min(len(seg), len(pn))
+                    if lcs >= max(2, min_len * 0.5):
+                        coverage = lcs / max(len(seg), len(pn), 1)
+                        _add(url, 0.7 * coverage, lcs)
+
+            # 选择最佳候选：按 (置信度, 匹配段长度) 降序排序
+            # 唯一候选直接采纳；多候选时置信度 >=0.85 直接采纳，或 >=0.7 且与次高差距 >=0.05
+            if scored:
+                ranked = sorted(scored.items(), key=lambda x: (-x[1][0], -x[1][1]))
+                if len(ranked) == 1:
+                    row["imageUrl"] = ranked[0][0]
+                elif ranked[0][1][0] >= 0.80:
+                    row["imageUrl"] = ranked[0][0]
+                elif ranked[0][1][0] >= 0.65 and (ranked[0][1][0] - ranked[1][1][0]) >= 0.03:
+                    row["imageUrl"] = ranked[0][0]
             row.pop("_spuCount", None)
     else:
         for row in product_name_overview:
