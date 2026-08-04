@@ -1632,9 +1632,13 @@ def _build_product_management_pages(
                 # 4) 子串包含匹配
                 #    商家编码段完全出现在产品名称中（seg in pn）：高置信度，不稀释
                 #    产品名称完全出现在商家编码段中（pn in seg）：按长度比稀释
+                #    当 seg 和 pn 都是纯编码标识符时跳过子串匹配（M521 ≠ M5212）
+                _is_code = lambda s: bool(_re.fullmatch(r'[a-z]+\d+\+?', s))
                 for seg, url in all_segments:
                     if len(seg) < 2:
                         continue
+                    if _is_code(seg) and _is_code(pn):
+                        continue  # 两个纯编码之间不做子串包含
                     if seg in pn:
                         # 商家编码段是产品名称的子串 -- 核心词匹配
                         conf = 0.92 if len(seg) >= 4 else 0.82
@@ -1674,14 +1678,12 @@ def _build_product_management_pages(
                                 _add(url, 0.82 * ratio, min(len(seg), len(cs)))
 
             # 选择最佳候选：按 (置信度, 匹配段长度) 降序排序
-            # 唯一候选直接采纳；多候选时置信度 >=0.85 直接采纳，或 >=0.7 且与次高差距 >=0.05
+            # 所有采纳都需置信度 >=0.65；>=0.80 直接采纳，>=0.65 且与次高差距 >=0.03 也采纳
             if scored:
                 ranked = sorted(scored.items(), key=lambda x: (-x[1][0], -x[1][1]))
-                if len(ranked) == 1:
+                if ranked[0][1][0] >= 0.80:
                     row["imageUrl"] = ranked[0][0]
-                elif ranked[0][1][0] >= 0.80:
-                    row["imageUrl"] = ranked[0][0]
-                elif ranked[0][1][0] >= 0.65 and (ranked[0][1][0] - ranked[1][1][0]) >= 0.03:
+                elif ranked[0][1][0] >= 0.65 and (len(ranked) == 1 or (ranked[0][1][0] - ranked[1][1][0]) >= 0.03):
                     row["imageUrl"] = ranked[0][0]
             row.pop("_spuCount", None)
     else:
