@@ -20,3 +20,46 @@ __pycache__/
 .playwright-mcp/
 output/
 参考文件/
+
+# === 真实业务数据 / 客户对话（绝不能进 Git）===
+# 客服对话原始数据
+agent_data.json
+agent_data.pkl
+chat_log_raw.json
+chat_sessions.json
+# 分析/抓取结果
+analytics-res.json
+console-before-tests.json
+# 客户话术分析报告（含真实客服数据）
+客服话术*.html
+!docs/**/客服话术*.html
+
+# === 本机运行时 / 配置（不跨机共享）===
+# Claude Code 本地配置（settings.local.json / *.local.md 含本机路径）
+.claude/
+.workbuddy/
+.build/
+
+# 名字容易引起警觉的临时脚本（实际只是 playwright 路径检查，但避免误传）
+check-pw.cjs
+
+# === 测试 / 验收产物（开发过程截图，不入仓）===
+# 根目录散落的 test-*.png 截图
+test-*.png
+# 验收测试输出
+test-results/
+# 临时截图目录
+screenshots/
+
+# === 根目录散落的一次性工件（按需 git add -f）===
+# 各类 before/after 截图、cockpit、workbench-light-after 等
+01-cockpit.png
+cockpit.png
+workbench-light-after.png
+tmall-detail-light-scrollbar.png
+tmall-detail-scrolled-right.png
+tmall-detail-tables.png
+# 一次性生成的报告/演示脚本（内容可能含敏感数据，谨慎 add）
+report.html
+review-screenshots.cjs
+generate_ppt.py
