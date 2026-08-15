@@ -318,9 +318,9 @@
   white-space: nowrap;
 }
 
-.product-gallery-trend.is-up { background: var(--color-success-soft, rgba(133, 216, 63, 0.14)); color: var(--color-success, #85d83f); }
-.product-gallery-trend.is-down { background: var(--color-danger-soft, rgba(255, 102, 88, 0.14)); color: var(--color-danger, #ff6658); }
-.product-gallery-trend.is-neutral { background: var(--color-surface-strong, rgba(20, 36, 40, 0.86)); color: var(--color-text-secondary, #9db3ad); }
+.product-gallery-trend.is-up { background: #142428; color: var(--color-success, #85d83f); }
+.product-gallery-trend.is-down { background: #142428; color: var(--color-danger, #ff6658); }
+.product-gallery-trend.is-neutral { background: #142428; color: var(--color-text-secondary, #9db3ad); }
 
 /* ---------- 卡体 ---------- */
 

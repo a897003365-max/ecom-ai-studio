@@ -1,8 +1,11 @@
-export interface DailyCoreDatum {
+export interface HierarchyDatum {
   date: string;
   year: string;
   month: string;
   day: string;
+}
+
+export interface DailyCoreDatum extends HierarchyDatum {
   productVisitors: number;
   addToCart: number;
   payBuyers: number;
@@ -22,30 +25,32 @@ export interface DailyCoreDatum {
 
 export type DailyCoreHierarchyLevel = "year" | "month" | "day";
 
-export interface DailyCoreHierarchyRow extends DailyCoreDatum {
+export type HierarchyRow<D extends HierarchyDatum> = D & {
   hierarchyLevel: DailyCoreHierarchyLevel;
   hierarchyKey: string;
   showYear: boolean;
   showMonth: boolean;
-}
+};
+
+export type DailyCoreHierarchyRow = HierarchyRow<DailyCoreDatum>;
 
 export interface DailyCoreExpansion {
   years: Set<string>;
   months: Set<string>;
 }
 
-const PBIX_SAVED_EXPANDED_YEARS = ["2026"];
-const PBIX_SAVED_EXPANDED_MONTHS = ["2026|07月"];
-
+// 默认展开数据中所有（年|月）节点，保证当前期间内每个月的每日明细首屏都可见。
+// 这样跨月默认期间（如近 7 天跨月）不会被折叠隐藏；折叠仍可手动收起年月。
 export function pbixDefaultDailyCoreExpansion(
   rows: Array<Pick<DailyCoreDatum, "year" | "month">>,
 ): DailyCoreExpansion {
-  const availableYears = new Set(rows.map((row) => row.year));
-  const availableMonths = new Set(rows.map((row) => `${row.year}|${row.month}`));
-  return {
-    years: new Set(PBIX_SAVED_EXPANDED_YEARS.filter((year) => availableYears.has(year))),
-    months: new Set(PBIX_SAVED_EXPANDED_MONTHS.filter((month) => availableMonths.has(month))),
-  };
+  const years = new Set<string>();
+  const months = new Set<string>();
+  rows.forEach((row) => {
+    years.add(row.year);
+    months.add(`${row.year}|${row.month}`);
+  });
+  return { years, months };
 }
 
 function divide(numerator: number, denominator: number): number | null {
@@ -70,8 +75,8 @@ function minimumStoreRank(rows: DailyCoreDatum[]): string | null {
 function aggregateDailyCoreRows(
   rows: DailyCoreDatum[],
   hierarchyLevel: Exclude<DailyCoreHierarchyLevel, "day">,
-  hierarchyKey: string,
-): DailyCoreHierarchyRow {
+  _hierarchyKey: string,
+): DailyCoreDatum {
   const first = rows[0];
   const totals = rows.reduce((result, row) => ({
     productVisitors: result.productVisitors + (row.productVisitors || 0),
@@ -107,32 +112,41 @@ function aggregateDailyCoreRows(
     refundRate: divide(totals.refundAmount, totals.payAmount),
     subsidizedFeeRate: divide(totals.spend, totals.subsidizedAmount),
     storeRank: minimumStoreRank(rows),
-    hierarchyLevel,
-    hierarchyKey,
-    showYear: true,
-    showMonth: hierarchyLevel === "month",
   };
 }
 
-export function buildDailyCoreHierarchy(
-  rows: DailyCoreDatum[],
+type AggregateHierarchyFn<D extends HierarchyDatum> = (
+  rows: D[],
+  level: Exclude<DailyCoreHierarchyLevel, "day">,
+  key: string,
+) => D;
+
+export function buildDailyHierarchy<D extends HierarchyDatum>(
+  rows: D[],
   expandedYears: ReadonlySet<string>,
   expandedMonths: ReadonlySet<string>,
-): DailyCoreHierarchyRow[] {
-  const years = new Map<string, Map<string, DailyCoreDatum[]>>();
+  aggregate: AggregateHierarchyFn<D>,
+): HierarchyRow<D>[] {
+  const years = new Map<string, Map<string, D[]>>();
   rows.forEach((row) => {
-    const months = years.get(row.year) ?? new Map<string, DailyCoreDatum[]>();
+    const months = years.get(row.year) ?? new Map<string, D[]>();
     const monthRows = months.get(row.month) ?? [];
     monthRows.push(row);
     months.set(row.month, monthRows);
     years.set(row.year, months);
   });
 
-  const visible: DailyCoreHierarchyRow[] = [];
+  const visible: HierarchyRow<D>[] = [];
   years.forEach((months, year) => {
     const yearRows = [...months.values()].flat();
     if (!expandedYears.has(year)) {
-      visible.push(aggregateDailyCoreRows(yearRows, "year", year));
+      visible.push({
+        ...aggregate(yearRows, "year", year),
+        hierarchyLevel: "year",
+        hierarchyKey: year,
+        showYear: true,
+        showMonth: false,
+      });
       return;
     }
 
@@ -141,8 +155,11 @@ export function buildDailyCoreHierarchy(
       const monthKey = `${year}|${month}`;
       if (!expandedMonths.has(monthKey)) {
         visible.push({
-          ...aggregateDailyCoreRows(monthRows, "month", monthKey),
+          ...aggregate(monthRows, "month", monthKey),
+          hierarchyLevel: "month",
+          hierarchyKey: monthKey,
           showYear: isFirstYearRow,
+          showMonth: true,
         });
         isFirstYearRow = false;
         return;
@@ -161,4 +178,12 @@ export function buildDailyCoreHierarchy(
     });
   });
   return visible;
+}
+
+export function buildDailyCoreHierarchy(
+  rows: DailyCoreDatum[],
+  expandedYears: ReadonlySet<string>,
+  expandedMonths: ReadonlySet<string>,
+): DailyCoreHierarchyRow[] {
+  return buildDailyHierarchy(rows, expandedYears, expandedMonths, aggregateDailyCoreRows);
 }

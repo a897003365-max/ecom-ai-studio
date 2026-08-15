@@ -658,13 +658,13 @@ function buildMonthlyOverview(snapshot, end) {
   const priorYearPlatformRows = priorYearRows.map((row) => ({ ...row, platform: platformName(row.platform) }));
   const priorYearDayPlatformMap = new Map(
     aggregateMetricRows(priorYearPlatformRows, ["date", "platform"])
-      .map((row) => [`${row.date} ${row.platform}`, Number(row.netRevenue || 0)]),
+      .map((row) => [`${row.date}\u0000${row.platform}`, Number(row.netRevenue || 0)]),
   );
   const priorYearDailyChannels = dateSequence(priorStart, priorMonthEnd).map((date) => ({
     date,
     channels: channelOrder.map((platform) => ({
       platform,
-      netRevenue: Number(priorYearDayPlatformMap.get(`${date} ${platform}`) || 0),
+      netRevenue: Number(priorYearDayPlatformMap.get(`${date}\u0000${platform}`) || 0),
     })),
   }));
   const dayMap = new Map(aggregateMetricRows(platformRows, ["date", "platform"])
@@ -740,10 +740,10 @@ function buildMetricTrends(snapshot, period) {
 function normalizedReportingPeriod(snapshot, range = {}) {
   const reporting = snapshot.reporting;
   const available = reporting.availablePeriod;
-  const defaultStart = snapshot.period?.start && snapshot.period.start >= available.start
-    ? snapshot.period.start
-    : available.start;
   const defaultEnd = reporting.completedThrough || snapshot.period?.end;
+  // 默认近 7 天：以最新完整日期为锚，往前推 6 天；不足则从可选范围起点开始
+  const sevenDayStart = defaultEnd ? shiftDay(defaultEnd, -6) : null;
+  const defaultStart = sevenDayStart && sevenDayStart >= available.start ? sevenDayStart : available.start;
   const start = range.start || defaultStart;
   const end = range.end || defaultEnd;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(start) || !/^\d{4}-\d{2}-\d{2}$/.test(end)) throw new Error("日期格式必须为 YYYY-MM-DD");
@@ -773,11 +773,23 @@ export function filterDingTalkSnapshot(snapshot, range = {}) {
   const offsiteSpend = snapshot.reporting.dailyOffsiteSpend
     .filter((row) => dateInRange(row.date, period.start, period.end))
     .reduce((sum, row) => sum + Number(row.spend || 0), 0);
+  // 店铺级净回款同比：按所选期间回退一年聚合去年同期 dailyStores，无同期数据的店铺返回 null
+  const priorYearStoreDaily = snapshot.reporting.dailyStores
+    .filter((row) => dateInRange(row.date, shiftYear(period.start, -1), shiftYear(period.end, -1)))
+    .map((row) => ({ ...row, platform: platformName(row.platform) }));
+  const priorYearStores = new Map(
+    aggregateMetricRows(priorYearStoreDaily, ["platform", "store"])
+      .map((row) => [`${row.platform}\u0000${row.store}`, row]),
+  );
   const stores = aggregateMetricRows(storeDaily, ["platform", "store"])
-    .map((row) => ({
-      ...reportingMetricShape(row, totals.netRevenue ? row.netRevenue / totals.netRevenue : 0),
-      offsiteSpend: row.platform === "天猫" && row.store === "麻大师旗舰店" ? offsiteSpend : 0,
-    }))
+    .map((row) => {
+      const priorYear = priorYearStores.get(`${row.platform}\u0000${row.store}`);
+      return {
+        ...reportingMetricShape(row, totals.netRevenue ? row.netRevenue / totals.netRevenue : 0),
+        offsiteSpend: row.platform === "天猫" && row.store === "麻大师旗舰店" ? offsiteSpend : 0,
+        netRevenueYoy: priorYear?.netRevenue ? row.netRevenue / priorYear.netRevenue - 1 : null,
+      };
+    })
     .sort((left, right) => right.netRevenue - left.netRevenue);
   const daily = aggregateMetricRows(platformDaily, ["date"])
     .map((row) => ({ date: row.date, ...reportingMetricShape(row) }))

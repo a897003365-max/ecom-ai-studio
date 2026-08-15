@@ -791,6 +791,8 @@ export interface DingTalkStoreMetric extends DingTalkMetricTotals {
   platform: string;
   store: string;
   offsiteSpend?: number;
+  /** 净回款同比（去年同期同时段回款额），无同期数据时为 null */
+  netRevenueYoy?: number | null;
 }
 
 export interface DingTalkMonthlyOverview {

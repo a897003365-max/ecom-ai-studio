@@ -7,7 +7,9 @@ import type {
   DingTalkSnapshot,
   ProductManagementPages,
 } from "../types/integration";
+import { Card } from "./Card";
 import { ChannelRevenueChart } from "./ChannelRevenueChart";
+import { ComparisonTicker } from "./ComparisonTicker";
 import { PlatformBadge } from "./PlatformBadge";
 
 interface ExecutiveCommerceOverviewProps {
@@ -43,6 +45,11 @@ function count(value: number) {
 
 function percent(value?: number | null) {
   return percentFormat.format(Number.isFinite(value) ? value || 0 : 0);
+}
+
+function yoy(value?: number | null) {
+  if (value === null || value === undefined || !Number.isFinite(value)) return <span className="exec-yoy is-flat">—</span>;
+  return <span className={`exec-yoy ${value >= 0 ? "is-up" : "is-down"}`}>{value >= 0 ? "+" : ""}{percent(value)}</span>;
 }
 
 function rate(numerator: number, denominator: number) {
@@ -182,7 +189,7 @@ function DailyBusinessTrend({ dingtalk }: { dingtalk: DingTalkSnapshot }) {
   }
 
   return (
-    <section className="exec-panel exec-trend-panel" data-testid="executive-daily-trend">
+    <section className="exec-panel exec-trend-panel" data-search-anchor="analytics-daily-trend" data-testid="executive-daily-trend">
       <header className="exec-panel-head">
         <div>
           <span className="exec-panel-kicker"><BarChart3 size={14} />经营主趋势</span>
@@ -292,7 +299,7 @@ function RevenueQualityBridge({ totals }: { totals: DingTalkMetricTotals }) {
   ] as const;
 
   return (
-    <section className="exec-panel exec-quality-panel" data-testid="revenue-quality-bridge">
+    <section className="exec-panel exec-quality-panel" data-search-anchor="analytics-revenue-quality" data-testid="revenue-quality-bridge">
       <header className="exec-panel-head">
         <div>
           <span className="exec-panel-kicker"><BadgeDollarSign size={14} />经营结果拆解</span>
@@ -356,7 +363,7 @@ function ChannelQualityTable({ platforms }: { platforms: DingTalkSnapshot["platf
   }), { gmv: 0, netRevenue: 0, spend: 0, refund: 0 });
 
   return (
-    <section className="exec-panel exec-channel-panel" data-testid="executive-channel-quality">
+    <section className="exec-panel exec-channel-panel" data-search-anchor="analytics-channel-quality" data-testid="executive-channel-quality">
       <header className="exec-panel-head">
         <div>
           <span className="exec-panel-kicker"><CircleGauge size={14} />渠道经营</span>
@@ -412,7 +419,7 @@ function ChannelQualityTable({ platforms }: { platforms: DingTalkSnapshot["platf
   );
 }
 
-function StoreQualityTable({ stores }: { stores: DingTalkSnapshot["stores"] }) {
+function StoreQualityTable({ stores, totalsYoy }: { stores: DingTalkSnapshot["stores"]; totalsYoy?: number | null }) {
   const rows = [...stores]
     .sort((left, right) => right.netRevenue - left.netRevenue)
     .map(withRates);
@@ -427,7 +434,7 @@ function StoreQualityTable({ stores }: { stores: DingTalkSnapshot["stores"] }) {
   }), { gmv: 0, netRevenue: 0, spend: 0, refund: 0, offsiteSpend: 0 });
 
   return (
-    <section className="exec-panel exec-channel-panel" data-testid="executive-store-quality">
+    <section className="exec-panel exec-channel-panel" data-search-anchor="analytics-store-quality" data-testid="executive-store-quality">
       <header className="exec-panel-head">
         <div>
           <span className="exec-panel-kicker"><CircleGauge size={14} />店铺经营</span>
@@ -439,7 +446,7 @@ function StoreQualityTable({ stores }: { stores: DingTalkSnapshot["stores"] }) {
         <table className="exec-channel-table">
           <thead>
             <tr>
-              <th>排名</th><th>渠道</th><th>店铺</th><th>GMV</th><th>净回款</th><th>回款率</th><th>推广费</th><th>费比</th><th>退款率</th><th>小红书推广费</th><th>占比</th>
+              <th>排名</th><th>渠道</th><th>店铺</th><th>GMV</th><th>净回款</th><th>净回款同比</th><th>回款率</th><th>推广费</th><th>费比</th><th>退款率</th><th>小红书推广费</th><th>占比</th>
             </tr>
           </thead>
           <tbody>
@@ -457,6 +464,7 @@ function StoreQualityTable({ stores }: { stores: DingTalkSnapshot["stores"] }) {
                     </span>
                   </td>
                   <td className="is-net">{money(item.netRevenue)}</td>
+                  <td>{yoy(item.netRevenueYoy)}</td>
                   <td>{percent(item.recoveryRate)}</td>
                   <td>{money(item.spend)}</td>
                   <td className={item.feeRate >= 0.3 ? "is-warning" : ""}>{percent(item.feeRate)}</td>
@@ -474,6 +482,7 @@ function StoreQualityTable({ stores }: { stores: DingTalkSnapshot["stores"] }) {
               <td colSpan={3}>{rows.length} 店铺小计</td>
               <td>{money(summary.gmv)}</td>
               <td>{money(summary.netRevenue)}</td>
+              <td>{yoy(totalsYoy)}</td>
               <td>{percent(rate(summary.netRevenue, summary.gmv))}</td>
               <td>{money(summary.spend)}</td>
               <td>{percent(rate(summary.spend, summary.netRevenue))}</td>
@@ -493,7 +502,7 @@ function CategoryPerformance({ productManagement }: { productManagement: Product
     .sort((left, right) => right.salesAmount - left.salesAmount);
   const maxValue = Math.max(...rows.map((item) => item.salesAmount), 1);
   return (
-    <section className="exec-panel exec-category-panel" data-testid="executive-category-performance">
+    <section className="exec-panel exec-category-panel" data-search-anchor="analytics-category-performance" data-testid="executive-category-performance">
       <header className="exec-panel-head">
         <div>
           <span className="exec-panel-kicker"><Target size={14} />商品结构</span>
@@ -523,7 +532,7 @@ function ChannelSpendEfficiency({ platforms }: { platforms: DingTalkSnapshot["pl
   const maxSpend = Math.max(...rows.map((item) => item.spend), 1);
   const maxFeeRate = Math.max(...rows.map((item) => item.feeRate), 0.01);
   return (
-    <section className="exec-panel exec-spend-panel" data-testid="executive-channel-spend">
+    <section className="exec-panel exec-spend-panel" data-search-anchor="analytics-channel-spend" data-testid="executive-channel-spend">
       <header className="exec-panel-head">
         <div>
           <span className="exec-panel-kicker"><Megaphone size={14} />投放效率</span>
@@ -557,7 +566,7 @@ function PromotionFunnelPanel({ totals, scope }: { totals: DingTalkMetricTotals;
   ];
   const maxValue = Math.max(...stages.map((stage) => stage.value), 1);
   return (
-    <section className="exec-panel exec-funnel-panel" data-testid="promotion-funnel">
+    <section className="exec-panel exec-funnel-panel" data-search-anchor="analytics-funnel" data-testid="promotion-funnel">
       <header className="exec-panel-head">
         <div>
           <span className="exec-panel-kicker"><Megaphone size={14} />推广漏斗</span>
@@ -702,8 +711,15 @@ export function ExecutiveCommerceOverview({ dingtalk, productManagement, selecte
     },
   ];
 
+  const latestComparison = reporting?.latestComparison;
+  const ratedPlatforms = dingtalk.platforms.map(withRates);
+  const ratedStores = dingtalk.stores.map(withRates);
+  const highestRefund = ratedPlatforms.length ? [...ratedPlatforms].sort((left, right) => right.refundRate - left.refundRate)[0] : undefined;
+  const highestFeeStore = ratedStores.length ? [...ratedStores].sort((left, right) => right.feeRate - left.feeRate)[0] : undefined;
+  const leadingChannel = ratedPlatforms.length ? [...ratedPlatforms].sort((left, right) => (right.channelShare || 0) - (left.channelShare || 0))[0] : undefined;
+
   return (
-    <div className="executive-overview" data-testid="executive-commerce-overview">
+    <div className="executive-overview" data-search-anchor="analytics-top" data-testid="executive-commerce-overview">
       <div className="exec-kpi-grid">
         {kpis.map((item, index) => <ExecutiveKpiCard index={index} item={item} key={item.label} />)}
       </div>
@@ -712,6 +728,10 @@ export function ExecutiveCommerceOverview({ dingtalk, productManagement, selecte
         <DailyBusinessTrend dingtalk={dingtalk} />
         <RevenueQualityBridge totals={dingtalk.totals} />
       </div>
+
+      {latestComparison && (
+        <ComparisonTicker comparison={latestComparison} />
+      )}
 
       {channelDailyTrend.length > 0 && (
         <div className="exec-mid-grid">
@@ -723,11 +743,20 @@ export function ExecutiveCommerceOverview({ dingtalk, productManagement, selecte
         </div>
       )}
 
+      <Card title="当前经营提示">
+        <div className="insight-grid">
+          <div className="insight-row"><span>回款贡献最高</span><b>{leadingChannel?.platform ?? "-"} · {percent(leadingChannel?.channelShare)}</b></div>
+          <div className="insight-row"><span>退款率最高渠道</span><b className="text-[var(--red)]">{highestRefund?.platform ?? "-"} · {percent(highestRefund?.refundRate)}</b></div>
+          <div className="insight-row"><span>费比最高店铺</span><b className="text-[var(--orange)]">{highestFeeStore?.store ?? "-"} · {percent(highestFeeStore?.feeRate)}</b></div>
+          <div className="insight-note">月度概览按所选结束日累计；最新播报使用最近完整日期。</div>
+        </div>
+      </Card>
+
       <div className="exec-bottom-grid">
         <ChannelQualityTable platforms={dingtalk.platforms} />
         <ChannelSpendEfficiency platforms={dingtalk.platforms} />
       </div>
-      <StoreQualityTable stores={dingtalk.stores} />
+      <StoreQualityTable stores={dingtalk.stores} totalsYoy={reporting?.metricTrends?.netRevenue?.yoy} />
     </div>
   );
 }

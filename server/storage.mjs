@@ -101,6 +101,18 @@ export function latestSnapshot(sourceId) {
   };
 }
 
+export function latestSnapshotMeta(sourceId) {
+  // 轻量新鲜度探针：只读 finished_at，不解析 snapshot_json，供缓存校验用
+  const row = db.prepare(`
+    SELECT finished_at
+    FROM sync_runs
+    WHERE source_id = ? AND status = 'success' AND snapshot_json IS NOT NULL
+    ORDER BY started_at DESC
+    LIMIT 1
+  `).get(sourceId);
+  return row ? { finishedAt: row.finished_at } : null;
+}
+
 export function listSyncRuns(limit = 20) {
   return db.prepare(`
     SELECT id, source_id, status, started_at, finished_at, record_count, detail

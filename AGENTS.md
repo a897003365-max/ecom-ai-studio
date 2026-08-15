@@ -21,6 +21,13 @@
 - 同步脚本支持 dry-run、超时、重试和锁跳过；不要在浏览器端直接暴露钉钉凭证。
 - 公网部署必须保护 /api/sync/*，并保留 /api/health 的脱敏状态信息。
 
+## yudao 主数据后台
+
+- yudao-boot-mini（E:/Github/yudao-boot-mini，独立仓库）承载人工录入的档案类数据：商品档案、店铺渠道、竞品价格；看板只做服务端只读代理，前端不直连。
+- 看板侧只经 server/yudao-client.mjs 调 yudao REST API；服务账号只读（4 个 ecom:*:query 权限），yudao 不可达时 /api/masterdata/* 降级返回空列表，不得让页面报错。
+- .env 的 YUDAO_PASSWORD 含 # 时必须加双引号；不在仓库记录实际密码。
+- yudao 四件套（MySQL 3306 / Redis 6379 / server 48080 / UI 48081）为手工启动，启停方式见 docs/HANDOFF.md 第 12 节；不动钉钉权威口径与数仓链路。
+
 ## 常用验证
 
 - npm run build

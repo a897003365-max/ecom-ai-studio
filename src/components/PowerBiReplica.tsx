@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type CSSProperties, type Dispatch, type ReactNode, type SetStateAction } from "react";
 import { BarChart3, Database, Search, Table2 } from "lucide-react";
 import type {
   PowerBiDailyCore,
@@ -8,8 +8,18 @@ import type {
   PowerBiPromotionDaily,
   WarehouseSnapshot,
 } from "../types/integration";
+import type { SearchTarget } from "../types/search";
 import { clsx } from "../utils/format";
-import { buildDailyCoreHierarchy, pbixDefaultDailyCoreExpansion, type DailyCoreHierarchyRow } from "./powerBiDailyCoreHierarchy";
+import { buildDailyCoreHierarchy, buildDailyHierarchy, pbixDefaultDailyCoreExpansion, type DailyCoreHierarchyRow } from "./powerBiDailyCoreHierarchy";
+
+function toggleExpanded(setter: Dispatch<SetStateAction<Set<string>>>, key: string) {
+  setter((current) => {
+    const next = new Set(current);
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
+    return next;
+  });
+}
 
 type Workspace = "overview" | "diagnosis";
 type ReplicaPage = "overall" | "promotion" | "product";
@@ -19,6 +29,7 @@ interface PowerBiReplicaProps {
   overview: ReactNode;
   warehouse: WarehouseSnapshot | null;
   period?: DatePeriod | null;
+  searchTarget?: SearchTarget | null;
 }
 
 const moneyFormat = new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 1 });
@@ -368,12 +379,34 @@ function PromotionTable({ rows, labelKey, variant = "default", showProductImages
   );
 }
 
+type PromotionDailyRow = PowerBiPromotionDaily & { year: string; month: string; day: string };
+
+function aggregatePromotionDaily(rows: PromotionDailyRow[], level: "year" | "month", _key: string): PromotionDailyRow {
+  const first = rows[0];
+  const totals = rows.reduce((acc, row) => {
+    PROMOTION_SUM_FIELDS.forEach((field) => {
+      acc[field] += row[field] || 0;
+    });
+    return acc;
+  }, { impressions: 0, clicks: 0, spend: 0, revenue: 0, carts: 0, directCarts: 0, consultations: 0 });
+  return {
+    date: first?.date ?? "",
+    year: first?.year ?? "",
+    month: level === "month" ? first?.month ?? "" : "",
+    day: "",
+    ...totals,
+  };
+}
+
 function PromotionDailySpendTable({ rows, start, end }: { rows: PowerBiPromotionDaily[]; start: string; end: string }) {
-  const dailyRows = useMemo(() => {
-    const output = new Map<string, PowerBiPromotionDaily>();
+  const dailyRows = useMemo<PromotionDailyRow[]>(() => {
+    const output = new Map<string, PromotionDailyRow>();
     rows.forEach((row) => {
       const current = output.get(row.date) ?? {
         date: row.date,
+        year: row.date.slice(0, 4),
+        month: `${row.date.slice(5, 7)}月`,
+        day: row.date.slice(8, 10),
         impressions: 0,
         clicks: 0,
         spend: 0,
@@ -389,7 +422,7 @@ function PromotionDailySpendTable({ rows, start, end }: { rows: PowerBiPromotion
     });
     return [...output.values()].sort((left, right) => right.date.localeCompare(left.date));
   }, [rows]);
-  const sort = useColumnSort("date", "desc");
+  const sort = useColumnSort("date", "asc");
 
   if (!dailyRows.length) {
     return <div className="pb-empty">当前期间无推广花费数据</div>;
@@ -406,8 +439,11 @@ function PromotionDailySpendTable({ rows, start, end }: { rows: PowerBiPromotion
     carts: acc.carts + row.carts,
     consultations: acc.consultations + row.consultations,
   }), { impressions: 0, clicks: 0, spend: 0, revenue: 0, carts: 0, consultations: 0 });
-  const accessors: Record<string, (row: PowerBiPromotionDaily) => SortValue> = {
+  const accessors: Record<string, (row: PromotionDailyRow) => SortValue> = {
     date: (row) => row.date,
+    year: (row) => row.year,
+    month: (row) => row.month,
+    day: (row) => row.day,
     spend: (row) => row.spend,
     feeShare: (row) => rate(row.spend, totalSpend),
     feeRate: (row) => rate(row.spend, row.revenue),
@@ -421,15 +457,31 @@ function PromotionDailySpendTable({ rows, start, end }: { rows: PowerBiPromotion
     revenue: (row) => row.revenue,
   };
   const sortedDaily = sortRows(dailyRows, sort.sortKey, sort.sortDir, accessors);
-  const pagination = usePagination(sortedDaily, `${sort.sortKey}-${sort.sortDir}`);
+  const hierarchyScopeKey = [...new Set(dailyRows.map((row) => `${row.year}|${row.month}`))].sort().join(",");
+  const [expandedYears, setExpandedYears] = useState<Set<string>>(() => pbixDefaultDailyCoreExpansion(dailyRows).years);
+  const [expandedMonths, setExpandedMonths] = useState<Set<string>>(() => pbixDefaultDailyCoreExpansion(dailyRows).months);
+  useEffect(() => {
+    const scope = hierarchyScopeKey ? hierarchyScopeKey.split(",").map((key) => {
+      const [year, month] = key.split("|");
+      return { year, month };
+    }) : [];
+    const defaultExpansion = pbixDefaultDailyCoreExpansion(scope);
+    setExpandedYears(defaultExpansion.years);
+    setExpandedMonths(defaultExpansion.months);
+  }, [hierarchyScopeKey]);
+  const hierarchyRows = buildDailyHierarchy(sortedDaily, expandedYears, expandedMonths, aggregatePromotionDaily);
+  const hierarchyStateKey = `${[...expandedYears].sort().join(",")}|${[...expandedMonths].sort().join(",")}`;
+  const pagination = usePagination(hierarchyRows, `${sort.sortKey}-${sort.sortDir}-${hierarchyStateKey}`);
 
   return (
     <section className="pb-daily-spend-table" data-testid="promotion-daily-spend-table">
-      <div className="pb-panel-title">每日推广费用 <small>花费（未含达人）· {start} 至 {end} · 共 {dailyRows.length} 天 · 默认按日降序</small></div>
+      <div className="pb-panel-title">每日推广费用 <small>花费（未含达人）· {start} 至 {end} · 共 {dailyRows.length} 天 · 年度 → 月份 → 日可展开折叠</small></div>
       <div className="pb-table-wrap pb-animated-table">
-        <table className="pb-data-table">
+        <table className="pb-data-table pb-daily-spend-table-table">
           <thead><tr>
-            <SortHeader columnKey="date" label="日期" sort={sort} />
+            <SortHeader columnKey="year" label="年度" sort={sort} />
+            <SortHeader columnKey="month" label="月份" sort={sort} />
+            <SortHeader columnKey="day" label="日" sort={sort} />
             <SortHeader columnKey="spend" label="花费" sort={sort} />
             <SortHeader columnKey="feeShare" label="花费占比" sort={sort} />
             <SortHeader columnKey="feeRate" label="费比" sort={sort} />
@@ -446,8 +498,10 @@ function PromotionDailySpendTable({ rows, start, end }: { rows: PowerBiPromotion
             {pagination.pagedItems.map((row, index) => {
               const feeRate = rate(row.spend, row.revenue);
               return (
-                <tr className="pb-table-row" key={row.date} style={{ "--pb-row-delay": `${180 + Math.min(index, 12) * 28}ms` } as CSSProperties}>
-                  <td>{shortDate(row.date)}</td>
+                <tr className={clsx("pb-table-row", row.hierarchyLevel !== "day" && "is-hierarchy-summary")} data-hierarchy-key={row.hierarchyKey} data-hierarchy-level={row.hierarchyLevel} key={`${row.hierarchyLevel}-${row.hierarchyKey}`} style={{ "--pb-row-delay": `${180 + Math.min(index, 12) * 28}ms` } as CSSProperties}>
+                  <td className="pb-hierarchy-cell">{row.showYear ? <button aria-expanded={expandedYears.has(row.year)} aria-label={`${expandedYears.has(row.year) ? "折叠" : "展开"}年度 ${row.year}`} className="pb-hierarchy-toggle" data-testid="promotion-daily-year-toggle" onClick={() => toggleExpanded(setExpandedYears, row.year)} type="button"><span aria-hidden="true" className="pb-hierarchy-icon">{expandedYears.has(row.year) ? "−" : "+"}</span><span>{row.year}</span></button> : null}</td>
+                  <td className="pb-hierarchy-cell">{row.showMonth ? <button aria-expanded={expandedMonths.has(`${row.year}|${row.month}`)} aria-label={`${expandedMonths.has(`${row.year}|${row.month}`) ? "折叠" : "展开"}月份 ${row.month}`} className="pb-hierarchy-toggle" data-testid="promotion-daily-month-toggle" onClick={() => toggleExpanded(setExpandedMonths, `${row.year}|${row.month}`)} type="button"><span aria-hidden="true" className="pb-hierarchy-icon">{expandedMonths.has(`${row.year}|${row.month}`) ? "−" : "+"}</span><span>{row.month}</span></button> : null}</td>
+                  <td>{row.hierarchyLevel === "day" ? row.day : ""}</td>
                   <td><span className="pb-data-bar"><i style={{ width: `${Math.min(100, row.spend / maxSpend * 100)}%`, background: "rgba(73, 191, 227, 0.42)" }} /><b>{money(row.spend)}</b></span></td>
                   <td>{percent(rate(row.spend, totalSpend))}</td>
                   <td><span className="pb-data-bar"><i style={{ width: `${Math.min(100, feeRate / maxFeeRate * 100)}%` }} /><b>{percent(feeRate)}</b></span></td>
@@ -463,7 +517,7 @@ function PromotionDailySpendTable({ rows, start, end }: { rows: PowerBiPromotion
               );
             })}
           </tbody>
-          <tfoot><tr className="font-bold"><td>期间合计</td><td>{money(totals.spend)}</td><td>100.00%</td><td>{percent(rate(totals.spend, totals.revenue))}</td><td>{number(totals.clicks)}</td><td>{percent(rate(totals.clicks, totals.impressions))}</td><td>{`¥${rate(totals.spend, totals.clicks).toFixed(2)}`}</td><td>{number(totals.carts)}</td><td>{percent(rate(totals.carts, totals.clicks))}</td><td>{`¥${rate(totals.spend, totals.carts).toFixed(2)}`}</td><td>{number(totals.consultations)}</td><td>{money(totals.revenue)}</td></tr></tfoot>
+          <tfoot><tr className="font-bold"><td colSpan={3}>期间合计</td><td>{money(totals.spend)}</td><td>100.00%</td><td>{percent(rate(totals.spend, totals.revenue))}</td><td>{number(totals.clicks)}</td><td>{percent(rate(totals.clicks, totals.impressions))}</td><td>{`¥${rate(totals.spend, totals.clicks).toFixed(2)}`}</td><td>{number(totals.carts)}</td><td>{percent(rate(totals.carts, totals.clicks))}</td><td>{`¥${rate(totals.spend, totals.carts).toFixed(2)}`}</td><td>{number(totals.consultations)}</td><td>{money(totals.revenue)}</td></tr></tfoot>
         </table>
       </div>
       <Pagination onPage={pagination.setPage} page={pagination.page} totalItems={pagination.totalItems} totalPages={pagination.totalPages} />
@@ -503,7 +557,7 @@ function OverallPage({ pages, start, end }: { pages: PowerBiPages; start: string
   const storePromotionRatio = rate(periodStorePromotionSpend, periodSubsidizedAmount);
   const previousStorePromotionRatio = previousPeriodData ? rate(previousStorePromotionSpend, previousSubsidizedAmount) : 0;
 
-  const dailySort = useColumnSort("date", "desc");
+  const dailySort = useColumnSort("date", "asc");
   const productSort = useColumnSort("payAmount", "desc");
   const dailyAccessors: Record<string, (row: PowerBiDailyCore) => SortValue> = {
     date: (row) => row.date,
@@ -540,12 +594,6 @@ function OverallPage({ pages, start, end }: { pages: PowerBiPages; start: string
   const dailyHierarchyRows = buildDailyCoreHierarchy(sortedDaily, expandedYears, expandedMonths);
   const hierarchyStateKey = `${[...expandedYears].sort().join(",")}|${[...expandedMonths].sort().join(",")}`;
   const dailyPagination = usePagination(dailyHierarchyRows, `${dailySort.sortKey}-${dailySort.sortDir}-${hierarchyStateKey}`);
-  const toggleExpanded = (setter: typeof setExpandedYears, key: string) => setter((current) => {
-    const next = new Set(current);
-    if (next.has(key)) next.delete(key);
-    else next.add(key);
-    return next;
-  });
   const productAccessors: Record<string, (row: PowerBiProductDaily) => SortValue> = {
     product: (row) => productsById.get(row.productId)?.merchantCode || row.productId || "未匹配商品",
     visitors: (row) => row.visitors,
@@ -568,7 +616,7 @@ function OverallPage({ pages, start, end }: { pages: PowerBiPages; start: string
   const productPagination = usePagination(sortedProducts, `${productSort.sortKey}-${productSort.sortDir}`);
 
   return (
-    <div className="pb-overall-layout">
+    <div className="pb-overall-layout" data-search-anchor="analytics-tmall-overall">
       <div className="pb-overall-main">
         <section className="pb-panel-title">店铺基础数据 <small>期间 {start} 至 {end}</small></section>
         <div className="pb-kpi-grid">
@@ -588,7 +636,7 @@ function OverallPage({ pages, start, end }: { pages: PowerBiPages; start: string
         </div>
       </div>
       <section className="pb-daily-matrix">
-        <div className="pb-panel-title">每天核心数据 <small>年度 → 月份 → 日可展开折叠 · 默认按日降序</small></div>
+        <div className="pb-panel-title">每天核心数据 <small>年度 → 月份 → 日可展开折叠 · 默认按日升序</small></div>
         <div className="pb-table-wrap pb-animated-table"><table className="pb-data-table pb-daily-core-table" data-testid="powerbi-daily-core-table"><thead><tr><SortHeader columnKey="year" label="年度" sort={dailySort} /><SortHeader columnKey="month" label="月份" sort={dailySort} /><SortHeader columnKey="day" label="日" sort={dailySort} /><SortHeader columnKey="productVisitors" label="商品访客数" sort={dailySort} /><SortHeader columnKey="addToCart" label="加购人数" sort={dailySort} /><SortHeader columnKey="addToCartRate" label="加购率" sort={dailySort} /><SortHeader columnKey="addToCartCost" label="加购成本" sort={dailySort} /><SortHeader columnKey="payAmount" label="支付金额" sort={dailySort} /><SortHeader columnKey="paidUnits" label="支付件数" sort={dailySort} /><SortHeader columnKey="conversionRate" label="访客转化率" sort={dailySort} /><SortHeader columnKey="refundAmount" label="退款金额" sort={dailySort} /><SortHeader columnKey="refundRate" label="退款率" sort={dailySort} /><SortHeader columnKey="spend" label="费额" sort={dailySort} /><SortHeader columnKey="subsidizedAmount" label="国补后金额(万)" sort={dailySort} /><SortHeader columnKey="subsidizedFeeRate" label="国补后费比" sort={dailySort} /><SortHeader columnKey="storeRank" label="店铺排名" sort={dailySort} /></tr></thead><tbody>{dailyPagination.pagedItems.map((row: DailyCoreHierarchyRow, index) => <tr className={clsx("pb-table-row", row.hierarchyLevel !== "day" && "is-hierarchy-summary")} data-hierarchy-key={row.hierarchyKey} data-hierarchy-level={row.hierarchyLevel} key={`${row.hierarchyLevel}-${row.hierarchyKey}`} style={{ "--pb-row-delay": `${260 + Math.min(index, 12) * 28}ms` } as CSSProperties}><td className="pb-hierarchy-cell">{row.showYear ? <button aria-expanded={expandedYears.has(row.year)} aria-label={`${expandedYears.has(row.year) ? "折叠" : "展开"}年度 ${row.year}`} className="pb-hierarchy-toggle" data-testid="daily-core-year-toggle" onClick={() => toggleExpanded(setExpandedYears, row.year)} type="button"><span aria-hidden="true" className="pb-hierarchy-icon">{expandedYears.has(row.year) ? "−" : "+"}</span><span>{row.year}</span></button> : null}</td><td className="pb-hierarchy-cell">{row.showMonth ? <button aria-expanded={expandedMonths.has(`${row.year}|${row.month}`)} aria-label={`${expandedMonths.has(`${row.year}|${row.month}`) ? "折叠" : "展开"}月份 ${row.month}`} className="pb-hierarchy-toggle" data-testid="daily-core-month-toggle" onClick={() => toggleExpanded(setExpandedMonths, `${row.year}|${row.month}`)} type="button"><span aria-hidden="true" className="pb-hierarchy-icon">{expandedMonths.has(`${row.year}|${row.month}`) ? "−" : "+"}</span><span>{row.month}</span></button> : null}</td><td>{row.hierarchyLevel === "day" ? row.day : ""}</td><td>{pbixInteger(row.productVisitors)}</td><td>{pbixInteger(row.addToCart)}</td><td>{pbixPercent(row.addToCartRate)}</td><td>{pbixDecimal(row.addToCartCost)}</td><td>{pbixWan(row.payAmount)}</td><td>{pbixInteger(row.paidUnits)}</td><td>{pbixPercent(row.conversionRate)}</td><td>{countFormat.format(row.refundAmount || 0)}</td><td>{pbixPercent(row.refundRate)}</td><td>{pbixWan(row.spend)}</td><td>{pbixWan(row.subsidizedAmount)}</td><td>{pbixPercent(row.subsidizedFeeRate)}</td><td>{row.storeRank || "—"}</td></tr>)}</tbody></table></div>
         <Pagination onPage={dailyPagination.setPage} page={dailyPagination.page} totalItems={dailyPagination.totalItems} totalPages={dailyPagination.totalPages} />
       </section>
@@ -610,7 +658,7 @@ function PromotionPage({ pages, start, end }: { pages: PowerBiPages; start: stri
     const product = products.get(row.productId || "");
     return { ...row, displayLabel: product?.merchantCode || row.productId, imageUrl: product?.imageUrl || null };
   });
-  return <div className="pb-detail-layout"><main><PromotionDailySpendTable end={end} rows={sceneDaily} start={start} /><section className="pb-panel-title">推广计划数据 <small>按场景聚合</small></section><PromotionTable labelKey="scene" rows={sceneRows} /><section className="pb-panel-title is-spaced">商品推广明细 <small>Top 60，按花费排序 · 图片链接</small></section><PromotionTable labelKey="productId" rows={labelledProducts} showProductImages variant="product-detail" /></main></div>;
+  return <div className="pb-detail-layout" data-search-anchor="analytics-tmall-promotion"><main><PromotionDailySpendTable end={end} rows={sceneDaily} start={start} /><section className="pb-panel-title">推广计划数据 <small>按场景聚合</small></section><PromotionTable labelKey="scene" rows={sceneRows} /><section className="pb-panel-title is-spaced">商品推广明细 <small>Top 60，按花费排序 · 图片链接</small></section><PromotionTable labelKey="productId" rows={labelledProducts} showProductImages variant="product-detail" /></main></div>;
 }
 
 function ProductPromotionPage({ pages, start, end }: { pages: PowerBiPages; start: string; end: string }) {
@@ -628,16 +676,21 @@ function ProductPromotionPage({ pages, start, end }: { pages: PowerBiPages; star
   ).sort((left, right) => String(right.productId).localeCompare(String(left.productId)));
   const filteredProducts = ranked.filter((row) => { const product = products.get(row.productId || ""); return `${product?.merchantCode || ""}${product?.productName || ""}${row.productId}`.toLowerCase().includes(search.toLowerCase()); });
   return (
-    <div className="pb-product-promotion-layout">
+    <div className="pb-product-promotion-layout" data-search-anchor="analytics-tmall-product">
       <aside className="pb-product-selector"><label><Search size={13} /><input onChange={(event) => setSearch(event.target.value)} placeholder="搜索商品编码" value={search} /></label><div>{filteredProducts.map((row, index) => { const product = products.get(row.productId || ""); const label = product?.merchantCode || row.productId || "未匹配商品"; return <button className={selectedProduct === row.productId ? "is-active" : ""} key={row.productId} onClick={() => setSelectedProduct(row.productId || "")} style={{ "--pb-row-delay": `${140 + Math.min(index, 12) * 30}ms` } as CSSProperties} type="button"><ProductThumb alt={product?.productName || label} src={product?.imageUrl} /><span>{label}</span><b>{money(row.spend)}</b><small>{product?.productName || "未匹配商品名称"}</small></button>; })}</div></aside>
       <main><section className="pb-panel-title">商品推广场景 <small>{products.get(selectedProduct)?.merchantCode || selectedProduct || "请选择商品"}</small></section><PromotionTable labelKey="scene" rows={sceneRows} /><section className="pb-panel-title is-spaced">商品每日推广数据 <small>{start} 至 {end}</small></section><PromotionTable labelKey="productId" labelHeader="日期" rows={dailyRows.map((row) => ({ ...row, productId: shortDate(row.productId || "") }))} /></main>
     </div>
   );
 }
 
-function GrowthDiagnosis({ warehouse, globalPeriod }: { warehouse: WarehouseSnapshot; globalPeriod?: DatePeriod | null }) {
+function GrowthDiagnosis({ warehouse, globalPeriod, searchTarget }: { warehouse: WarehouseSnapshot; globalPeriod?: DatePeriod | null; searchTarget?: SearchTarget | null }) {
   const pages = warehouse.powerbiPages;
   const [page, setPage] = useState<ReplicaPage>("overall");
+  // 搜索目标同步天猫明细子页，不改变用户正常点击行为
+  const targetReplicaPage = searchTarget?.page === "analytics" ? searchTarget.replicaPage : undefined;
+  useEffect(() => {
+    if (targetReplicaPage) setPage(targetReplicaPage);
+  }, [targetReplicaPage, searchTarget?.requestId]);
   const defaultPeriod = useMemo(() => {
     if (!pages.period) return null;
     const monthStart = `${pages.period.end.slice(0, 8)}01`;
@@ -664,15 +717,20 @@ function GrowthDiagnosis({ warehouse, globalPeriod }: { warehouse: WarehouseSnap
   );
 }
 
-export function PowerBiReplica({ overview, warehouse, period }: PowerBiReplicaProps) {
+export function PowerBiReplica({ overview, warehouse, period, searchTarget }: PowerBiReplicaProps) {
   const [workspace, setWorkspace] = useState<Workspace>("overview");
+  // 搜索目标同步工作区（全渠道总览 / 天猫明细），不改变用户正常点击行为
+  const targetWorkspace = searchTarget?.page === "analytics" ? searchTarget.workspace : undefined;
+  useEffect(() => {
+    if (targetWorkspace) setWorkspace(targetWorkspace);
+  }, [targetWorkspace, searchTarget?.requestId]);
   return (
     <section className="powerbi-replica-section" data-testid="powerbi-replica">
       <div className="analytics-workspace-tabs" role="tablist" aria-label="运营数据视图">
         <button aria-selected={workspace === "overview"} className={workspace === "overview" ? "is-active" : ""} onClick={() => setWorkspace("overview")} role="tab" type="button">全渠道总览</button>
         <button aria-selected={workspace === "diagnosis"} className={workspace === "diagnosis" ? "is-active" : ""} onClick={() => setWorkspace("diagnosis")} role="tab" type="button">天猫明细</button>
       </div>
-      {workspace === "overview" ? overview : warehouse?.powerbiPages ? <GrowthDiagnosis globalPeriod={period} warehouse={warehouse} /> : <div className="pb-empty">正在等待 PowerBI 本地数仓快照…</div>}
+      {workspace === "overview" ? overview : warehouse?.powerbiPages ? <GrowthDiagnosis globalPeriod={period} searchTarget={searchTarget} warehouse={warehouse} /> : <div className="pb-empty">正在等待 PowerBI 本地数仓快照…</div>}
     </section>
   );
 }

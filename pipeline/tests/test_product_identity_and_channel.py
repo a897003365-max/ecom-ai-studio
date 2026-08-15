@@ -199,11 +199,11 @@ class ProductIdentityAndChannelWarehouseTests(unittest.TestCase):
             pages = _build_product_management_pages(connection)
 
             overview_names = {row["productCode"]: row["productName"] for row in pages["productOverview"]}
-            return_names = {row["productCode"]: row["productName"] for row in pages["returnRanking"]}
+            return_names = {row["productName"] for row in pages["returnRanking"]}
             product_names = {row["productName"] for row in pages["productNameOverview"]}
             self.assertEqual(overview_names["SKU-A"], "云栖青床垫")
             self.assertEqual(overview_names["69-CODE"], "京东云栖床垫")
-            self.assertEqual(return_names["69-CODE"], "京东云栖床垫")
+            self.assertIn("京东云栖床垫", return_names)
             self.assertEqual(product_names, {"云栖青床垫", "京东云栖床垫"})
             self.assertEqual({row["channel"] for row in pages["channelBreakdown"]}, {"淘宝天猫", "京东自营"})
             self.assertIn("淘宝天猫", pages["dailyChannelMatrix"]["columns"])

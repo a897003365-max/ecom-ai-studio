@@ -1,10 +1,10 @@
 {
-  "generatedAt": "2026-07-25T17:24:44.853830+08:00",
+  "generatedAt": "2026-08-14T16:50:37.393485+08:00",
   "queryCount": 25,
   "completedQueries": 25,
-  "sourceFileCount": 3967,
-  "parquetPartitionCount": 3967,
-  "rowCount": 2716580,
+  "sourceFileCount": 4213,
+  "parquetPartitionCount": 4213,
+  "rowCount": 3084167,
   "scope": "powerbi_unique_only",
   "excludedQueryCount": 2,
   "excludedQueries": [
@@ -51,9 +51,9 @@
     },
     {
       "query": "04-旗舰店基础数据",
-      "files": 251,
-      "partitions": 251,
-      "rows": 7392,
+      "files": 268,
+      "partitions": 268,
+      "rows": 7902,
       "failedFiles": 0,
       "status": "migrated"
     },
@@ -75,65 +75,65 @@
     },
     {
       "query": "07-旗舰店商品销售数据",
-      "files": 665,
-      "partitions": 665,
-      "rows": 69408,
+      "files": 685,
+      "partitions": 685,
+      "rows": 71279,
       "failedFiles": 0,
       "status": "migrated"
     },
     {
       "query": "08-1关键词报表数据",
-      "files": 134,
-      "partitions": 134,
-      "rows": 1169333,
+      "files": 158,
+      "partitions": 158,
+      "rows": 1350349,
       "failedFiles": 0,
       "status": "migrated"
     },
     {
       "query": "08-2人群报表数据",
-      "files": 136,
-      "partitions": 136,
-      "rows": 229366,
+      "files": 160,
+      "partitions": 160,
+      "rows": 264980,
       "failedFiles": 0,
       "status": "migrated"
     },
     {
       "query": "08-旗舰店推广花费",
-      "files": 444,
-      "partitions": 444,
-      "rows": 1042227,
+      "files": 489,
+      "partitions": 489,
+      "rows": 1148752,
       "failedFiles": 0,
       "status": "migrated"
     },
     {
       "query": "10-1淘宝客服绩效明细",
-      "files": 567,
-      "partitions": 567,
-      "rows": 9820,
+      "files": 610,
+      "partitions": 610,
+      "rows": 10520,
       "failedFiles": 0,
       "status": "migrated"
     },
     {
       "query": "10-2京东客服营销明细",
-      "files": 261,
-      "partitions": 261,
-      "rows": 2023,
+      "files": 284,
+      "partitions": 284,
+      "rows": 2239,
       "failedFiles": 0,
       "status": "migrated"
     },
     {
       "query": "10-3京东客服绩效数据",
-      "files": 260,
-      "partitions": 260,
-      "rows": 2020,
+      "files": 283,
+      "partitions": 283,
+      "rows": 2236,
       "failedFiles": 0,
       "status": "migrated"
     },
     {
       "query": "10-4客服员工日报统计",
-      "files": 270,
-      "partitions": 270,
-      "rows": 3347,
+      "files": 294,
+      "partitions": 294,
+      "rows": 3715,
       "failedFiles": 0,
       "status": "migrated"
     },
@@ -147,9 +147,9 @@
     },
     {
       "query": "14-推广竞品数据",
-      "files": 48,
-      "partitions": 48,
-      "rows": 1344,
+      "files": 51,
+      "partitions": 51,
+      "rows": 1428,
       "failedFiles": 0,
       "status": "migrated"
     },
@@ -157,7 +157,7 @@
       "query": "辅4-床垫编码",
       "files": 1,
       "partitions": 1,
-      "rows": 8055,
+      "rows": 8168,
       "failedFiles": 0,
       "status": "migrated"
     },
@@ -221,7 +221,7 @@
       "query": "15-聚水潭商品数据",
       "files": 1,
       "partitions": 1,
-      "rows": 130021,
+      "rows": 170254,
       "failedFiles": 0,
       "status": "migrated"
     },
@@ -229,7 +229,7 @@
       "query": "product-master",
       "files": 5,
       "partitions": 5,
-      "rows": 19799,
+      "rows": 19920,
       "failedFiles": 0,
       "status": "migrated"
     }

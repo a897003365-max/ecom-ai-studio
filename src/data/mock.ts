@@ -1,7 +1,6 @@
 import type {
   AgentResponsibility,
   BusinessLineOverview,
-  CompetitorPriceItem,
   CompetitorStore,
   ConfigItem,
   ContentProduct,
@@ -612,14 +611,6 @@ export const competitorStores: CompetitorStore[] = [
   { store: "慕思寝具京东自营", platform: "京东", brand: "慕思", productCount: 18, warningCount: 0, lastCrawl: "2026-07-07 08:05", status: "监控中" },
   { store: "梦百合抖音自播间", platform: "抖音", brand: "梦百合", productCount: 21, warningCount: 1, lastCrawl: "2026-07-07 08:06", status: "监控中" },
   { store: "雅兰寝具旗舰店", platform: "天猫", brand: "雅兰", productCount: 16, warningCount: 0, lastCrawl: "2026-07-07 08:08", status: "待复核" },
-];
-
-export const competitorPrices: CompetitorPriceItem[] = [
-  { id: "c1", productName: "喜临门_乳胶床垫", mainImage: "🛏️", store: "喜临门官方旗舰店", brand: "喜临门", platform: "天猫", originalPrice: "¥2,199", couponPrice: "¥1,869", campaignInfo: "跨店满减 + 店铺券", previousPrice: "¥2,199", priceChange: "▼ 15.0%", low30d: "¥1,869", newStatus: "非上新", warningStatus: "降价预警", alertThreshold: "10%", alertReason: "券后价低于昨日 15.0%，刷新 30 日低价", suggestedAction: "人工确认是否调整直播间利益点", tone: "red" },
-  { id: "c2", productName: "慕思_护脊床垫", mainImage: "🛏️", store: "慕思寝具京东自营", brand: "慕思", platform: "京东", originalPrice: "¥3,799", couponPrice: "¥3,499", campaignInfo: "品牌日满减", previousPrice: "¥3,499", priceChange: "持平", low30d: "¥3,299", newStatus: "非上新", warningStatus: "无变化", alertThreshold: "10%", alertReason: "价格未触发阈值", suggestedAction: "继续观察结构卖点和主图变化", tone: "muted" },
-  { id: "c3", productName: "梦百合_记忆棉床垫", mainImage: "🛏️", store: "梦百合抖音自播间", brand: "梦百合", platform: "抖音", originalPrice: "¥999", couponPrice: "¥849", campaignInfo: "直播间券", previousPrice: "¥999", priceChange: "▼ 15.0%", low30d: "¥849", newStatus: "非上新", warningStatus: "降价预警", alertThreshold: "10%", alertReason: "直播间券放大导致价格带下探", suggestedAction: "生成价格对比报告草稿", tone: "red" },
-  { id: "c4", productName: "雅兰_弹簧床垫", mainImage: "🛏️", store: "雅兰寝具旗舰店", brand: "雅兰", platform: "天猫", originalPrice: "¥1,799", couponPrice: "¥1,679", campaignInfo: "店铺券", previousPrice: "¥1,599", priceChange: "▲ 5.0%", low30d: "¥1,459", newStatus: "上新 7 日内", warningStatus: "观察", alertThreshold: "10%", alertReason: "上新 7 日内但价格上调", suggestedAction: "关注新品素材打法", tone: "orange" },
-  { id: "c5", productName: "金可儿_酒店款床垫", mainImage: "🛏️", store: "金可儿床垫京东自营", brand: "金可儿", platform: "京东", originalPrice: "¥4,999", couponPrice: "¥4,299", campaignInfo: "品牌日券", previousPrice: "¥4,999", priceChange: "▼ 14.0%", low30d: "¥4,299", newStatus: "非上新", warningStatus: "降价预警", alertThreshold: "10%", alertReason: "高价位竞品进入活动价区间", suggestedAction: "复盘高客单素材和标题", tone: "red" },
 ];
 
 export const queueTasks: QueueTask[] = [

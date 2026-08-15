@@ -6,12 +6,13 @@ interface CardProps {
   action?: ReactNode;
   children: ReactNode;
   className?: string;
+  dataUi?: string;
   hover?: boolean;
 }
 
-export function Card({ title, action, children, className, hover = false }: CardProps) {
+export function Card({ title, action, children, className, dataUi, hover = false }: CardProps) {
   return (
-    <section className={clsx("card", hover && "card-hover", className)}>
+    <section className={clsx("card", hover && "card-hover", className)} data-ui={dataUi ?? "card"}>
       {(title || action) && (
         <div className="section-title">
           <span>{title}</span>

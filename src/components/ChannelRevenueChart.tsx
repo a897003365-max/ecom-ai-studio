@@ -67,7 +67,7 @@ export function ChannelRevenueChart({ daily, selectedChannel }: ChannelRevenueCh
   const channelColor = (channel: string) => palette[Math.max(0, allChannels.indexOf(channel)) % palette.length];
 
   return (
-    <div className="channel-chart" data-testid="channel-revenue-chart">
+    <div className="channel-chart" data-testid="channel-revenue-chart" data-ui="sales-chart">
       <div className="channel-chart-head">
         <div>
           <div className="text-sm font-bold">{selectedChannel === "all" ? "各渠道每日回款额" : `${selectedChannel}每日回款额`}</div>

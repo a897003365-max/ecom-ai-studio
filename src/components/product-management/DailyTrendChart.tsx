@@ -15,6 +15,23 @@ const MONEY_COLOR = "#12695f";
 const REFUND_COLOR = "#b43c45";
 const RATE_COLOR = "#c86628";
 
+/** Catmull-Rom 平滑曲线（与运营数据看板 ChannelRevenueChart 一致）。 */
+function smoothPath(points: Array<{ x: number; y: number }>) {
+  if (!points.length) return "";
+  if (points.length === 1) return `M ${points[0].x} ${points[0].y}`;
+  let path = `M ${points[0].x.toFixed(2)} ${points[0].y.toFixed(2)}`;
+  for (let index = 0; index < points.length - 1; index += 1) {
+    const before = points[index - 1] ?? points[index];
+    const current = points[index];
+    const next = points[index + 1];
+    const after = points[index + 2] ?? next;
+    const control1 = { x: current.x + (next.x - before.x) / 6, y: current.y + (next.y - before.y) / 6 };
+    const control2 = { x: next.x - (after.x - current.x) / 6, y: next.y - (after.y - current.y) / 6 };
+    path += ` C ${control1.x.toFixed(2)} ${control1.y.toFixed(2)}, ${control2.x.toFixed(2)} ${control2.y.toFixed(2)}, ${next.x.toFixed(2)} ${next.y.toFixed(2)}`;
+  }
+  return path;
+}
+
 /** 双轴折线图：左轴金额（商家实收 + 退货金额），右轴百分比（退款金额占比）。 */
 export function DailyTrendChart({ data }: Props) {
   const [hover, setHover] = useState<{ index: number; x: number; y: number } | null>(null);
@@ -80,10 +97,10 @@ export function DailyTrendChart({ data }: Props) {
   // 多折线 helper
   function polyline(key: string, values: number[], yFn: (v: number) => number, color: string, dash?: string) {
     if (days === 0) return null;
-    const pts = data.map((_, i) => `${xFor(i).toFixed(1)},${yFn(values[i]).toFixed(1)}`).join(" ");
+    const pts = data.map((_, i) => ({ x: xFor(i), y: yFn(values[i]) }));
     return (
       <g key={key}>
-        <polyline points={pts} fill="none" stroke={color} strokeWidth={2.2} strokeDasharray={dash ?? "none"} strokeLinecap="round" strokeLinejoin="round" />
+        <path d={smoothPath(pts)} fill="none" stroke={color} strokeWidth={2.2} strokeDasharray={dash ?? "none"} strokeLinecap="round" strokeLinejoin="round" />
         {data.map((_, i) => (
           <circle key={i} cx={xFor(i)} cy={yFn(values[i])} r={2.4} fill={color} />
         ))}

@@ -3,6 +3,8 @@
 > 交接时间：2026-07-24
 > 执行模型：纯文本模型（未做任何视觉验证）
 > 后续：切换多模态模型按第 5 节清单做 UI 视觉检查，并可继续 Phase 3–6
+>
+> **2026-07-27 更新**：Phase 5 定制结构已对齐 PBI 口径——基于「卖家备注」推导「是否定制」（含 定制/折叠/横折/竖折），quality=ready，定制信号 9.29%，4 类标签互斥（折叠>横折>竖折>其他定制）。下方 Phase 5 旧描述（降级版/7 标签/颜色规格推导/1.5%）为 2026-07-24 历史记录，详见 [product-structure-data-audit.md](product-structure-data-audit.md)。
 
 ## 1. 总览
 
@@ -15,7 +17,7 @@
 | Phase 2 价格结构 | ✅ 完成 | 7 档分桶 + 3 矩阵，ready |
 | Phase 3 尺寸结构 | ✅ 完成 | q18->q27->颜色规格优先级，10 尺寸，ready |
 | Phase 4 SPU 销量 | ✅ 完成 | 78 SPU，TOP15，渠道矩阵，ready |
-| Phase 5 定制结构 | ✅ 完成 | 降级版，degraded，常规 vs 定制 + 7 标签 |
+| Phase 5 定制结构 | ✅ 完成 | 对齐 PBI（卖家备注），ready，常规 vs 定制 + 4 标签（2026-07-27 更新） |
 | Phase 6 综合验证 | ✅ 完成 | 43 测试 + 2 契约 + build 全绿 |
 
 ## 2. 验证状态（Phase 2 末尾，全绿）
@@ -46,7 +48,9 @@ snapshot `local-data/warehouse/analytics-snapshot.json` 的 `productManagement.p
 - 订单行覆盖率 90.1%（超 80% 阈值），SPU 映射率 90.1%（110 个 distinct SPU）。
 - **Phase 3/4 可直接用 `q18.商家规编（后台） = 订单.商品编码` join**，无需额外去重。但 builder 仍保留 try/except 兜底。
 
-### 3.2 定制模块严重降级（⚠️ Phase 5 必须调整）
+### 3.2 定制模块（2026-07-27 已对齐 PBI，下方为 Phase 0 历史审计）
+
+> **2026-07-27 更新**：已改用「卖家备注」推导「是否定制」（对齐 PBI），quality=ready，信号 9.29%，4 类标签。下方"严重降级"为 Phase 0 当时用颜色规格的审计结论，现已不适用。
 
 颜色规格里的定制关键词极少：定制/定做/非标 仅 1 行，异形 0，缺角 0，折叠 3147（是产品属性非定制信号）。
 
@@ -84,7 +88,7 @@ snapshot `local-data/warehouse/analytics-snapshot.json` 的 `productManagement.p
 - 写测试：SPU 映射、缺失归未识别、TOP15、日期升序
 - 实现 [SpuSalesTrendPanel.tsx](src/components/product-management/SpuSalesTrendPanel.tsx)
 
-### Phase 5：定制结构（降级版）
+### Phase 5：定制结构（2026-07-27 已对齐 PBI，下方为旧降级版测试计划）
 
 - 实现 `build_customization_structure`（按第 3.2 节降级）：
   - comparison：常规 vs 折叠款（不是常规 vs 定制）
@@ -216,7 +220,7 @@ git diff --check
 
 - **Phase 3 尺寸结构**：`build_size_structure` + `_normalize_size`。优先级 q18->q27->颜色规格->未填写。标准化 `宽×长mm`（cm 转 mm，3-4 位数字过滤枕头三围）。低频 <0.5% 并入"其他尺寸"。snapshot：10 尺寸，1800×2000mm 占 50.6%，q18 覆盖 90.1%。
 - **Phase 4 SPU 销量**：`build_spu_sales_trend` + `_pivot_count_matrix`。SPU 取 q18.SPU产品商编，缺失归"未识别 SPU"。TOP15 + 未识别日趋势。snapshot：78 SPU，M77 居首（4432万），未识别 9.9%。
-- **Phase 5 定制结构（降级）**：`build_customization_structure`。颜色规格关键词推导，7 标签互斥（缺角>异形>折叠>尺寸>厚度>内材>未填写）。quality=degraded。snapshot：常规 128077 vs 定制 1943（1.5%），TOP20 履约。毛利因成本口径复杂暂返回 null。
+- **Phase 5 定制结构**：`build_customization_structure`。基于「是否定制」字段（`transforms.py` 从卖家备注推导，对齐 PBI），4 标签互斥（折叠>横折>竖折>其他定制）。quality=ready。snapshot：常规 121743 vs 定制 12475（9.29%），SPU 定制汇总 + TOP20 履约。毛利因成本口径复杂暂返回 null。（2026-07-27 更新；旧降级版见顶部说明）
 
 ### 8.3 Phase 6 综合验证（全绿）
 
@@ -229,7 +233,7 @@ npx vite build                                      # built in 1.71s
 python pipeline/sync.py sync                        # exit 0
 ```
 
-snapshot 4 模块状态：priceStructure=ready、sizeStructure=ready、spuSalesTrend=ready、customizationStructure=degraded。
+snapshot 4 模块状态：priceStructure=ready、sizeStructure=ready、spuSalesTrend=ready、customizationStructure=ready（2026-07-27 更新）。
 
 ### 8.4 多模态复验清单（第二轮）
 
@@ -255,7 +259,7 @@ snapshot 4 模块状态：priceStructure=ready、sizeStructure=ready、spuSalesT
 
 ### 8.6 已知限制
 
-- 定制结构模块为降级版，信号弱（1.5%），不等同参考看板 7 类标签。需接入 ERP 定制字段才能完整。
+- 定制结构模块已于 2026-07-27 对齐 PBI（卖家备注口径），quality=ready，信号 9.29%。旧降级版（1.5%）见顶部说明。
 - 定制 comparison 的 grossMargin 暂为 null（成本口径复杂，未计算）。
 - SPU 日趋势 `dailySpuTrend` 全量化后 5476 点（78 SPU），snapshot 增至 4.44MB。前端已做多选搜索+折线图（见第 9 节）。
 - 价格/尺寸/SPU 的 coverage.productCodeRatio 均为 null（未统计 distinct 编码）。

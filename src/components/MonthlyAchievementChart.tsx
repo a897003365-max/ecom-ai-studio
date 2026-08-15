@@ -73,7 +73,7 @@ export function MonthlyAchievementChart({ data }: MonthlyAchievementChartProps) 
               const y = margin.top + plotHeight - tick * plotHeight;
               return (
                 <g key={tick}>
-                  <line stroke="rgba(255,255,255,0.08)" strokeDasharray="4 5" x1={margin.left} x2={width - margin.right} y1={y} y2={y} />
+                  <line stroke="var(--border)" strokeDasharray="4 5" x1={margin.left} x2={width - margin.right} y1={y} y2={y} />
                   <text fill="var(--muted-2)" fontSize="10" textAnchor="end" x={margin.left - 10} y={y + 3}>{amountLabel(maxAmount * tick)}</text>
                   <text fill="var(--muted-2)" fontSize="10" textAnchor="start" x={width - margin.right + 10} y={y + 3}>{percent(maxRate * tick)}</text>
                 </g>

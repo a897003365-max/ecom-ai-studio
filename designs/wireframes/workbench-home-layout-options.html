@@ -1,9 +1,10 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-theme="dark">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="../../src/styles/tokens.css" />
   <title>ecom AI Studio · 统一详细线稿</title>
   <style>
     :root{
@@ -31,7 +32,7 @@
     *{box-sizing:border-box}
     html{scroll-behavior:smooth}
     html,body{margin:0;min-height:100%;background:#dfe4df;color:var(--ink);font-family:"Microsoft YaHei","PingFang SC","Segoe UI",Arial,sans-serif}
-    body{min-width:1180px}
+    body{min-width:0}
     button,a{font:inherit;color:inherit}
     button{border:0}
     a{text-decoration:none}
@@ -72,6 +73,10 @@
     .sidebar-footer{margin-top:auto;padding-top:16px}
     .side-persona{margin:8px;padding:10px 11px;border:1px solid rgba(255,255,255,.12);border-radius:7px;color:#fff;font-size:9.5px;font-weight:800}
     .side-persona span{display:block;margin-top:4px;color:rgba(255,255,255,.43);font-size:8.5px;font-weight:500}
+    .theme-toggle{display:flex;width:calc(100% - 16px);align-items:center;justify-content:space-between;gap:10px;margin:0 8px 6px;padding:9px 10px;border:1px solid rgba(255,255,255,.14);border-radius:7px;background:rgba(255,255,255,.06);color:rgba(255,255,255,.62);font-size:9px;cursor:pointer}
+    .theme-toggle:hover{border-color:rgba(159,207,51,.5);background:rgba(255,255,255,.1);color:#fff}
+    .theme-toggle b{display:flex;align-items:center;gap:6px;color:#fff;font-size:9.5px}
+    .theme-toggle b:before{content:"";width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 3px rgba(159,207,51,.12)}
     .sr-only{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
     main{min-width:0}
     .screen{display:none;min-height:100vh;padding:25px 30px 42px}
@@ -430,6 +435,345 @@
     .toast{position:fixed;z-index:40;right:24px;bottom:24px;max-width:360px;padding:12px 14px;border:1px solid rgba(255,255,255,.18);border-radius:8px;background:var(--dark);color:#fff;box-shadow:var(--shadow);opacity:0;transform:translateY(12px);pointer-events:none;transition:.2s ease}
     .toast.show{opacity:1;transform:none}
     .toast b{display:block;font-size:10.5px}.toast span{display:block;margin-top:4px;color:rgba(255,255,255,.58);font-size:9.5px;line-height:1.5}
+
+    /* 深色运营模式：白底评审稿继续作为浅色模式，新主题值来自项目 Design Token。 */
+    html[data-theme="dark"]{
+      --ink:var(--color-text-primary);
+      --muted:var(--color-text-secondary);
+      --line:var(--color-border-strong);
+      --line-soft:var(--color-border-default);
+      --paper:var(--color-bg-canvas);
+      --panel:var(--color-surface);
+      --soft:var(--color-bg-elevated);
+      --soft-2:var(--color-bg-subtle);
+      --dark:var(--color-surface-solid);
+      --accent:var(--color-accent);
+      --accent-deep:var(--color-accent);
+      --accent-soft:var(--color-accent-soft);
+      --warn:var(--color-warning);
+      --warn-soft:var(--color-warning-soft);
+      --danger:var(--color-danger);
+      --danger-soft:var(--color-danger-soft);
+      --blue:var(--color-info);
+      --blue-soft:var(--color-info-soft);
+      --danger-on-dark:var(--color-danger);
+      --shadow:var(--shadow-card);
+      color-scheme:dark;
+    }
+    html[data-theme="dark"] body{background:var(--color-bg-canvas)}
+    html[data-theme="dark"] .app{background:var(--paper)}
+    html[data-theme="dark"] .sidebar{background:#081115;border-right:1px solid var(--line-soft)}
+    html[data-theme="dark"] .prototype-note{background:rgba(16,32,36,.56)}
+    html[data-theme="dark"] .context-box,
+    html[data-theme="dark"] .pill,
+    html[data-theme="dark"] .tag,
+    html[data-theme="dark"] .notice-line,
+    html[data-theme="dark"] .src-chip,
+    html[data-theme="dark"] .process-row,
+    html[data-theme="dark"] .scope-card,
+    html[data-theme="dark"] .tab,
+    html[data-theme="dark"] .check-card,
+    html[data-theme="dark"] .decision-column p,
+    html[data-theme="dark"] .action-step,
+    html[data-theme="dark"] .compare div,
+    html[data-theme="dark"] .review-item,
+    html[data-theme="dark"] .data-status-card,
+    html[data-theme="dark"] .requirement,
+    html[data-theme="dark"] .global-screen .context .box,
+    html[data-theme="dark"] .global-screen .field,
+    html[data-theme="dark"] .drawer-close{background:var(--panel)}
+    html[data-theme="dark"] .global-screen .lane,
+    html[data-theme="dark"] .global-screen .annot,
+    html[data-theme="dark"] .global-screen .rank,
+    html[data-theme="dark"] .global-screen .task,
+    html[data-theme="dark"] .global-screen .cell,
+    html[data-theme="dark"] .urgent-fact,
+    html[data-theme="dark"] .bridge-step,
+    html[data-theme="dark"] .decision-column,
+    html[data-theme="dark"] .formula-item,
+    html[data-theme="dark"] .criteria div{background:var(--soft-2)}
+    html[data-theme="dark"] .pill.accent,
+    html[data-theme="dark"] .tag.accent,
+    html[data-theme="dark"] .src-chip.verified,
+    html[data-theme="dark"] .impact.gain{color:var(--accent)}
+    html[data-theme="dark"] .pill.warn,
+    html[data-theme="dark"] .tag.warn,
+    html[data-theme="dark"] .src-chip.partial{color:var(--warn)}
+    html[data-theme="dark"] .pill.danger,
+    html[data-theme="dark"] .tag.danger,
+    html[data-theme="dark"] .src-chip.missing,
+    html[data-theme="dark"] .impact.loss{color:var(--danger)}
+    html[data-theme="dark"] .pill.blue,
+    html[data-theme="dark"] .tag.blue{color:var(--blue)}
+    html[data-theme="dark"] .panel{border-color:var(--line-soft);box-shadow:inset 0 1px 0 rgba(255,255,255,.025)}
+    html[data-theme="dark"] .panel.dark,
+    html[data-theme="dark"] .performance-card,
+    html[data-theme="dark"] .action-summary{background:var(--color-surface-solid)}
+    html[data-theme="dark"] .btn{border-color:var(--line);background:var(--soft-2)}
+    html[data-theme="dark"] .btn:hover{background:var(--color-bg-elevated)}
+    html[data-theme="dark"] .btn.dark{border-color:var(--line);background:var(--color-surface-solid)}
+    html[data-theme="dark"] .btn.accent{border-color:var(--accent);background:var(--accent);color:#142008}
+    html[data-theme="dark"] .table tbody tr:hover{background:rgba(166,229,54,.055)}
+    html[data-theme="dark"] .chart polyline:first-of-type{stroke:var(--color-text-primary)}
+    html[data-theme="dark"] .chart polyline:nth-of-type(2){stroke:var(--color-text-muted)}
+    html[data-theme="dark"] .drawer{background:var(--color-surface-solid);border-left-color:var(--line)}
+    html[data-theme="dark"] .overlay{background:rgba(0,0,0,.58)}
+    html[data-theme="dark"] .theme-toggle b:before{background:var(--color-info);box-shadow:0 0 0 3px var(--color-info-soft)}
+
+    /* 经营变化指挥台视觉层：提高可读性，以业务语义组织多色信号。 */
+    html[data-theme="light"]{color-scheme:light}
+    html[data-theme="dark"]{
+      --signal-revenue:var(--color-warning);
+      --signal-sales:var(--color-info);
+      --signal-profit:var(--color-category-purple);
+      --signal-refund:var(--color-category-pink);
+      --signal-risk:var(--color-danger);
+      --signal-positive:var(--color-success);
+    }
+    html[data-theme="dark"] body{
+      background:
+        radial-gradient(circle at 72% -18%,rgba(73,191,227,.08),transparent 34%),
+        linear-gradient(180deg,var(--color-bg-subtle) 0,var(--color-bg-canvas) 52%,#050a0c 100%);
+      font-family:var(--font-sans);
+      font-size:var(--font-size-body);
+      line-height:var(--line-height-body);
+      -webkit-font-smoothing:antialiased;
+    }
+    html[data-theme="dark"] .app{background:transparent}
+    html[data-theme="dark"] main{background:linear-gradient(180deg,rgba(73,191,227,.018),transparent 240px)}
+    html[data-theme="dark"] .sidebar{
+      background:linear-gradient(180deg,#081317 0,#071014 70%,#050c0f 100%);
+      border-right:1px solid var(--line-soft);
+      box-shadow:14px 0 34px rgba(0,0,0,.18);
+    }
+    html[data-theme="dark"] .brand b{font-family:var(--font-display);font-size:19px;letter-spacing:.025em}
+    html[data-theme="dark"] .brand span{font-size:10.5px;line-height:1.55}
+    html[data-theme="dark"] .primary-link{min-height:40px;border-radius:var(--radius-control);font-size:11.5px;font-weight:700}
+    html[data-theme="dark"] .primary-link i{font-size:9px}
+    html[data-theme="dark"] .primary-link:hover{background:rgba(255,255,255,.055);border-color:var(--line-soft)}
+    html[data-theme="dark"] .primary-link.active,
+    html[data-theme="dark"] .workbench-menu.section-active .primary-row{
+      background:linear-gradient(90deg,rgba(166,229,54,.12),rgba(166,229,54,.035));
+      border-color:rgba(166,229,54,.28);
+    }
+    html[data-theme="dark"] .drilldown-link{min-height:34px;font-size:10.5px}
+    html[data-theme="dark"] .side-note,
+    html[data-theme="dark"] .side-persona,
+    html[data-theme="dark"] .theme-toggle{font-size:10.5px}
+    html[data-theme="dark"] .side-persona span{font-size:9.5px}
+    html[data-theme="dark"] .screen{padding:26px 28px 44px}
+    html[data-theme="dark"] .prototype-note{
+      min-height:34px;
+      border-color:rgba(166,229,54,.18);
+      background:linear-gradient(90deg,rgba(166,229,54,.055),rgba(73,191,227,.025));
+      color:var(--muted);
+      font-size:11px;
+    }
+    html[data-theme="dark"] .prototype-note b{color:var(--accent)}
+    html[data-theme="dark"] .page-head{margin-bottom:20px}
+    html[data-theme="dark"] .page-title,
+    html[data-theme="dark"] .global-screen .page-title{
+      font-family:var(--font-display);
+      font-size:clamp(26px,2.4vw,34px);
+      font-weight:800;
+      letter-spacing:-.025em;
+      line-height:1.08;
+    }
+    html[data-theme="dark"] .page-sub,
+    html[data-theme="dark"] .global-screen .page-sub{margin-top:8px;font-size:12.5px;line-height:1.55}
+    html[data-theme="dark"] .breadcrumb{font-size:10.5px}
+    html[data-theme="dark"] .context-box,
+    html[data-theme="dark"] .global-screen .context .box{
+      min-height:50px;
+      border-color:var(--line-soft);
+      background:rgba(255,255,255,.026);
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.02);
+    }
+    html[data-theme="dark"] .eyebrow{font-size:10.5px;line-height:1.35}
+    html[data-theme="dark"] .context-box .value,
+    html[data-theme="dark"] .global-screen .context .value{margin-top:5px;font-size:12px;font-variant-numeric:tabular-nums}
+    html[data-theme="dark"] .section-title,
+    html[data-theme="dark"] .global-screen .section-title{margin:22px 0 11px;font-size:15px;letter-spacing:-.01em}
+    html[data-theme="dark"] .section-title>span:first-child,
+    html[data-theme="dark"] .global-screen .step{
+      width:27px;height:27px;
+      border:1px solid rgba(166,229,54,.28);
+      background:var(--color-accent-soft);
+      color:var(--accent);
+      font-size:10px;
+    }
+    html[data-theme="dark"] .section-title small,
+    html[data-theme="dark"] .global-screen .hint{font-size:10.5px}
+    html[data-theme="dark"] .panel{
+      border:1px solid var(--line-soft);
+      border-radius:var(--radius-card);
+      background:
+        linear-gradient(145deg,rgba(73,191,227,.024),transparent 42%),
+        var(--panel);
+      padding:16px;
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.035),var(--shadow-card);
+      transition:border-color 180ms ease,transform 180ms var(--ease-out-expo),box-shadow 180ms ease;
+    }
+    html[data-theme="dark"] .panel:hover{border-color:rgba(175,203,190,.25);box-shadow:0 12px 30px rgba(0,0,0,.23),inset 0 1px 0 rgba(255,255,255,.04)}
+    html[data-theme="dark"] .panel-title,
+    html[data-theme="dark"] .global-screen .panel-title{font-family:var(--font-display);font-size:15px;letter-spacing:-.01em}
+    html[data-theme="dark"] .panel-sub,
+    html[data-theme="dark"] .global-screen .panel-sub{font-size:10.5px;line-height:1.55}
+    html[data-theme="dark"] .small{font-size:10.5px;line-height:1.5}
+    html[data-theme="dark"] .big{font-family:var(--font-display);font-size:42px}
+    html[data-theme="dark"] .med{font-family:var(--font-display);font-size:23px}
+    html[data-theme="dark"] .pill{min-height:27px;padding:4px 9px;font-size:10px}
+    html[data-theme="dark"] .tag{min-height:24px;padding:3px 8px;font-size:9.5px}
+    html[data-theme="dark"] .src-chip{font-size:8.5px}
+    html[data-theme="dark"] .pill,
+    html[data-theme="dark"] .tag,
+    html[data-theme="dark"] .src-chip{background:rgba(255,255,255,.035)}
+    html[data-theme="dark"] .pill.accent,
+    html[data-theme="dark"] .tag.accent,
+    html[data-theme="dark"] .src-chip.verified{border-color:rgba(166,229,54,.35);background:var(--accent-soft)}
+    html[data-theme="dark"] .pill.warn,
+    html[data-theme="dark"] .tag.warn,
+    html[data-theme="dark"] .src-chip.partial{border-color:rgba(243,182,63,.36);background:var(--warn-soft)}
+    html[data-theme="dark"] .pill.danger,
+    html[data-theme="dark"] .tag.danger,
+    html[data-theme="dark"] .src-chip.missing{border-color:rgba(255,102,88,.36);background:var(--danger-soft)}
+    html[data-theme="dark"] .pill.blue,
+    html[data-theme="dark"] .tag.blue{border-color:rgba(73,191,227,.35);background:var(--blue-soft)}
+    html[data-theme="dark"] .btn{
+      min-height:34px;
+      padding:7px 11px;
+      border-radius:var(--radius-control);
+      font-size:11px;
+      transition:background var(--transition-fast),border-color var(--transition-fast),color var(--transition-fast),transform var(--transition-default);
+    }
+    html[data-theme="dark"] .btn:hover{border-color:rgba(166,229,54,.34);transform:translateY(-1px)}
+    html[data-theme="dark"] .btn.dark{border-color:rgba(166,229,54,.22);background:rgba(166,229,54,.07);color:var(--accent)}
+    html[data-theme="dark"] .btn.accent{box-shadow:0 8px 22px rgba(166,229,54,.13)}
+    html[data-theme="dark"] .link-btn{color:var(--accent);font-size:10.5px}
+    html[data-theme="dark"] .metric{
+      --metric-tone:var(--accent);
+      min-height:96px;
+      overflow:hidden;
+      padding:13px;
+      border-color:var(--line-soft);
+      background:linear-gradient(145deg,color-mix(in srgb,var(--metric-tone) 7%,transparent),transparent 55%),rgba(255,255,255,.022);
+    }
+    html[data-theme="dark"] .metric:after{
+      position:absolute;right:-30px;bottom:-38px;width:88px;height:88px;
+      border:1px solid color-mix(in srgb,var(--metric-tone) 18%,transparent);
+      border-radius:50%;content:"";pointer-events:none;
+    }
+    html[data-theme="dark"] .metric .number{margin-top:8px;color:var(--metric-tone);font-family:var(--font-display);font-size:24px;line-height:1}
+    html[data-theme="dark"] .metric .med{margin-top:8px;color:var(--metric-tone);font-size:25px;line-height:1}
+    html[data-theme="dark"] .metric:is(.risk,.good,.partial) .number{color:var(--metric-tone)}
+    html[data-theme="dark"] .metric .small{margin-top:7px;color:var(--muted)}
+    html[data-theme="dark"] .metric.risk{--metric-tone:var(--signal-risk)}
+    html[data-theme="dark"] .metric.good{--metric-tone:var(--signal-positive)}
+    html[data-theme="dark"] .metric.partial{--metric-tone:var(--signal-revenue)}
+    html[data-theme="dark"] .metric.solid-risk,
+    html[data-theme="dark"] .metric.solid-good,
+    html[data-theme="dark"] .metric.solid-partial{background:linear-gradient(145deg,color-mix(in srgb,var(--metric-tone) 14%,transparent),transparent 65%),rgba(255,255,255,.025)}
+    html[data-theme="dark"] #home .diagnosis-grid>.panel:first-child .metric:nth-child(1){--metric-tone:var(--signal-revenue)}
+    html[data-theme="dark"] #home .diagnosis-grid>.panel:first-child .metric:nth-child(2){--metric-tone:var(--signal-positive)}
+    html[data-theme="dark"] #home .diagnosis-grid>.panel:first-child .metric:nth-child(3){--metric-tone:var(--signal-refund);border-color:rgba(242,124,156,.32)}
+    html[data-theme="dark"] #home .diagnosis-grid>.panel:first-child .metric:nth-child(4){--metric-tone:var(--signal-profit)}
+    html[data-theme="dark"] #products>.grid.g5>.metric:nth-child(1){--metric-tone:var(--signal-revenue)}
+    html[data-theme="dark"] #products>.grid.g5>.metric:nth-child(2){--metric-tone:var(--signal-sales)}
+    html[data-theme="dark"] #products>.grid.g5>.metric:nth-child(3){--metric-tone:var(--signal-refund)}
+    html[data-theme="dark"] #products>.grid.g5>.metric:nth-child(4){--metric-tone:var(--signal-profit)}
+    html[data-theme="dark"] #products>.grid.g5>.metric:nth-child(5){--metric-tone:var(--signal-positive)}
+    html[data-theme="dark"] .performance-card{
+      border:1px solid rgba(166,229,54,.2);
+      border-radius:var(--radius-card);
+      background:
+        radial-gradient(circle at 86% 0,rgba(166,229,54,.14),transparent 34%),
+        linear-gradient(145deg,rgba(73,191,227,.035),transparent 46%),
+        var(--color-surface-solid);
+      box-shadow:var(--shadow-card);
+    }
+    html[data-theme="dark"] .performance-card .big{font-size:clamp(42px,4vw,52px)}
+    html[data-theme="dark"] .forecast-box{border-color:rgba(166,229,54,.3);background:rgba(166,229,54,.075)}
+    html[data-theme="dark"] .hero-stat{background:rgba(255,255,255,.035)}
+    html[data-theme="dark"] .urgent-card{background:linear-gradient(145deg,rgba(243,182,63,.045),transparent 55%),var(--panel)}
+    html[data-theme="dark"] .urgent-signal{background:var(--danger-soft)}
+    html[data-theme="dark"] .urgent-signal.verify{background:var(--warn-soft)}
+    html[data-theme="dark"] .urgent-signal b{font-size:16px}
+    html[data-theme="dark"] .urgent-signal span{font-size:10.5px}
+    html[data-theme="dark"] .urgent-fact b{font-size:13px}
+    html[data-theme="dark"] .urgent-fact span{font-size:9.5px}
+    html[data-theme="dark"] .signal-row,
+    html[data-theme="dark"] .process-row{border-color:var(--line-soft);background:rgba(255,255,255,.022)}
+    html[data-theme="dark"] .signal-row b,
+    html[data-theme="dark"] .process-name b{font-size:11.5px}
+    html[data-theme="dark"] .signal-row p,
+    html[data-theme="dark"] .process-name span{font-size:9.5px}
+    html[data-theme="dark"] .signal-evidence,
+    html[data-theme="dark"] .process-reason{font-size:10.5px}
+    html[data-theme="dark"] .signal-evidence b{font-size:11px}
+    html[data-theme="dark"] .signal-value strong{font-size:12px}
+    html[data-theme="dark"] .signal-value small{font-size:9.5px}
+    html[data-theme="dark"] .note{font-size:10.5px;background:rgba(255,255,255,.025)}
+    html[data-theme="dark"] .note.good{background:var(--color-success-soft)}
+    html[data-theme="dark"] .note.warn{background:var(--color-warning-soft)}
+    html[data-theme="dark"] .table{font-size:11px}
+    html[data-theme="dark"] .table th{padding:10px 9px;font-size:10px}
+    html[data-theme="dark"] .table td{padding:11px 9px}
+    html[data-theme="dark"] .table b{font-size:11.5px}
+    html[data-theme="dark"] .global-screen .field{min-height:34px;font-size:10.5px}
+    html[data-theme="dark"] .global-screen .chart{
+      border-color:var(--line-soft);
+      background:repeating-linear-gradient(to bottom,transparent 0,transparent 35px,rgba(175,203,190,.1) 36px);
+    }
+    html[data-theme="dark"] .global-screen .chart polyline:first-of-type{stroke:var(--signal-revenue)}
+    html[data-theme="dark"] .global-screen .chart polyline:nth-of-type(2){stroke:var(--signal-sales)}
+    html[data-theme="dark"] .global-screen .global-axis,
+    html[data-theme="dark"] .global-screen .legend,
+    html[data-theme="dark"] .global-screen .annot{font-size:9.5px}
+    html[data-theme="dark"] .global-screen .annot{border-color:var(--line-soft);background:rgba(255,255,255,.018)}
+    html[data-theme="dark"] .global-screen .annot>span[style*="background:#fff"]{
+      border-color:var(--line)!important;background:var(--color-surface-solid)!important;color:var(--ink)!important;
+    }
+    html[data-theme="dark"] .global-screen .rank b,
+    html[data-theme="dark"] .global-screen .lane h4{font-size:11.5px}
+    html[data-theme="dark"] .global-screen .rank p,
+    html[data-theme="dark"] .global-screen .task{font-size:9.5px}
+    html[data-theme="dark"] .global-screen .task b{font-size:10.5px}
+    html[data-theme="dark"] .global-screen .cell{border-color:var(--line-soft);background:rgba(73,191,227,.07)}
+    html[data-theme="dark"] .global-screen .cell.d1{background:rgba(73,191,227,.16)}
+    html[data-theme="dark"] .global-screen .cell.d2{background:rgba(166,229,54,.22)}
+    html[data-theme="dark"] .global-screen .cell.d3{background:rgba(166,142,232,.38)}
+    html[data-theme="dark"] .global-screen .cell.d4{background:rgba(242,124,156,.55)}
+    html[data-theme="dark"] .global-screen svg [fill="#172019"]{fill:var(--color-text-primary)}
+    html[data-theme="dark"] .global-screen svg [fill="#626c65"]{fill:var(--color-text-muted)}
+    html[data-theme="dark"] .global-screen svg [fill="#9fcf33"]{fill:var(--color-accent)}
+    html[data-theme="dark"] .global-screen svg [fill="#62890f"]{fill:var(--color-success)}
+    html[data-theme="dark"] .global-screen svg [fill="#9f443e"]{fill:var(--color-danger)}
+    html[data-theme="dark"] .global-screen svg [fill="#242a27"]{fill:var(--color-category-purple)}
+    html[data-theme="dark"] .global-screen svg [fill="#8f9692"]{fill:var(--color-info)}
+    html[data-theme="dark"] .global-screen svg [stroke="#262c29"]{stroke:var(--color-warning)}
+    html[data-theme="dark"] .global-screen svg [stroke="#8b928e"]{stroke:var(--color-info)}
+    html[data-theme="dark"] .global-screen svg [stroke="#242a27"]{stroke:var(--color-category-purple)}
+    html[data-theme="dark"] .global-screen svg rect[fill="#fff"]{fill:var(--color-surface-solid);stroke:var(--line)}
+    html[data-theme="dark"] .drawer-card{border-color:var(--line-soft);background:rgba(255,255,255,.025)}
+    html[data-theme="dark"] .drawer-card h3{font-size:11.5px}
+    html[data-theme="dark"] .drawer-card p{font-size:10.5px}
+    html[data-theme="dark"] .drawer-route{background:linear-gradient(145deg,rgba(166,229,54,.08),transparent),var(--color-bg-elevated)}
+    html[data-theme="dark"] button:focus-visible,
+    html[data-theme="dark"] a:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+
+    @keyframes command-rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+    html[data-theme="dark"] .screen.active>.page-head,
+    html[data-theme="dark"] .screen.active>.home-hero,
+    html[data-theme="dark"] .screen.active>.section-title,
+    html[data-theme="dark"] .screen.active>.grid,
+    html[data-theme="dark"] .screen.active>.panel{
+      animation:command-rise 440ms var(--ease-out-expo) both;
+    }
+    html[data-theme="dark"] .screen.active>.home-hero{animation-delay:55ms}
+    html[data-theme="dark"] .screen.active>.section-title{animation-delay:90ms}
+    html[data-theme="dark"] .screen.active>.grid,
+    html[data-theme="dark"] .screen.active>.panel{animation-delay:120ms}
+
     @keyframes screen-in{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
     @media(max-width:1450px){
       .app{grid-template-columns:204px minmax(0,1fr)}
@@ -440,6 +784,59 @@
       .process-row{grid-template-columns:34px 132px minmax(0,1fr) 96px auto}
       .signal-row{grid-template-columns:83px minmax(0,1fr) auto}
     }
+    @media(max-width:1023px){
+      .app{width:100%;grid-template-columns:1fr}
+      .sidebar{position:sticky;z-index:50;top:0;height:auto;min-height:0;display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:12px;max-width:100vw;padding:9px 12px;overflow:hidden;border-bottom:1px solid rgba(255,255,255,.12)}
+      .brand{padding:0;border:0}.brand b{font-size:12px;white-space:nowrap}.brand span,.side-rule,.side-note,.side-persona{display:none}
+      .primary-nav{display:flex;min-width:0;max-width:100%;gap:5px;margin:0;overflow-x:auto;overscroll-behavior-inline:contain;scrollbar-width:thin}
+      .workbench-menu{flex:0 0 auto}.primary-row{display:flex}.nav-toggle,.drilldown-nav{display:none!important}
+      .primary-link{flex:0 0 auto;min-height:34px;min-width:max-content;padding:6px 8px}
+      .primary-link i{width:20px;height:20px}
+      .sidebar-footer{margin:0;padding:0}.theme-toggle{width:36px;height:34px;margin:0;padding:0;justify-content:center}.theme-toggle>span,.theme-toggle b{font-size:0}.theme-toggle b:before{width:9px;height:9px}
+      .screen{padding:20px 20px 34px}
+      .page-head{flex-direction:column;gap:14px}.context{width:100%;justify-content:flex-start}.context-box{flex:1;min-width:132px}
+      .home-hero,.split,.diagnosis-grid,.home-bottom,.action-hero,.review-hero{grid-template-columns:1fr}
+      .bridge,.global-screen .kpi-strip{grid-template-columns:repeat(2,minmax(0,1fr))}
+      .panel{min-width:0}
+      .g5{grid-template-columns:repeat(3,minmax(0,1fr))}.g4,.g3{grid-template-columns:repeat(2,minmax(0,1fr))}
+      .global-screen .g5{grid-template-columns:repeat(3,minmax(0,1fr))}
+      .performance-card,.urgent-card{min-height:0}
+      .drawer{width:min(430px,100vw)}
+    }
+    @media(max-width:767px){
+      .screen{padding:16px 14px 30px}
+      .prototype-note{align-items:flex-start;flex-direction:column;margin-bottom:13px}
+      .page-title{font-size:21px}.page-sub{font-size:10.5px}
+      .context{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.context-box,.context-box.wide{min-width:0}
+      .g5,.g4,.g3,.g2,.split-even,.split.reverse,.data-status-grid,.criteria,.compare,.bridge,.global-screen .kpi-strip{grid-template-columns:1fr}
+      .span2{grid-column:auto}
+      .panel{max-width:100%;overflow-x:auto}
+      .flow,.process-map{max-width:100%;overflow-x:auto;overscroll-behavior-inline:contain}
+      .toolbar{flex-wrap:wrap}.toolbar .push{margin-left:0}
+      .performance-top{flex-direction:column}.forecast-box{width:100%;min-width:0}.performance-card .big{font-size:36px}
+      .performance-actions{align-items:flex-start;flex-direction:column}.performance-actions .btns{width:100%}
+      .section-title{align-items:flex-start;flex-wrap:wrap;font-size:13px}.section-title small{width:100%;margin-left:34px}
+      .panel-head{flex-direction:column}.urgent-rank{align-items:flex-start}
+      .signal-row{grid-template-columns:1fr}.signal-value{text-align:left}
+      .process-row{display:flex;align-items:center;flex-wrap:wrap}.process-reason{flex-basis:100%}.process-score{flex:1}
+      .bridge-step:not(:last-child):after,.process-stage:not(:last-child):after,.formula-item:not(:last-child):after{display:none}
+      .requirement{grid-template-columns:1fr}.gate{grid-template-columns:1fr}
+      .score-grid{max-width:100%;grid-template-columns:150px repeat(4,80px) 90px 96px;overflow-x:auto}
+      .funnel{align-items:stretch;overflow-x:auto}.funnel-stage{flex:0 0 150px!important;width:150px!important}
+      .global-screen .hint{width:100%;margin-left:0}.global-screen .section-title{flex-wrap:wrap}
+      html[data-theme="dark"] .global-screen .g5{grid-template-columns:repeat(2,minmax(0,1fr))}
+      .global-screen .process{overflow-x:auto}.global-screen .node{min-width:130px}
+      .review-item{grid-template-columns:1fr}
+      .drawer{padding:18px}.toast{right:14px;bottom:14px;max-width:calc(100vw - 28px)}
+    }
+    @media(max-width:430px){
+      .sidebar{grid-template-columns:auto minmax(0,1fr) auto;gap:8px;padding-inline:10px}
+      .brand b{width:48px;white-space:normal;line-height:1.05}.primary-link{grid-template-columns:20px minmax(0,1fr);font-size:9.5px}
+      .screen{padding-inline:12px}.context{grid-template-columns:1fr}
+      .hero-stats{grid-template-columns:1fr}.performance-card{padding:15px}.urgent-card{padding:15px}
+      .metric{min-height:70px}.big{font-size:31px}.med{font-size:18px}
+      .btn{min-height:36px}
+    }
     @media print{
       body{min-width:0;background:#fff}.app{display:block;width:100%}.sidebar,.drawer,.overlay,.toast{display:none}
       .screen{display:block!important;break-after:page;min-height:1000px}.prototype-note{display:none}
@@ -448,8 +845,8 @@
   </style>
 </head>
 <body>
-  <div class="app">
-    <aside class="sidebar">
+  <div class="app" data-ui="prototype-shell">
+    <aside class="sidebar" data-ui="prototype-navigation">
       <div class="brand">
         <b>ECOM AI STUDIO</b>
         <span>经营工作台<br>BUSINESS WORKBENCH</span>
@@ -507,13 +904,16 @@
           <span class="side-status"><i></i>PowerBI 差异数据 · 07-17</span>
           <span class="side-status"><i></i>任务服务 · 正常</span>
         </div>
+        <button class="theme-toggle" id="themeToggle" type="button" aria-pressed="true" aria-label="切换至浅色模式">
+          <span>外观</span><b id="themeLabel">深色模式</b>
+        </button>
         <div class="side-persona">运营负责人<span>净回款诊断与行动视角</span></div>
       </div>
     </aside>
 
     <main>
       <!-- 01 工作台首页 -->
-      <section class="screen" id="home">
+      <section class="screen" id="home" data-ui="workbench-home">
         <div class="prototype-note">
           <span><b>可落地样板</b> · 数值采用 2026-07-17 完整数据；只显示当前数据能够支撑的判断。</span>
           <span>没有依据的结论不进入首页</span>
@@ -531,8 +931,8 @@
           </div>
         </header>
 
-        <div class="home-hero">
-          <article class="performance-card">
+        <div class="home-hero" data-ui="executive-overview">
+          <article class="performance-card" data-ui="target-progress">
             <div class="performance-top">
               <div>
                 <div class="eyebrow">本月累计净回款 <span class="src-chip verified">钉钉 · T-1 完整</span></div>
@@ -562,7 +962,7 @@
             </div>
           </article>
 
-          <article class="panel urgent-card">
+          <article class="panel urgent-card" data-ui="priority-action">
             <div class="urgent-rank">
               <span class="pill accent"><i class="dot"></i>预计可达标</span>
               <button class="link-btn" data-route="structure" type="button">查看经营结构 →</button>
@@ -2578,8 +2978,24 @@
       const drawerClose = document.getElementById("drawerClose");
       const routeButton = document.getElementById("drawerRouteButton");
       const toast = document.getElementById("toast");
+      const themeToggle = document.getElementById("themeToggle");
+      const themeLabel = document.getElementById("themeLabel");
       let drawerRoute = "home";
       let toastTimer;
+
+      function setTheme(theme) {
+        const nextTheme = theme === "dark" ? "dark" : "light";
+        document.documentElement.dataset.theme = nextTheme;
+        themeToggle.setAttribute("aria-pressed", String(nextTheme === "dark"));
+        themeLabel.textContent = nextTheme === "dark" ? "深色模式" : "浅色模式";
+        themeToggle.setAttribute("aria-label", nextTheme === "dark" ? "切换至浅色模式" : "切换至深色模式");
+        localStorage.setItem("ecom-wireframe-theme", nextTheme);
+      }
+
+      setTheme(localStorage.getItem("ecom-wireframe-theme") || "dark");
+      themeToggle.addEventListener("click", () => {
+        setTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
+      });
 
       function currentPage() {
         const hash = location.hash.replace("#","");

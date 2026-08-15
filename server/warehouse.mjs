@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, statSync } from "node:fs";
 import { readFile, stat } from "node:fs/promises";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
@@ -166,8 +166,27 @@ async function readJson(path, fallback = null) {
 }
 
 export async function readWarehouseSnapshot() {
-  return readJson(snapshotPath, null);
+  // 内存缓存：按 mtime 复用解析结果，避免每次请求都读+解析 6.6MB JSON。
+  // sync 写出新快照后 mtime 变化，下次读取自动失效重解析。
+  const mtime = warehouseSnapshotMtime();
+  if (mtime && snapshotCache.mtime === mtime && snapshotCache.value !== null) {
+    return snapshotCache.value;
+  }
+  const value = await readJson(snapshotPath, null);
+  if (mtime) snapshotCache = { mtime, value };
+  return value;
 }
+
+// 轻量新鲜度探针：只 stat 文件 mtime，不解析 6.6MB JSON，供缓存校验用
+export function warehouseSnapshotMtime() {
+  try {
+    return statSync(snapshotPath).mtimeMs;
+  } catch {
+    return null;
+  }
+}
+
+let snapshotCache = { mtime: null, value: null };
 
 export async function checkWarehouse() {
   const [snapshot, state, migration] = await Promise.all([
@@ -223,7 +242,7 @@ export async function syncWarehouse() {
   return activeSync;
 }
 
-export async function queryProductsOnDemand({ start, end, statuses, channels, storeShortNames }) {
+async function runQueryProductsOnDemand({ start, end, statuses, channels, storeShortNames }) {
   const python = process.env.PYTHON || "python";
   const args = [syncScript, "query-products"];
   if (start) args.push("--start", start);
@@ -239,4 +258,46 @@ export async function queryProductsOnDemand({ start, end, statuses, channels, st
     env: { ...process.env, PYTHONIOENCODING: "utf-8" },
   });
   return JSON.parse(stdout);
+}
+
+// 按需查询结果缓存：相同筛选 + 快照未变时直接复用，避免重复 spawn Python（~12.6s/次）。
+// single-flight 防并发击穿；mtime 变化（sync 后）自动失效。
+const productQueryCache = new Map();
+
+function productQueryKey({ start, end, statuses, channels, storeShortNames }) {
+  const s = [...(statuses ?? [])].sort().join(",");
+  const c = [...(channels ?? [])].sort().join(",");
+  const st = [...(storeShortNames ?? [])].sort().join(",");
+  return `${start || ""}|${end || ""}|${s}|${c}|${st}`;
+}
+
+export async function queryProductsOnDemand(opts) {
+  const key = productQueryKey(opts);
+  const mtime = warehouseSnapshotMtime();
+  const entry = productQueryCache.get(key);
+  if (entry && entry.mtime === mtime && entry.value) {
+    return entry.value;
+  }
+  // 同一 key + 同一 mtime 下进行中的查询复用，避免并发重复 spawn
+  if (entry?.inflight && entry.inflightMtime === mtime) {
+    return entry.inflight;
+  }
+  const inflight = runQueryProductsOnDemand(opts)
+    .then((value) => {
+      productQueryCache.set(key, { value, mtime, inflight: null, inflightMtime: null });
+      return value;
+    })
+    .catch((error) => {
+      const current = productQueryCache.get(key);
+      if (current) current.inflight = null;
+      throw error;
+    });
+  const existing = productQueryCache.get(key);
+  if (existing) {
+    existing.inflight = inflight;
+    existing.inflightMtime = mtime;
+  } else {
+    productQueryCache.set(key, { value: null, mtime: null, inflight, inflightMtime: mtime });
+  }
+  return inflight;
 }

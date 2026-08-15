@@ -1,16 +1,22 @@
 import { createReadStream, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
+import { createHash } from "node:crypto";
+import { brotliCompressSync, constants as zlibConstants, gzipSync } from "node:zlib";
 import { extname, join, normalize } from "node:path";
 import "dotenv/config";
 import { createServer as createViteServer } from "vite";
 import { AuthError, createAuthService, PERMISSIONS } from "./auth.mjs";
+import { getAnalytics, invalidateAnalyticsCache, prewarmAnalyticsCache } from "./analytics-cache.mjs";
+import { handleArkCall } from "./arkProxy.mjs";
 import { parseDingTalkFile } from "./dingtalk.mjs";
-import { checkDingTalkApi, filterDingTalkSnapshot, syncDingTalkApi } from "./dingtalk-api.mjs";
+import { checkDingTalkApi, syncDingTalkApi } from "./dingtalk-api.mjs";
 import { acquireDingTalkLock } from "./dingtalk-lock.mjs";
 import { checkFeishu, sheetInventory, syncFeishu } from "./feishu.mjs";
 import { buildDashboardDataStatus } from "./dashboard-status.mjs";
-import { buildWarehouseDashboardMetrics, checkWarehouse, queryProductsOnDemand, readWarehouseSnapshot, syncWarehouse } from "./warehouse.mjs";
+import { checkWarehouse, queryProductsOnDemand, readWarehouseSnapshot, syncWarehouse, warehouseSnapshotMtime } from "./warehouse.mjs";
+import { searchSite } from "./search-service.mjs";
+import { fetchCompetitorPrices, fetchProducts } from "./yudao-client.mjs";
 import { getPipelineState, hasSourceXlsx, sourceXlsxInfo, startAnalysisPipeline } from "./intelligence-pipeline.mjs";
 import { hasVisionKey } from "./vision-client.mjs";
 import {
@@ -20,6 +26,7 @@ import {
   getTask,
   latestUpload,
   latestSnapshot,
+  latestSnapshotMeta,
   listSyncRuns,
   listTasks,
   listUploads,
@@ -87,6 +94,31 @@ const loginRateLimiter = {
   },
 };
 
+// API 级限流：防单 IP 暴力探测/DoS（登录另有 loginRateLimiter 限 5 次/15 分钟）
+const apiHits = new Map();
+const apiRateLimiter = {
+  limit: 120,
+  windowMs: 60 * 1000,
+  check(key) {
+    const now = Date.now();
+    const record = apiHits.get(key);
+    if (!record || record.resetAt <= now) {
+      apiHits.set(key, { count: 1, resetAt: now + this.windowMs });
+      return;
+    }
+    record.count += 1;
+    if (record.count > this.limit) {
+      const retryAfter = Math.max(1, Math.ceil((record.resetAt - now) / 1000));
+      throw new AuthError(429, "rate_limit_exceeded", `请求过于频繁，请在 ${retryAfter} 秒后重试`, { retryAfter });
+    }
+  },
+};
+
+function clientIp(request) {
+  const forwarded = String(request.headers["x-forwarded-for"] || "").split(",")[0].trim();
+  return process.env.AUTH_TRUST_PROXY === "1" && forwarded ? forwarded : (request.socket.remoteAddress || "local");
+}
+
 const uploadPolicy = [
   {
     id: "local-direct",
@@ -119,12 +151,45 @@ const uploadPolicy = [
 ];
 
 function sendJson(response, status, payload, headers = {}) {
-  response.writeHead(status, {
+  const body = typeof payload === "string" ? payload : JSON.stringify(payload);
+  const outHeaders = {
     "Content-Type": "application/json; charset=utf-8",
     "Cache-Control": "no-store",
     ...headers,
-  });
-  response.end(JSON.stringify(payload));
+  };
+  // 大响应按 Accept-Encoding 协商压缩（2.8MB analytics -> ~300KB）
+  const acceptEncoding = String(response.req?.headers?.["accept-encoding"] || "").toLowerCase();
+  const useBr = acceptEncoding.includes("br") && body.length > 1024;
+  const useGzip = !useBr && acceptEncoding.includes("gzip") && body.length > 1024;
+  if (useBr) {
+    outHeaders["Content-Encoding"] = "br";
+    response.writeHead(status, outHeaders);
+    // 默认 quality 11 在 4MB 看板响应上同步耗时 ~5s（阻塞事件循环）；降至 6 后 ~50ms，体积仅大 ~25%。
+    response.end(brotliCompressSync(body, { params: { [zlibConstants.BROTLI_PARAM_QUALITY]: 6 } }));
+    return;
+  }
+  if (useGzip) {
+    outHeaders["Content-Encoding"] = "gzip";
+    response.writeHead(status, outHeaders);
+    response.end(gzipSync(body));
+    return;
+  }
+  response.writeHead(status, outHeaders);
+  response.end(body);
+}
+
+// 内容哈希 ETag：用响应体 SHA-1 作 ETag，命中 If-None-Match 直接 304。
+// 选内容哈希而非 mtime 指纹：analytics-cache 的 SWR 会在 sync 后先返回旧值再后台刷新，
+// 内容哈希随实际值变化，刷新完成后 ETag 自然改变，客户端能拿到新值；指纹法则会把旧值永久钉住。
+function sendJsonCached(response, payload) {
+  const body = JSON.stringify(payload);
+  const etag = `"${createHash("sha1").update(body).digest("base64url").slice(0, 20)}"`;
+  if (response.req?.headers?.["if-none-match"] === etag) {
+    response.writeHead(304, { ETag: etag, "Cache-Control": "no-cache" });
+    response.end();
+    return;
+  }
+  return sendJson(response, 200, body, { ETag: etag, "Cache-Control": "no-cache" });
 }
 
 function parseCookies(request) {
@@ -176,6 +241,29 @@ function sendAuthError(response, error) {
   }, headers);
 }
 
+// 安全响应头：防点击劫持/类型嗅探/协议降级；CSP 基线兼容 Vite dev（上线可收紧 script-src）
+function applySecurityHeaders(response, request) {
+  response.setHeader("X-Content-Type-Options", "nosniff");
+  response.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  response.setHeader("X-Frame-Options", "SAMEORIGIN");
+  response.setHeader("Permissions-Policy", "geolocation=(), microphone=(), camera=()");
+  const forwardedProto = String(request.headers["x-forwarded-proto"] || "").split(",")[0].trim();
+  if (process.env.AUTH_SECURE_COOKIE === "1" || forwardedProto === "https") {
+    response.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+  }
+  response.setHeader("Content-Security-Policy", [
+    "default-src 'self'",
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: https:",
+    "font-src 'self' data:",
+    "connect-src 'self'",
+    "frame-ancestors 'self'",
+    "base-uri 'self'",
+    "form-action 'self'",
+  ].join("; "));
+}
+
 function requestIdentity(request, body = {}) {
   const forwarded = String(request.headers["x-forwarded-for"] || "").split(",")[0].trim();
   const address = process.env.AUTH_TRUST_PROXY === "1" && forwarded
@@ -189,9 +277,13 @@ function requiredPermissionForApi(method, path) {
   if (path === "/api/data-sources") return ["settings.view", "dashboard.view"];
   if (path === "/api/history") return "settings.view";
   if (path === "/api/uploads" || /^\/api\/sync\/(warehouse|feishu|dingtalk)$/.test(path)) return "settings.manage";
+  if (path === "/api/ark/call") return "content.manage";
   if (path === "/api/analytics") return "analytics.view";
+  if (path === "/api/search") return ["analytics.view", "products.view"];
   if (path === "/api/sync/analytics") return "analytics.manage";
   if (path === "/api/products") return "products.view";
+  if (path === "/api/masterdata/competitor-prices") return "intelligence.view";
+  if (path === "/api/masterdata/products") return "products.view";
   if (path.startsWith("/api/workflows")) return method === "GET" ? "content.view" : "content.manage";
   if (path.startsWith("/api/tasks")) return method === "GET"
     ? ["tasks.view", "content.view", "images.view", "intelligence.view"]
@@ -248,17 +340,6 @@ function normalizeTaskId(value) {
   return workflowEnvelopePaths(value).taskId;
 }
 
-function sameDatePeriod(left, right) {
-  return Boolean(
-    left?.start
-    && left?.end
-    && right?.start
-    && right?.end
-    && left.start === right.start
-    && left.end === right.end,
-  );
-}
-
 function hasCurrentProductManagementMetrics(productManagement) {
   const kpis = productManagement?.kpis;
   return Boolean(
@@ -268,37 +349,10 @@ function hasCurrentProductManagementMetrics(productManagement) {
     && Object.hasOwn(kpis, "collectionRate")
     && !Object.hasOwn(kpis, "totalShippedAmount")
     && !Object.hasOwn(kpis, "totalShippedUnits")
-    && Array.isArray(productManagement?.fulfillmentByProduct),
+    && Array.isArray(productManagement?.fulfillmentByProduct)
+    && productManagement?.monthlyComparison?.currentPeriod
+    && Array.isArray(productManagement?.previousDailyTrend),
   );
-}
-
-async function productManagementForAnalytics(snapshot, requestedPeriod) {
-  const cached = snapshot?.productManagement ?? null;
-  if (
-    hasCurrentProductManagementMetrics(cached)
-    && (!requestedPeriod?.start || !requestedPeriod?.end || sameDatePeriod(cached?.period, requestedPeriod))
-  ) {
-    return { productManagement: cached, productManagementStatus: cached ? "aligned" : "unavailable" };
-  }
-  try {
-    const onDemand = await queryProductsOnDemand({
-      start: requestedPeriod.start,
-      end: requestedPeriod.end,
-      statuses: [],
-    });
-    const productManagement = onDemand?.productManagement ?? null;
-    const alignedProductManagement = hasCurrentProductManagementMetrics(productManagement)
-      && sameDatePeriod(productManagement?.period, requestedPeriod)
-      ? productManagement
-      : null;
-    return {
-      productManagement: alignedProductManagement,
-      productManagementStatus: alignedProductManagement ? "aligned" : "unavailable",
-    };
-  } catch {
-    // Do not silently mix a cached all-history product snapshot into a filtered analytics page.
-    return { productManagement: null, productManagementStatus: "unavailable" };
-  }
 }
 
 function dingtalkAutomationStatus() {
@@ -449,6 +503,8 @@ async function syncSource(sourceId) {
         detail: detailBySource[sourceId],
         snapshot,
       });
+      // 数据更新后标记 analytics 缓存 stale 并后台异步刷新（不阻塞调用方）
+      invalidateAnalyticsCache();
       return { runId: run.id, snapshot };
     } catch (error) {
       finishSync(run.id, { status: "failed", detail: errorMessage(error) });
@@ -598,6 +654,12 @@ async function handleApi(request, response, url) {
   if (request.method === "GET" && path === "/api/health") {
     return sendJson(response, 200, { ok: true, mode: production ? "production" : "development", time: new Date().toISOString(), dingtalk: dingtalkAutomationStatus() });
   }
+  // API 级限流：单 IP 120 次/分钟，超限返回 429
+  try {
+    apiRateLimiter.check(clientIp(request));
+  } catch (error) {
+    return sendAuthError(response, error);
+  }
   if (path.startsWith("/api/auth/")) return handleAuthApi(request, response, url);
 
   const currentUser = await requestUser(request);
@@ -613,34 +675,35 @@ async function handleApi(request, response, url) {
     return sendJson(response, 200, await getDataSources());
   }
   if (request.method === "GET" && path === "/api/analytics") {
+    const start = url.searchParams.get("start") || undefined;
+    const end = url.searchParams.get("end") || undefined;
+    const { value } = await getAnalytics(start, end);
+    return sendJsonCached(response, value);
+  }
+  if (request.method === "POST" && path === "/api/search") {
+    let body;
+    try {
+      body = await readJson(request, 8 * 1024);
+    } catch {
+      return sendJson(response, 400, { error: { code: "invalid_json", message: "请求内容不是有效 JSON" } });
+    }
+    const query = String(body.query ?? "").trim();
+    const mode = body.mode === "suggest" ? "suggest" : "answer";
+    const limit = Number.isInteger(body.limit) ? Math.min(10, Math.max(1, body.limit)) : 8;
+    if (query.length < 1 || query.length > 200) {
+      return sendJson(response, 400, { error: { code: "invalid_query", message: "查询长度需为 1–200 个字符" } });
+    }
     const dingtalkSnapshot = latestSnapshot("dingtalk")?.snapshot ?? null;
     const warehouseSnapshot = await readWarehouseSnapshot();
-    const dingtalk = dingtalkSnapshot
-      ? filterDingTalkSnapshot(dingtalkSnapshot, {
-        start: url.searchParams.get("start") || undefined,
-        end: url.searchParams.get("end") || undefined,
-      })
-      : null;
-    const requestedPeriod = dingtalk?.period?.start && dingtalk?.period?.end
-      ? dingtalk.period
-      : {
-        start: url.searchParams.get("start") || warehouseSnapshot?.powerbiPages?.period?.start,
-        end: url.searchParams.get("end") || warehouseSnapshot?.powerbiPages?.period?.end,
-      };
-    const product = await productManagementForAnalytics(warehouseSnapshot, requestedPeriod);
-    const warehouse = warehouseSnapshot ? {
-      ...warehouseSnapshot,
-      productManagement: product.productManagement,
-      productManagementStatus: product.productManagementStatus,
-      dashboard: buildWarehouseDashboardMetrics(warehouseSnapshot, requestedPeriod),
-    } : null;
-    return sendJson(response, 200, {
-      warehouse,
-      feishu: latestSnapshot("feishu")?.snapshot ?? null,
-      dingtalk,
-      dataStatus: dashboardDataStatus({ dingtalk: dingtalkSnapshot, warehouse }),
-      history: listSyncRuns(12),
-    });
+    const context = {
+      dingtalk: dingtalkSnapshot,
+      dingtalkMeta: latestSnapshotMeta("dingtalk"),
+      warehouse: warehouseSnapshot,
+      warehouseMtime: warehouseSnapshotMtime(),
+      warehouseRefreshedAt: warehouseSnapshot?.refreshedAt ?? null,
+    };
+    const result = await searchSite({ query, mode, limit, user: currentUser, permissions: currentUser.permissions }, context);
+    return sendJson(response, 200, result);
   }
   if (request.method === "GET" && path === "/api/products") {
     const start = url.searchParams.get("start") || undefined;
@@ -648,12 +711,15 @@ async function handleApi(request, response, url) {
     const statuses = url.searchParams.getAll("status");
     const channels = url.searchParams.getAll("channel");
     const storeShortNames = url.searchParams.getAll("storeShortName");
+    // 用快照 refreshedAt（随 sync 变化）而非 new Date()，保证相同数据响应体一致，ETag 可命中 304
+    const snapshot = await readWarehouseSnapshot();
+    const refreshedAt = snapshot?.refreshedAt ?? null;
     if (start || end || statuses.length || channels.length || storeShortNames.length) {
       try {
         const onDemand = await queryProductsOnDemand({ start, end, statuses, channels, storeShortNames });
-        return sendJson(response, 200, {
+        return sendJsonCached(response, {
           productManagement: onDemand.productManagement,
-          refreshedAt: new Date().toISOString(),
+          refreshedAt,
           status: "ok",
           filtered: { start: start ?? null, end: end ?? null, statuses, channels, storeShortNames },
         });
@@ -666,12 +732,11 @@ async function handleApi(request, response, url) {
         });
       }
     }
-    const warehouse = await readWarehouseSnapshot();
-    const cachedProductManagement = warehouse?.productManagement ?? null;
+    const cachedProductManagement = snapshot?.productManagement ?? null;
     if (hasCurrentProductManagementMetrics(cachedProductManagement)) {
-      return sendJson(response, 200, {
+      return sendJsonCached(response, {
         productManagement: cachedProductManagement,
-        refreshedAt: warehouse?.refreshedAt ?? null,
+        refreshedAt,
         status: "ok",
       });
     }
@@ -680,9 +745,9 @@ async function handleApi(request, response, url) {
       const productManagement = hasCurrentProductManagementMetrics(onDemand?.productManagement)
         ? onDemand.productManagement
         : null;
-      return sendJson(response, 200, {
+      return sendJsonCached(response, {
         productManagement,
-        refreshedAt: productManagement ? new Date().toISOString() : null,
+        refreshedAt: productManagement ? refreshedAt : null,
         status: productManagement ? "ok" : "stale",
         ...(productManagement ? {} : { error: "商品管理快照缺少当前口径字段" }),
       });
@@ -693,6 +758,18 @@ async function handleApi(request, response, url) {
         status: "stale",
         error: error instanceof Error ? error.message : "商品管理口径重算失败",
       });
+    }
+  }
+  // yudao 业务管理后台只读代理：不可达/未配置/报错时降级返回空列表，不把异常抛给前端
+  if (request.method === "GET" && (path === "/api/masterdata/competitor-prices" || path === "/api/masterdata/products")) {
+    const fetcher = path === "/api/masterdata/competitor-prices" ? fetchCompetitorPrices : fetchProducts;
+    try {
+      const { items, total } = await fetcher();
+      return sendJson(response, 200, { items, total, degraded: false, source: "yudao", fetchedAt: new Date().toISOString() });
+    } catch (error) {
+      const reason = errorMessage(error);
+      console.error(`[yudao] ${path} 降级：${reason}`);
+      return sendJson(response, 200, { items: [], total: 0, degraded: true, reason });
     }
   }
   if (request.method === "POST" && path === "/api/sync/analytics") {
@@ -706,6 +783,9 @@ async function handleApi(request, response, url) {
   }
   if (request.method === "POST" && path === "/api/sync/dingtalk") {
     return sendJson(response, 200, await syncSource("dingtalk"));
+  }
+  if (path === "/api/ark/call") {
+    return handleArkCall(request, response);
   }
   if (request.method === "GET" && path === "/api/workflows") {
     return sendJson(response, 200, { workflow: await getWorkflowStatus() });
@@ -738,8 +818,8 @@ async function handleApi(request, response, url) {
       outputFiles: [],
       failureReason: "-",
     };
-    const allowedTypes = new Set(["content_generate", "script_generate", "quality_check"]);
-    if (!allowedTypes.has(task.type)) return sendJson(response, 400, { error: "该端口只接受文案、分镜或质检任务" });
+    const allowedTypes = new Set(["content_generate", "script_generate", "quality_check", "export_package"]);
+    if (!allowedTypes.has(task.type)) return sendJson(response, 400, { error: "该端口只接受文案、分镜、质检或导出任务" });
     const stored = upsertTask(task);
     const workflow = await queueWorkflowEnvelope(stored);
     return sendJson(response, 202, { task: stored, workflow, executionMode: "local_queue" });
@@ -917,6 +997,7 @@ function serveProduction(response, pathname) {
 const vite = production ? null : await createViteServer({
   server: {
     middlewareMode: true,
+    allowedHosts: true,
     watch: { ignored: ["**/local-data/**", "**/migration/**"] },
   },
   appType: "spa",
@@ -924,6 +1005,7 @@ const vite = production ? null : await createViteServer({
 
 const server = createServer(async (request, response) => {
   try {
+    applySecurityHeaders(response, request);
     const url = new URL(request.url ?? "/", `http://${request.headers.host || `${host}:${preferredPort}`}`);
     if (url.pathname.startsWith("/api/")) {
       await handleApi(request, response, url);
@@ -981,3 +1063,7 @@ while (true) {
 
 console.log(`Ecom AI Studio local service: http://${host}:${activePort}`);
 console.log(`Mode: ${production ? "production" : "development"}; API and UI share one port.`);
+
+// 启动后后台异步预热 analytics 缓存，不阻塞端口监听；首请求若未就绪则等待 single-flight
+prewarmAnalyticsCache();
+console.log("Analytics cache prewarm started in background.");

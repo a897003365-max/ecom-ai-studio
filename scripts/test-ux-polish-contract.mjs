@@ -12,7 +12,6 @@ const [
   tasks,
   products,
   settings,
-  analytics,
   powerBi,
   monthly,
   topbar,
@@ -27,7 +26,6 @@ const [
   read("src/pages/TaskQueuePage.tsx"),
   read("src/pages/ProductManagementPage.tsx"),
   read("src/pages/SettingsPage.tsx"),
-  read("src/components/LayeredAnalyticsView.tsx"),
   read("src/components/PowerBiReplica.tsx"),
   read("src/components/MonthlyOverview.tsx"),
   read("src/components/Topbar.tsx"),
@@ -36,7 +34,7 @@ const [
   read("src/styles.css"),
 ]);
 
-const visibleUi = [dashboard, content, images, intelligence, tasks, products, settings, analytics, powerBi, monthly, topbar, toasts].join("\n");
+const visibleUi = [dashboard, content, images, intelligence, tasks, products, settings, powerBi, monthly, topbar, toasts].join("\n");
 for (const phrase of [
   "已创建 mock 批次",
   "已更新为 mock 状态",

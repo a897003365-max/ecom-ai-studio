@@ -73,7 +73,7 @@ export async function getWorkflowStatus() {
 }
 
 export async function queueWorkflowEnvelope(task) {
-  if (!new Set(["content_generate", "script_generate", "quality_check"]).has(task.type)) return null;
+  if (!new Set(["content_generate", "script_generate", "quality_check", "export_package"]).has(task.type)) return null;
   const paths = workflowEnvelopePaths(task.id);
   const { inbox, outputDirectory, queueFile } = paths;
   await mkdir(inbox, { recursive: true });

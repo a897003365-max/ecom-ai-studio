@@ -2,14 +2,17 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 const app = readFileSync(new URL("../src/App.tsx", import.meta.url), "utf8");
+const dashboard = readFileSync(new URL("../src/pages/DashboardPage.tsx", import.meta.url), "utf8");
 const topbar = readFileSync(new URL("../src/components/Topbar.tsx", import.meta.url), "utf8");
 const productManagement = readFileSync(new URL("../src/pages/ProductManagementPage.tsx", import.meta.url), "utf8");
+const sizeStructurePanel = readFileSync(new URL("../src/components/product-management/SizeStructurePanel.tsx", import.meta.url), "utf8");
+const productGallery = readFileSync(new URL("../src/components/product-management/ProductGalleryView.tsx", import.meta.url), "utf8");
+const productGalleryStyles = readFileSync(new URL("../src/styles/product-gallery.css", import.meta.url), "utf8");
 const localApi = readFileSync(new URL("../src/services/localApi.ts", import.meta.url), "utf8");
 const analytics = readFileSync(new URL("../src/pages/AnalyticsPage.tsx", import.meta.url), "utf8");
 const monthlyOverview = readFileSync(new URL("../src/components/MonthlyOverview.tsx", import.meta.url), "utf8");
 const revenueChart = readFileSync(new URL("../src/components/ChannelRevenueChart.tsx", import.meta.url), "utf8");
 const executive = readFileSync(new URL("../src/components/ExecutiveCommerceOverview.tsx", import.meta.url), "utf8");
-const layered = readFileSync(new URL("../src/components/LayeredAnalyticsView.tsx", import.meta.url), "utf8");
 const channelShare = readFileSync(new URL("../src/components/ChannelShareChart.tsx", import.meta.url), "utf8");
 const monthlyAchievement = readFileSync(new URL("../src/components/MonthlyAchievementChart.tsx", import.meta.url), "utf8");
 const channelPerformance = readFileSync(new URL("../src/components/ChannelPerformanceCharts.tsx", import.meta.url), "utf8");
@@ -20,6 +23,14 @@ const integration = readFileSync(new URL("../src/types/integration.ts", import.m
 const channelSnapshot = readFileSync(new URL("../src/utils/channelSnapshot.ts", import.meta.url), "utf8");
 const dingtalkApi = readFileSync(new URL("../server/dingtalk-api.mjs", import.meta.url), "utf8");
 
+assert.match(dashboard, /getAnalyticsData/, "工作台首页未接入真实经营数据接口");
+assert.match(dashboard, /getAnalyticsData\(monthToDate\)/, "工作台首页未固定读取最近完整日的月累计数据");
+assert.match(dashboard, /data-testid="workbench-net-revenue-hero"/, "工作台首页缺少净回款与月末预测主区");
+assert.match(dashboard, /data-testid="workbench-result-signals"/, "工作台首页缺少经营结果与过程信号");
+assert.match(dashboard, /data-testid="workbench-verification-list"/, "工作台首页缺少有依据的核查事项");
+assert.match(dashboard, /当前未关联经营行动/, "工作台首页未区分核查事项与真实经营行动");
+assert.doesNotMatch(dashboard, /当前任务概览|业务主线/, "工作台首页仍保留旧任务总览结构");
+
 assert.doesNotMatch(app, /showStoreSelector=/, "顶部不应再按页面显示店铺选择器");
 assert.doesNotMatch(topbar, /床垫旗舰店（天猫）/, "全站顶部不应保留固定天猫店铺入口");
 assert.match(productManagement, /ariaLabel="渠道平台筛选"/, "商品总览缺少渠道平台筛选器");
@@ -29,15 +40,20 @@ assert.match(productManagement, /data-testid="matrix-shared-scale"/, "矩阵未�
 assert.match(productManagement, /label: "商家实收"/, "商品管理未显示商家实收口径");
 assert.doesNotMatch(productManagement, /label: "销售金额"/, "商品管理不应再展示销售金额列");
 assert.doesNotMatch(productManagement, /实发金额|实发量|实发数量/, "商品管理仍展示实发金额或实发量字段");
-assert.doesNotMatch(productManagement, /dailyWarehouseMatrix/, "商品管理仍展示每日工厂出货量矩阵");
+assert.match(productManagement, /matrixToTrendSeries\(pm\.dailyWarehouseMatrix\)/, "每日发货仓销量应渲染为趋势折线图而非矩阵表");
 assert.match(productManagement, /id: "fulfillment", label: "仓配履约"/, "商品管理缺少仓配履约页");
 assert.match(productManagement, /id: "price", label: "价格结构"/, "商品管理缺少价格结构页签");
 assert.match(productManagement, /id: "size", label: "尺寸结构"/, "商品管理缺少尺寸结构页签");
-assert.match(productManagement, /id: "spu", label: "SPU 销量"/, "商品管理缺少 SPU 销量页签");
+assert.match(productManagement, /id: "gallery", label: "商品画册"/, "商品管理缺少商品画册页签");
+assert.match(productManagement, /ProductGalleryView/, "商品管理未接入商品画册组件");
 assert.match(productManagement, /id: "custom", label: "定制结构"/, "商品管理缺少定制结构页签");
+assert.doesNotMatch(productManagement, /id: "daily"/, "矩阵分析页签应已迁空并删除");
+assert.doesNotMatch(productManagement, /label: "矩阵分析"/, "矩阵分析页签应已迁空并删除");
 assert.match(productManagement, /PriceStructurePanel/, "商品管理未接入价格结构面板");
 assert.match(productManagement, /SizeStructurePanel/, "商品管理未接入尺寸结构面板");
-assert.match(productManagement, /SpuSalesTrendPanel/, "商品管理未接入 SPU 销量面板");
+assert.match(sizeStructurePanel, /label: "销量占比"/, "尺寸分布应展示销量占比列");
+assert.doesNotMatch(sizeStructurePanel, /label: "金额占比"/, "尺寸分布应移除金额占比列");
+assert.match(productManagement, /SpuTrendCard/, "商品管理未接入 SPU 销量趋势卡（原 SPU 销量页签已并入矩阵分析）");
 assert.match(productManagement, /CustomizationStructurePanel/, "商品管理未接入定制结构面板");
 assert.match(productManagement, /平均发货时效/, "仓配履约页缺少平均发货时效指标");
 assert.match(productManagement, /第3天发货占比/, "仓配履约页缺少第3天发货占比指标");
@@ -45,7 +61,6 @@ assert.match(localApi, /channels\?: string\[\]/, "商品接口缺少渠道平台
 assert.match(localApi, /storeShortNames\?: string\[\]/, "商品接口缺少店铺简称筛选参数");
 assert.match(analytics, /data-testid="monthly-overview"/, "页面缺少月度经营概览模块");
 assert.match(revenueChart, /data-testid="channel-revenue-chart"/, "页面缺少渠道月度回款趋势图");
-assert.match(analytics, /data-testid="comparison-ticker"/, "页面缺少渠道及店铺日环比滚动播报");
 assert.match(analytics, /每日同步计划/, "页面未显示钉钉固定同步计划");
 assert.match(analytics, /最近同步/, "页面未显示钉钉最近实际同步时间");
 assert.doesNotMatch(analytics, /月度指标沿用/, "标题仍显示冗余的月度公式依赖说明");
@@ -72,8 +87,6 @@ assert.match(executive, /data-testid="executive-channel-quality"/, "缺少渠道
 assert.match(executive, /data-testid="executive-category-performance"/, "缺少核心品类经营模块");
 assert.doesNotMatch(executive, /\bROI\b/, "全渠道总览仍显示 ROI，应统一为费比");
 assert.doesNotMatch(powerBiReplica, />ROI</, "天猫推广明细仍显示 ROI，应统一为费比");
-assert.doesNotMatch(layered, /Math\.random|buildMockMetrics/, "分层看板仍在生成随机或派生 mock 指标");
-assert.match(layered, /warehouseDashboard/, "分层看板未接入 PowerBI 本地数仓指标摘要");
 assert.match(channelShare, /data-testid="channel-gmv-share-chart"/, "缺少真实 GMV 占比条形图");
 assert.match(monthlyAchievement, /data-testid="monthly-achievement-chart"/, "缺少近 12 月销售达成组合图");
 assert.match(monthlyAchievement, /polyline/, "近 12 月达成率未绘制为连续折线");
@@ -85,5 +98,20 @@ assert.match(channelPerformance, /data-testid="channel-performance-charts"/, "�
 assert.match(funnel, /metric-card card-glow funnel-card/, "转化漏斗未复用全局指标卡视觉");
 assert.match(funnel, /funnel-stage/, "转化漏斗缺少逐层交互状态");
 assert.match(styles, /\.funnel-fill/, "转化漏斗缺少与全局动效一致的填充动画");
+for (const testId of ["product-gallery", "product-card", "product-detail-drawer", "product-sku-table"]) {
+  assert.match(productGallery, new RegExp(`data-testid=["'{\\s]*${testId}`), `商品画册缺少 ${testId} 稳定定位`);
+}
+assert.match(productGallery, /const PAGE_SIZE = 20/, "商品画册每页必须固定为 20 个产品");
+assert.match(productGallery, /const SKU_PAGE_SIZE = 20/, "商品详情每页必须固定为 20 个 SKU");
+assert.match(productGallery, /loading="lazy"/, "商品主图必须启用懒加载");
+assert.match(productGallery, /role="dialog"/, "商品详情抽屉缺少对话框语义");
+assert.match(productGallery, /aria-modal="true"/, "商品详情抽屉缺少模态语义");
+assert.match(productGallery, /商家实收/, "商品卡片未突出商家实收");
+assert.match(productGallery, /毛利率/, "商品卡片未展示毛利率");
+assert.match(productGallery, /销量/, "商品卡片未展示销量");
+assert.match(productGallery, /较上期/, "商品详情未展示等长上期变化");
+assert.match(productGalleryStyles, /aspect-ratio:\s*1/, "商品主视觉必须保持 1:1");
+assert.match(productGalleryStyles, /grid-template-columns:\s*repeat\(4/, "商品画册桌面端必须为四列");
+assert.match(productGalleryStyles, /@media\s*\(max-width:\s*639px\)/, "商品画册缺少手机单列断点（<640px）");
 
 console.log("dashboard-ui contract: ok");

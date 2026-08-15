@@ -10,6 +10,7 @@ export interface SpuTrendSeries {
 interface Props {
   series: SpuTrendSeries[];
   dates: string[];
+  emptyHint?: string;
 }
 
 export const SPU_TREND_COLORS = [
@@ -17,9 +18,26 @@ export const SPU_TREND_COLORS = [
   "#b25f38", "#6a7180", "#4f8b72", "#a54d68", "#8a6f2b",
 ];
 
+/** Catmull-Rom 平滑曲线（与运营数据看板 ChannelRevenueChart 一致）。 */
+function smoothPath(points: Array<{ x: number; y: number }>) {
+  if (!points.length) return "";
+  if (points.length === 1) return `M ${points[0].x} ${points[0].y}`;
+  let path = `M ${points[0].x.toFixed(2)} ${points[0].y.toFixed(2)}`;
+  for (let index = 0; index < points.length - 1; index += 1) {
+    const before = points[index - 1] ?? points[index];
+    const current = points[index];
+    const next = points[index + 1];
+    const after = points[index + 2] ?? next;
+    const control1 = { x: current.x + (next.x - before.x) / 6, y: current.y + (next.y - before.y) / 6 };
+    const control2 = { x: next.x - (after.x - current.x) / 6, y: next.y - (after.y - current.y) / 6 };
+    path += ` C ${control1.x.toFixed(2)} ${control1.y.toFixed(2)}, ${control2.x.toFixed(2)} ${control2.y.toFixed(2)}, ${next.x.toFixed(2)} ${next.y.toFixed(2)}`;
+  }
+  return path;
+}
+
 /** SPU 日销量多折线趋势图，移植自参考看板 salesLineChart。
  * R1 单选标注、R2 tooltip 跟随+合计、R4 图例线段、R5 变量替换、R8 深色适配。 */
-export function SpuTrendLineChart({ series, dates }: Props) {
+export function SpuTrendLineChart({ series, dates, emptyHint }: Props) {
   const [hover, setHover] = useState<{ index: number; x: number; y: number } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -40,7 +58,7 @@ export function SpuTrendLineChart({ series, dates }: Props) {
   }
 
   if (days === 0 || series.length === 0) {
-    return <div className="py-8 text-center text-[12px] text-[var(--muted)]">暂无趋势数据，请在上方搜索框选择 SPU。</div>;
+    return <div className="py-8 text-center text-[12px] text-[var(--muted)]">{emptyHint ?? "暂无趋势数据，请在上方搜索框选择 SPU。"}</div>;
   }
 
   const single = series.length === 1;
@@ -115,10 +133,10 @@ export function SpuTrendLineChart({ series, dates }: Props) {
           <line x1={xFor(hover.index)} y1={top} x2={xFor(hover.index)} y2={base} style={{ stroke: "var(--muted-2)" }} strokeDasharray="4 4" />
         )}
         {series.map((s, si) => {
-          const points = dates.map((_, i) => `${xFor(i).toFixed(1)},${yFor(s.values[i] || 0).toFixed(1)}`).join(" ");
+          const pts = dates.map((_, i) => ({ x: xFor(i), y: yFor(s.values[i] || 0) }));
           return (
             <g key={si}>
-              <polyline points={points} fill="none" stroke={s.color} strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" />
+              <path d={smoothPath(pts)} fill="none" stroke={s.color} strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" />
               {dates.map((_, i) => (
                 <circle key={i} cx={xFor(i)} cy={yFor(s.values[i] || 0)} r={2.8} fill={s.color} />
               ))}

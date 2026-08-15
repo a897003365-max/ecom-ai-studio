@@ -68,8 +68,10 @@ const multiScopeRows = [
   { ...hierarchyRows[0], date: "2027-01-01", year: "2027", month: "01月", day: "01" },
 ];
 const defaultExpansion = pbixDefaultDailyCoreExpansion(multiScopeRows);
-assert([...defaultExpansion.years].join(",") === "2026", "PBIX 默认展开态只应展开保存的 2026 年节点");
-assert([...defaultExpansion.months].join(",") === "2026|07月", "PBIX 默认展开态只应展开保存的 2026/07 月节点");
+assert([...defaultExpansion.years].join(",") === "2026,2027", "默认展开态应展开数据中所有年份");
+assert([...defaultExpansion.months].join(",") === "2026|07月,2026|06月,2027|01月", "默认展开态应展开数据中所有月份，跨月期间首屏不折叠隐藏");
+const singleMonthExpansion = pbixDefaultDailyCoreExpansion(hierarchyRows);
+assert([...singleMonthExpansion.years].join(",") === "2026" && [...singleMonthExpansion.months].join(",") === "2026|07月", "单月数据默认应展开该月，保证每日明细首屏可见");
 const expandedHierarchy = buildDailyCoreHierarchy(hierarchyRows, new Set(["2026"]), new Set(["2026|07月"]));
 assert(expandedHierarchy.length === 2 && expandedHierarchy.every((row) => row.hierarchyLevel === "day"), "PBIX 默认展开状态应只显示日明细，不插入年月小计行");
 assert(expandedHierarchy[0].showYear && expandedHierarchy[0].showMonth && !expandedHierarchy[1].showYear && !expandedHierarchy[1].showMonth, "Tabular 年月标签未按 PBIX 层级只在首行显示");

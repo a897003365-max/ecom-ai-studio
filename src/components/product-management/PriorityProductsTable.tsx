@@ -1,5 +1,5 @@
 // 商品变化指挥中心 · 重点商品数据表
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 import { money, percent, count } from "./useProductSummary";
 import type { ProductRow } from "./useProductSummary";
@@ -52,6 +52,7 @@ export function PriorityProductsTable({
   productChannelMatrix,
   productChannelRevenueMatrix,
   productChannelRefundMatrix,
+  focusTarget,
 }: {
   rows: ProductRow[];
   currentPeriod: { start: string; end: string } | null;
@@ -59,6 +60,7 @@ export function PriorityProductsTable({
   productChannelMatrix: ProductMatrix;
   productChannelRevenueMatrix: ProductMatrix;
   productChannelRefundMatrix: ProductMatrix;
+  focusTarget?: { kind: "product" | "spu" | "sku"; value: string; productName?: string } | null;
 }) {
   const [sortKey, setSortKey] = useState<string>("received");
   const [dir, setDir] = useState<SortDir>("desc");
@@ -115,6 +117,25 @@ export function PriorityProductsTable({
   const visible = paginate ? sorted.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE) : sorted;
   const baseIndex = paginate ? safePage * PAGE_SIZE : 0;
 
+  // 搜索焦点：自动切页到目标商品行并滚动高亮
+  useEffect(() => {
+    if (!focusTarget) return;
+    const idx = sorted.findIndex((r) => (focusTarget.kind === "spu" ? r.spu === focusTarget.value : r.name === (focusTarget.productName ?? focusTarget.value)));
+    if (idx < 0) return;
+    setPage(Math.floor(idx / PAGE_SIZE));
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const timer = window.setTimeout(() => {
+      const el = document.querySelector<HTMLElement>(`[data-focus-product="${CSS.escape(focusTarget.value)}"]`);
+      if (el) {
+        el.scrollIntoView({ block: "center", behavior: reducedMotion ? "auto" : "smooth" });
+        el.classList.add("search-target-highlight");
+        window.setTimeout(() => el.classList.remove("search-target-highlight"), 2000);
+      }
+    }, 80);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusTarget?.value, focusTarget?.kind, sorted]);
+
   return (
     <>
       {(currentPeriod || previousPeriod) && (
@@ -128,7 +149,7 @@ export function PriorityProductsTable({
           )}
         </p>
       )}
-      <article className="panel product-panel">
+      <article className="panel product-panel" data-search-anchor="products-priority">
       <header className="panel-head">
         <div>
           <span className="panel-kicker">Priority Products</span>
@@ -167,7 +188,7 @@ export function PriorityProductsTable({
               const hasChannelData = channelUnits && allChannels.some((c) => (channelUnits[c] || 0) > 0);
               return (
                 <Fragment key={`${row.name}-${baseIndex + index}`}>
-                  <tr>
+                  <tr data-focus-product={row.name}>
                     <td>{baseIndex + index + 1}</td>
                     <td>
                       {hasChannelData ? (

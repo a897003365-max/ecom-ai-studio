@@ -40,6 +40,7 @@ export function KpiSection({
         className,
       )}
       data-layer={layerCode}
+      data-ui="kpi-section"
     >
       <header className="mb-3 flex items-baseline justify-between gap-3">
         <div className="flex items-baseline gap-2">

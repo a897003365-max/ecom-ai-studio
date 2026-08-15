@@ -7,7 +7,9 @@ import { SortableTable } from "../components/SortableTable";
 import { StatusTag } from "../components/StatusTag";
 import { Tabs } from "../components/Tabs";
 import { getProductData, syncDataSource } from "../services/localApi";
+import { useSearchTarget } from "../hooks/useSearchTarget";
 import type { ProductManagementPages, ProductMatrix, ProductReturnDimensionBreakdownItem } from "../types/integration";
+import type { SearchTarget } from "../types/search";
 import { CustomizationStructurePanel } from "../components/product-management/CustomizationStructurePanel";
 import { PriceStructurePanel } from "../components/product-management/PriceStructurePanel";
 import { ProductCommandOverview } from "../components/product-management/ProductCommandOverview";
@@ -26,6 +28,8 @@ interface DateRange {
 
 interface ProductManagementPageProps {
   onAction: (title: string, detail?: string) => void;
+  searchTarget?: SearchTarget | null;
+  onSearchConsumed?: () => void;
 }
 
 type ProductTab = "overview" | "gallery" | "channel" | "trend" | "returns" | "fulfillment" | "price" | "size" | "custom";
@@ -180,7 +184,7 @@ function MultiValueSlicer({
   );
 }
 
-export function ProductManagementPage({ onAction }: ProductManagementPageProps) {
+export function ProductManagementPage({ onAction, searchTarget, onSearchConsumed }: ProductManagementPageProps) {
   const [pm, setPm] = useState<ProductManagementPages | null>(null);
   const [refreshedAt, setRefreshedAt] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -264,6 +268,30 @@ export function ProductManagementPage({ onAction }: ProductManagementPageProps) 
   useEffect(() => {
     void load();
   }, []);
+
+  // 顶部智能找数：应用页签/日期/渠道/店铺筛选
+  const searchRequestId = searchTarget?.requestId;
+  useEffect(() => {
+    if (searchTarget?.page !== "products") return;
+    const target = searchTarget;
+    if (target.tab) setTab(target.tab);
+    const date = target.filters?.start && target.filters?.end ? { start: target.filters.start, end: target.filters.end } : null;
+    const channels = target.filters?.channels ?? [];
+    const storeShortNames = target.filters?.storeShortNames ?? [];
+    if (date || channels.length || storeShortNames.length) {
+      void load(date, [], channels, storeShortNames);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchRequestId]);
+
+  useSearchTarget(
+    searchTarget?.page === "products" ? searchTarget : null,
+    Boolean(pm),
+    () => onSearchConsumed?.(),
+    () => onAction("已进入对应数据页", "目标区域暂未加载"),
+  );
+
+  const searchFocus = searchTarget?.page === "products" ? searchTarget.focus : undefined;
 
   async function sync() {
     setSyncing(true);
@@ -389,15 +417,17 @@ export function ProductManagementPage({ onAction }: ProductManagementPageProps) 
           />
 
           {tab === "overview" && (
-            <ProductCommandOverview channelScoped={channels.length > 0} pm={pm} />
+            <div data-search-anchor="products-overview">
+              <ProductCommandOverview channelScoped={channels.length > 0} focusTarget={searchFocus} pm={pm} />
+            </div>
           )}
 
-          {tab === "gallery" && <ProductGalleryView pm={pm} />}
+          {tab === "gallery" && <div data-search-anchor="products-gallery"><ProductGalleryView pm={pm} /></div>}
 
-          {tab === "channel" && <ChannelQualityPanel pm={pm} />}
+          {tab === "channel" && <div data-search-anchor="products-channel"><ChannelQualityPanel pm={pm} /></div>}
 
           {tab === "trend" && (
-            <>
+            <div data-search-anchor="products-trend">
               <Card title="月度商家实收趋势">
                 <SortableTable
                   minWidth={920}
@@ -465,11 +495,11 @@ export function ProductManagementPage({ onAction }: ProductManagementPageProps) 
               <Card title="每日渠道销量 · 日期 × 渠道销售数量" className="mt-4">
                 <MatrixTable matrix={pm.dailyChannelMatrix} rowHeader="日期" minWidth={960} pageSize={15} />
               </Card>
-            </>
+            </div>
           )}
 
           {tab === "returns" && (
-            <>
+            <div data-search-anchor="products-returns">
               <ReturnBreakdownTable title="渠道退货拆分 · 按退货金额排序" rows={pm.returnChannelBreakdown} dimLabel="渠道平台" />
               <ReturnBreakdownTable title="店铺退货拆分 · 按退货金额排序" rows={pm.returnStoreBreakdown} dimLabel="店铺简称" />
               <ReturnBreakdownTable title="床垫类别退货拆分 · 按退货金额排序" rows={pm.returnCategoryBreakdown} dimLabel="床垫类别" emptyHint="产品主表未同步，无床垫类别数据" />
@@ -488,12 +518,21 @@ export function ProductManagementPage({ onAction }: ProductManagementPageProps) 
                                       ]}
                 />
               </Card>
-            </>
+            </div>
           )}
 
           {tab === "fulfillment" && (
-            <>
-            <Card title="仓配履约 · 产品名称维度的订单量与发货时效差异">
+            <div data-search-anchor="products-fulfillment">
+            <Card title="渠道平台 × 订单状态明细">
+              <MatrixTable matrix={pm.channelStatusMatrix ?? { columns: [], rows: [] }} rowHeader="渠道平台" minWidth={860} />
+            </Card>
+            <Card title="发货仓 × 订单状态 销售数量" className="mt-4">
+              <MatrixTable matrix={pm.warehouseStatusMatrix} rowHeader="发货仓" minWidth={860} />
+            </Card>
+            <Card title="每日订单状态分布 · 日期 × 订单状态销售数量" className="mt-4">
+              <MatrixTable matrix={pm.dailyStatusMatrix} rowHeader="日期" minWidth={960} pageSize={15} />
+            </Card>
+            <Card title="仓配履约 · 产品名称维度的订单量与发货时效差异" className="mt-4">
               <div className="mb-3 text-[12px] text-[var(--muted)]">
                 时效 = 发货日期 − 订单日期
               </div>
@@ -518,21 +557,12 @@ export function ProductManagementPage({ onAction }: ProductManagementPageProps) 
             <Card title="产品名称 × 订单状态销售数量（Top 30）" className="mt-4">
               <MatrixTable matrix={pm.productStatusMatrix} rowHeader="产品名称" minWidth={860} />
             </Card>
-            <Card title="发货仓 × 订单状态 销售数量" className="mt-4">
-              <MatrixTable matrix={pm.warehouseStatusMatrix} rowHeader="发货仓" minWidth={860} />
-            </Card>
-            <Card title="每日订单状态分布 · 日期 × 订单状态销售数量" className="mt-4">
-              <MatrixTable matrix={pm.dailyStatusMatrix} rowHeader="日期" minWidth={960} pageSize={15} />
-            </Card>
-            <Card title="渠道平台 × 订单状态明细" className="mt-4">
-              <MatrixTable matrix={pm.channelStatusMatrix ?? { columns: [], rows: [] }} rowHeader="渠道平台" minWidth={860} />
-            </Card>
-            </>
+            </div>
           )}
 
-          {tab === "price" && <PriceStructurePanel data={pm.priceStructure} />}
-          {tab === "size" && <SizeStructurePanel data={pm.sizeStructure} />}
-          {tab === "custom" && <CustomizationStructurePanel data={pm.customizationStructure} />}
+          {tab === "price" && <div data-search-anchor="products-price"><PriceStructurePanel data={pm.priceStructure} /></div>}
+          {tab === "size" && <div data-search-anchor="products-size"><SizeStructurePanel data={pm.sizeStructure} /></div>}
+          {tab === "custom" && <div data-search-anchor="products-custom"><CustomizationStructurePanel data={pm.customizationStructure} /></div>}
         </>
       )}
     </div>

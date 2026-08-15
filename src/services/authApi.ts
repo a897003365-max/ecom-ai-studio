@@ -1,24 +1,30 @@
 import type { AccountInput, AuthStatus, AuthUser, PermissionDefinition, UserInput, UserUpdateInput } from "../types/auth";
+import { startProgress, stopProgress } from "../utils/progress";
 
 interface ApiErrorBody {
   error?: string | { code?: string; message?: string; details?: unknown };
 }
 
 async function authRequest<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(path, {
-    ...init,
-    credentials: "same-origin",
-    headers: {
-      "Content-Type": "application/json",
-      ...init?.headers,
-    },
-  });
-  const payload = await response.json() as T & ApiErrorBody;
-  if (!response.ok) {
-    const message = typeof payload.error === "string" ? payload.error : payload.error?.message;
-    throw new Error(message || `账号服务请求失败：${response.status}`);
+  startProgress();
+  try {
+    const response = await fetch(path, {
+      ...init,
+      credentials: "same-origin",
+      headers: {
+        "Content-Type": "application/json",
+        ...init?.headers,
+      },
+    });
+    const payload = await response.json() as T & ApiErrorBody;
+    if (!response.ok) {
+      const message = typeof payload.error === "string" ? payload.error : payload.error?.message;
+      throw new Error(message || `账号服务请求失败：${response.status}`);
+    }
+    return payload;
+  } finally {
+    stopProgress();
   }
-  return payload;
 }
 
 export function getAuthStatus() {

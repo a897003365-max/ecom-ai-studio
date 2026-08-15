@@ -90,6 +90,11 @@ assert.equal(filtered.platforms.find((item) => item.platform === "抖音").chann
 assert.equal(filtered.stores.find((item) => item.store === "麻大师旗舰店").gmv, 400);
 assert.equal(filtered.stores.find((item) => item.store === "抖音1").gmv, 300);
 assert.equal(filtered.stores.find((item) => item.store === "抖音1").refund, 50);
+assert.equal(
+  filtered.stores.find((item) => item.store === "抖音1").netRevenueYoy,
+  null,
+  "原始快照无去年同期数据时店铺净回款同比应为 null",
+);
 assert.equal(filtered.daily.length, 1);
 assert.equal(filtered.reporting.dailyPlatforms.length, 2, "筛选后应暴露 dailyPlatforms 供前端按渠道切分日趋势");
 assert.equal(filtered.reporting.dailyPlatforms.find((item) => item.platform === "天猫").exposure, 700, "dailyPlatforms 应携带曝光过程指标");
@@ -131,6 +136,25 @@ assert.equal(
 const priorDayChannel = priorRhythmFiltered.reporting.monthlyOverview.priorYearDailyChannels[0].channels.find((item) => item.netRevenue > 0);
 assert.ok(priorDayChannel, "去年同期首日应存在有回款的渠道行");
 assert.equal(priorDayChannel.netRevenue, 100, "去年同期首日该渠道回款应为 100");
+
+// 店铺级净回款同比：有去年同期 dailyStores 时按平台+店铺计算，无则 null
+const storeYoySnapshot = structuredClone(snapshot);
+const storeYoyBaseRow = storeYoySnapshot.reporting.dailyStores.find((row) => row.store === "麻大师旗舰店");
+storeYoySnapshot.reporting.dailyStores.push(
+  { ...storeYoyBaseRow, date: "2023-12-01", gmv: 500, netRevenue: 180 },
+  { ...storeYoyBaseRow, date: "2023-12-02", gmv: 200, netRevenue: 100 },
+);
+const storeYoyFiltered = filterDingTalkSnapshot(storeYoySnapshot, { start: "2024-12-01", end: "2024-12-02" });
+assert.equal(
+  storeYoyFiltered.stores.find((item) => item.store === "麻大师旗舰店").netRevenueYoy,
+  920 / 280 - 1,
+  "有去年同期数据时店铺净回款同比应按净回款口径计算",
+);
+assert.equal(
+  storeYoyFiltered.stores.find((item) => item.store === "抖音1").netRevenueYoy,
+  null,
+  "无去年同期数据的店铺净回款同比应为 null",
+);
 
 assert.equal(filtered.reporting.monthlyAchievement.length, 12, "逐月销售达成应返回连续 12 个月");
 assert.equal(

@@ -11,9 +11,10 @@ import { StatusTag } from "../components/StatusTag";
 import { TableShell } from "../components/TableShell";
 import { Tabs } from "../components/Tabs";
 import { Thumbnail } from "../components/Thumbnail";
-import { competitorPrices, competitorStores } from "../data/mock";
+import { competitorStores } from "../data/mock";
 import { competitorImageUrl, getBrandRanking, getInsights, getTop100Dataset } from "../services/intelligenceApi";
-import type { BrandRankingDataset, InsightsDataset, TaskCreateInput, Top100Dataset, Top100ItemV2 } from "../types";
+import { getCompetitorPrices } from "../services/localApi";
+import type { BrandRankingDataset, CompetitorPriceItem, InsightsDataset, TaskCreateInput, Top100Dataset, Top100ItemV2 } from "../types";
 import { clsx } from "../utils/format";
 
 type IntelligenceTab = "top100" | "price";
@@ -35,6 +36,20 @@ export function IntelligencePage({ onAction, onCreateTask, canManage }: Intellig
   const [analyzing, setAnalyzing] = useState(false);
   const [prevPhase, setPrevPhase] = useState<string>("idle");
   const analyzeStatus = useAnalyzeStatus(1500);
+  const [priceItems, setPriceItems] = useState<CompetitorPriceItem[] | null>(null);
+  const [priceDegraded, setPriceDegraded] = useState<string | null>(null);
+
+  useEffect(() => {
+    getCompetitorPrices()
+      .then((payload) => {
+        setPriceItems(payload.items);
+        setPriceDegraded(payload.degraded ? payload.reason || "业务管理后台不可用" : null);
+      })
+      .catch((error: unknown) => {
+        setPriceItems([]);
+        setPriceDegraded(error instanceof Error ? error.message : String(error));
+      });
+  }, []);
 
   async function loadAll() {
     setRefreshing(true);
@@ -362,6 +377,18 @@ export function IntelligencePage({ onAction, onCreateTask, canManage }: Intellig
           <DetailDrawer item={drawerItem} onClose={() => setDrawerItem(null)} />
         </>
       ) : (
+        <>
+          {priceDegraded && (
+            <Card className="mb-4 border-[var(--orange)]/40 bg-[var(--orange)]/10">
+              <div className="text-sm">
+                <span className="font-bold text-[var(--orange)]">业务管理后台数据不可用：</span>
+                <span className="text-[var(--muted)]">{priceDegraded}</span>
+                <div className="mt-1 text-xs text-[var(--muted)]">
+                  请在 <code>.env</code> 配置 <code>YUDAO_USERNAME</code> / <code>YUDAO_PASSWORD</code>，并确认 yudao 业务管理后台已启动。
+                </div>
+              </div>
+            </Card>
+          )}
         <div className="grid gap-4 xl:grid-cols-[0.75fr_1.6fr_0.75fr]">
           <Card title="竞品店铺列表">
             <TableShell minWidth={620}>
@@ -420,7 +447,7 @@ export function IntelligencePage({ onAction, onCreateTask, canManage }: Intellig
                 </tr>
               </thead>
               <tbody>
-                {competitorPrices.map((item, index) => (
+                {priceItems?.map((item, index) => (
                   <tr key={item.id}>
                     <td className="font-semibold">{item.productName}</td>
                     <td><Thumbnail icon={item.mainImage} index={index} /></td>
@@ -438,13 +465,25 @@ export function IntelligencePage({ onAction, onCreateTask, canManage }: Intellig
                     <td><button className="btn" onClick={() => onAction("查看价格轨迹", `${item.productName} 的历史价格变化已打开`)} type="button">查看</button></td>
                   </tr>
                 ))}
+                {priceItems === null && (
+                  <tr>
+                    <td colSpan={14} className="py-8 text-center text-sm text-[var(--muted)]">加载中…</td>
+                  </tr>
+                )}
+                {priceItems !== null && priceItems.length === 0 && (
+                  <tr>
+                    <td colSpan={14} className="py-8 text-center text-sm text-[var(--muted)]">
+                      {priceDegraded ? "业务管理后台不可用，暂无竞品价格数据。" : "暂无竞品价格数据，请在业务管理后台维护。"}
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </TableShell>
           </Card>
 
           <Card title="价格预警侧栏">
             <div className="grid gap-3">
-              {competitorPrices.filter((item) => item.warningStatus !== "无变化").map((item) => (
+              {(priceItems ?? []).filter((item) => item.warningStatus !== "无变化").map((item) => (
                 <div className="rounded-lg border border-[var(--border)] bg-white/[0.02] p-3" key={item.id}>
                   <div className="mb-2 flex items-start justify-between gap-2">
                     <div className="font-bold">{item.productName}</div>
@@ -462,6 +501,7 @@ export function IntelligencePage({ onAction, onCreateTask, canManage }: Intellig
             </div>
           </Card>
         </div>
+        </>
       )}
     </div>
   );

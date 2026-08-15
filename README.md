@@ -17,6 +17,31 @@ npm run dev
 
 默认地址为 `http://127.0.0.1:5173/`。端口被占用时服务自动选择后续端口；网页和 `/api/*` 始终共用实际输出的地址。
 
+### 开机自启（Windows 计划任务）
+
+无需每次重启电脑后手动运行 `npm run dev`。注册一次登录自启任务：
+
+```bash
+npm run schedule:devserver
+```
+
+任务名为 `EcomAIStudio-DevServer`：用户登录时自动启动 `node server/index.mjs`（开发模式，API + UI 同端口 5173，含 Vite HMR），以当前用户身份运行，失败最多自动重启 3 次（间隔 1 分钟）。注册脚本为 `scripts/register-devserver-schedule.ps1`。
+
+常用管理命令：
+
+```bash
+# 手动重启（改了 server/ 或 pipeline/ 代码后需要）
+powershell -Command "Restart-ScheduledTask -TaskName 'EcomAIStudio-DevServer'"
+# 取消开机自启
+powershell -Command "Disable-ScheduledTask -TaskName 'EcomAIStudio-DevServer'"
+# 重新启用
+powershell -Command "Enable-ScheduledTask -TaskName 'EcomAIStudio-DevServer'"
+```
+
+- 改 `src/` 前端代码：刷新浏览器即生效（Vite HMR），无需重启任务。
+- 改 `server/`、`pipeline/` 或 `transforms.py` 等后端代码：需 `Restart-ScheduledTask` 重启任务后生效。
+- 改 `transforms.py`（数据转换层）字段后，还需 `python pipeline/sync.py sync --query 15-聚水潭商品数据 --force` 强制重建 parquet，否则数仓视图仍是旧值。
+
 登录与权限功能已完整保留，但本地开发默认采用免登录模式，不拦截页面和业务 API。正式上线前设置 `AUTH_ENFORCEMENT_ENABLED=1` 后，首次打开会进入“创建首位管理员”页面；之后登录必须同时匹配邮箱、手机号和密码。账号、密码哈希和服务端会话保存在已忽略的 `local-data/auth/auth-store.json`，浏览器只接收 HttpOnly 会话 Cookie。
 
 构建与验证：

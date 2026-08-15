@@ -2,6 +2,38 @@
 
 本文件只记录可复核的运行事件、数据口径修复和验证结果；日期使用 YYYY-MM-DD。
 
+## 2026-08-07
+
+### yudao 业务管理后台集成（方案 A：服务端只读代理）
+
+- 背景：调研 yudao-boot-mini 后确定用它的人工录入后台承载看板缺失的档案类数据（商品档案、店铺渠道、竞品价格）；集成方式为方案 A——看板 Node 服务端以只读服务账号调 yudao REST API，前端不直连、不感知 yudao。不做 SSO/权限托管/Java 迁移，钉钉权威口径与数仓链路不动。
+- 环境（全部绿色安装，未污染系统）：JDK17/Maven/MySQL 8.0.42（3306，root/123456，库 ruoyi-vue-pro）/Redis 5.0.14（6379）在 `E:/Github/yudao-env/`；后端仓库 `E:/Github/yudao-boot-mini`（48080）；管理 UI `E:/Github/yudao-ui-admin-vue3`（48081，pnpm dev）。yudao 与看板分属不同仓库，互不进对方 git。
+- ecom 模块：新增 `yudao-module-ecom`，代码生成器产出 4 张表 CRUD——`ecom_channel`（7 渠道）、`ecom_store`（24 店铺）、`ecom_product`（335 商品，种子自 PowerBI 快照）、`ecom_competitor_price`（0 行，留待业务录入）；菜单挂在父菜单「电商数据」（id 6735）下；admin UI 生成页面经 vite transform 编译验证。
+- 修复：`ecom_competitor_price.low_30d` 列被 MyBatis Plus 反推为 `low30d`，create 报 `Unknown column 'low30d' in 'field list'`；在 `CompetitorPriceDO.java` 加 `@TableField("low_30d")` 重建后修复。教训：列名含「下划线+数字」时代码生成器反推不可靠，需显式注解。
+- 服务账号：`ecomdashboard`，角色 id 160 仅含 4 个 `ecom:*:query` 权限；越权写操作返回 403 已验证。看板 `.env` 增加 `YUDAO_BASE_URL/YUDAO_USERNAME/YUDAO_PASSWORD/YUDAO_TENANT_ID`；dotenv 会把未加引号值中的 `#` 当注释截断，密码必须写成 `YUDAO_PASSWORD="..."`（带引号），`.env.example` 已注明。
+- 看板改动：`server/yudao-client.mjs`（新增，登录缓存+分页拉取）；`server/index.mjs` 新增 `GET /api/masterdata/competitor-prices`（intelligence.view）与 `GET /api/masterdata/products`（products.view），yudao 不可达/登录失败时 HTTP 200 返回 `{items:[],total:0,degraded:true,reason}` 不炸页面；前端 `IntelligencePage` 竞品价格页签脱离 mock 接 API（loading/降级/空态三态），mock.ts 对应段落已删；`SettingsPage` 增加到 48081 后台的外链卡片。
+- 验证：端到端链路（admin 建测试行 → 看板 5199 测试实例读到 total=1 且 `low30d=1499` 字段映射正确 → 删除 → 回空态）通过；`npm run build`、`git diff --check` 通过。注意 Windows Git Bash 下 `curl -d` 带中文会发 GBK 字节导致 yudao 500，中文测试一律用 node fetch。
+- 菜单修复（同日，管理 UI 登录后卡登录页/404 的根因）：① 父菜单「电商数据」（id 6735）的 `path` 原写为 `ecom`，vue-router 要求顶级路由以 `/` 开头，登录后动态注册路由直接抛 `Route paths should start with a "/"`，已改为 `/ecom`；② 渠道/商品菜单的 `component_name` 原为 `Channel`/`Product`，与 yudao 自带路由（如 `/im/channel` 名为 `Channel`）重名——vue-router 同名后注册者会顶掉先注册者，导致 `/ecom/channel`、`/ecom/product` 404，已改为 `EcomChannel`/`EcomProduct`。教训：代码生成器产出的菜单 SQL 落地后，须以真实浏览器登录 + 逐页打开验证，仅编译页面文件不够。5173 dev server 已于同日重启加载新后端代码，竞品价格页签在 5173 上确认为正常空态（非降级）。
+- 看板入口菜单（同日新增）：「电商数据」下新增菜单 id 6760「运营看板入口」，`path=http://127.0.0.1:5173/`（外链菜单，前端 `meta.link` 机制 `window.open` 新标签页打开，非 iframe）；与看板「系统设置 → 业务管理后台」外链形成双向互通。真实浏览器验证：菜单出现、点击新标签页打开 5173 且完整加载、渠道/商品档案页回归正常。回滚：`DELETE FROM system_menu WHERE id=6760`。若看板入口改 5180：`UPDATE system_menu SET path='http://127.0.0.1:5180/' WHERE id=6760`。
+- 遗留：4 个店铺（「神机榜」×2、兰知春序、崔氏家具）的渠道映射待业务方在后台补录；竞品价格表留空待业务录入；yudao 四件套（MySQL/Redis/server/UI）当前为手工启动的会话进程，未注册为 Windows 计划任务。
+
+## 2026-08-05
+
+### 顶部智能找数 v1.1：普通用户视角体验优化
+
+- 背景：以普通用户口径实测 v1（直接驱动 `server/search-service.mjs` + 真实快照，钉钉 `completedThrough=2026-08-03`），发现三类问题：静默错答（"昨天/上个月/这个月"不识别时按全周期回答且无周期标识；"8月1日"单日被静默扩成整月；"退款率最高的渠道"被静默改答全渠道值）、实体死路（裸商品/裸渠道 unsupported）、浮层层叠 bug（见下）。
+- 改动文件：
+  - `server/search-service.mjs`：`parsePeriod` 新增昨天/前天/本周/上周/这个月/上个月/单日 `M月D日[号]`/中文完整日期/中文月份；含未识别时间词时落到最新完整数据日（不再静默全周期）；裸指标默认本月 MTD 并把实际周期回填答案卡；新增排名意图（渠道维度用快照平台行算 Top3 答案卡，店铺/商品维度降级为明示导航）；裸实体兜底（商品→销量/退货率/净销售额三卡，渠道→GMV/净回款/退款率三卡，店铺→明示导航）；无实体时带 kpi 聚合的商品指标（待发货件数/定制率）可直接回答；`OTHER_PAGES` 权限过滤修为 `${page}.view` 映射（权限管理页 admin.users）；实体索引指纹加入权限 salt，修复无商品权限调用复用含商品实体缓存索引的越权泄漏。
+  - `server/search-catalog.mjs`：`normalizeTerm` 增加中文数字↔阿拉伯数字、o↔0 变体归一（豆七↔豆7、M52O9↔M5209），查询与索引两侧同规则。
+  - `src/components/GlobalSearch.tsx`：答案卡数值提升为右侧大字号主视觉；定义卡去重并中文化（显示"站内推广费 ÷ 净回款"而非 spend/netRevenue）；unsupported 显示"没看懂这个问题，换个说法试试"，示例副标题改"试试这个问法"；kbd 按平台显示（Windows→Ctrl K）；面板底部加键盘提示；**浮层改 `createPortal` 挂到 document.body**。
+  - `src/styles.css`：新增 `.global-search-item-value` / `.global-search-unsupported` / `.global-search-footer`。
+  - `scripts/test-global-search-api.mjs`：新增 9/10/11 三节断言（口语时间词与默认周期、排名意图对账、裸实体/变体/KPI/页面导航权限）。
+- 关键 bug（v1 预存）：搜索浮层渲染在带 `backdrop-blur` 的 `.topbar` 内，fixed 被困进 topbar 层叠上下文，主内容区压在浮层之上——鼠标点击结果被页头拦截、视觉上页面内容透进浮层。portal 到 body 后两者均消失（该问题在 v1 验收截图 02-search-modal-open.png 中已可见，当时未发现）。
+- dev server（5173）已按 §11.6 重启为新后端；交接 §11.7 待复验项通过。
+- 验证：`npm run test:global-search`（contract+api 新增 8 条用户口径查询断言）、`npm run typecheck`、`npm run build`、`npm run test:ux-polish`、`npm run test:select-theme`、`npm run test:products`、`npm run test:auth`、`npm run test:public-surface`、`npm run test:dingtalk-api`、`npm run test:analytics-sync`、`git diff --check` 均通过。浏览器实测（Playwright + 系统 Chrome）：六个固定验收查询 + 10 条新查询行为符合预期；答案卡大数值/周期 chip/页脚提示/unsupported 文案渲染正常；点击答案卡可导航并高亮目标区域；移动端 390×844 全屏浮层无横向溢出；控制台零错误（截图在 output/playwright/）。
+- 预存在失败（与本次无关，保持记录）：`test:smoke` 因钉钉 2026-08-04 09:30 计划同步失败、健康状态 degraded 而断言失败（数据面沿用 08-04 05:03 成功快照）；`test:analytics-dashboard` 仍为 §11.8 记录的 sharedMax 预存在失败。
+- 未做（沿用边界）：不接 LLM/向量库、不生成经营数字、不记录查询历史；排名仅用快照已有数据纯函数计算。
+
 ## 2026-07-25
 
 ### 商品经营明细字段补齐（对齐 .pbix）

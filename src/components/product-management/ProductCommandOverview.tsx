@@ -17,9 +17,10 @@ import type { ProductManagementPages } from "../../types/integration";
 interface Props {
   pm: ProductManagementPages;
   channelScoped: boolean;
+  focusTarget?: { kind: "product" | "spu" | "sku"; value: string; productName?: string } | null;
 }
 
-export function ProductCommandOverview({ pm, channelScoped }: Props) {
+export function ProductCommandOverview({ pm, channelScoped, focusTarget }: Props) {
   const tooltip = useChartTooltip();
   const model = useMemo(() => buildProductCommandModel(pm), [pm]);
   const prevLabel = model.previousMonth ?? "上期";
@@ -97,6 +98,7 @@ export function ProductCommandOverview({ pm, channelScoped }: Props) {
       </section>
 
       <PriorityProductsTable
+        focusTarget={focusTarget}
         rows={model.productRows}
         currentPeriod={model.currentPeriod}
         previousPeriod={model.previousPeriod}

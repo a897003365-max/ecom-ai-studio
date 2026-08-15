@@ -5,6 +5,7 @@ import { PlatformBadge } from "../components/PlatformBadge";
 import { ProgressBar } from "../components/ProgressBar";
 import { StatusTag } from "../components/StatusTag";
 import { TableShell } from "../components/TableShell";
+import { CopyWorkbench, type WorkbenchTaskType } from "../components/workbench/CopyWorkbench";
 import { contentPipeline, contentProducts } from "../data/mock";
 import type { ContentProduct, ProductStatus, TaskCreateInput } from "../types";
 import { productStatusText, productStatusTone } from "../utils/status";
@@ -15,6 +16,7 @@ interface ContentProductionPageProps {
 }
 
 export function ContentProductionPage({ onAction, onCreateTask }: ContentProductionPageProps) {
+  const [view, setView] = useState<"workbench" | "batches">("workbench");
   const [products, setProducts] = useState<ContentProduct[]>(contentProducts);
   const [selectedId, setSelectedId] = useState(products[0]?.id ?? "");
   const selectedProduct = useMemo(() => products.find((product) => product.id === selectedId) ?? products[0], [products, selectedId]);
@@ -36,6 +38,15 @@ export function ContentProductionPage({ onAction, onCreateTask }: ContentProduct
     });
   }
 
+  function createWorkbenchTask(task: { name: string; type: WorkbenchTaskType; module: string; batch: string; inputFiles?: string[]; timeline?: string[] }) {
+    createContentTask(task.type, task.name, task.batch);
+  }
+
+  const viewTabs = [
+    { id: "workbench" as const, label: "文案分镜工作台" },
+    { id: "batches" as const, label: "批次总览" },
+  ];
+
   return (
     <div>
       <PageHeader
@@ -50,6 +61,25 @@ export function ContentProductionPage({ onAction, onCreateTask }: ContentProduct
         }
       />
 
+      <div className="mb-4 flex gap-1 overflow-x-auto border-b border-[var(--border)]" role="tablist">
+        {viewTabs.map((tab) => (
+          <button
+            className={view === tab.id ? "tab-trigger is-active" : "tab-trigger"}
+            key={tab.id}
+            onClick={() => setView(tab.id)}
+            role="tab"
+            aria-selected={view === tab.id}
+            type="button"
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {view === "workbench" ? (
+        <CopyWorkbench onAction={onAction} onCreateTask={createWorkbenchTask} />
+      ) : (
+        <>
       <div className="module-grid mb-5">
         {contentPipeline.map((step, index) => (
           <Card key={step.id}>
@@ -197,6 +227,8 @@ export function ContentProductionPage({ onAction, onCreateTask }: ContentProduct
           </div>
         </Card>
       </div>
+        </>
+      )}
     </div>
   );
 }

@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Filter } from "lucide-react";
 import { AnalyticsDateFilter } from "../components/AnalyticsDateFilter";
+import { AnalyticsLoadingState } from "../components/AnalyticsLoadingState";
 import { Card } from "../components/Card";
-import { ComparisonTicker } from "../components/ComparisonTicker";
 import { ExecutiveCommerceOverview } from "../components/ExecutiveCommerceOverview";
 import { MetricCard } from "../components/MetricCard";
 import { MonthlyOverview } from "../components/MonthlyOverview";
@@ -14,13 +14,17 @@ import { TableShell } from "../components/TableShell";
 import { useAnalyticsViewMode, ViewModeToggle } from "../components/ViewModeToggle";
 import { getAnalyticsData, syncAnalyticsData } from "../services/localApi";
 import { channelOptions, selectChannelSnapshot } from "../utils/channelSnapshot";
+import { useSearchTarget } from "../hooks/useSearchTarget";
 import type { KpiMetric, Platform, RegenerationSuggestion } from "../types";
 import type { AnalyticsIntegrationPayload, DingTalkMetricTotals, DingTalkSnapshot } from "../types/integration";
+import type { SearchTarget } from "../types/search";
 
 interface AnalyticsPageProps {
   onAction: (title: string, detail?: string) => void;
   onCreateTask: (suggestion: RegenerationSuggestion) => void;
   canManage: boolean;
+  searchTarget?: SearchTarget | null;
+  onSearchConsumed?: () => void;
 }
 
 const compactNumber = new Intl.NumberFormat("zh-CN", { notation: "compact", maximumFractionDigits: 1 });
@@ -36,6 +40,15 @@ function count(value: number) {
 
 function percent(value?: number) {
   return `${((value || 0) * 100).toFixed(2)}%`;
+}
+
+function yoyCell(value?: number | null) {
+  if (value === null || value === undefined || !Number.isFinite(value)) return <span className="text-[var(--muted)]">—</span>;
+  return (
+    <span className={value >= 0 ? "font-bold text-[var(--green)]" : "font-bold text-[var(--red)]"}>
+      {value >= 0 ? "+" : ""}{percent(value)}
+    </span>
+  );
 }
 
 function withBusinessRates<T extends DingTalkMetricTotals>(metric: T): T & Required<Pick<DingTalkMetricTotals, "feeRate" | "recoveryRate" | "refundRate">> {
@@ -84,7 +97,7 @@ function isProductPeriodAligned(
   );
 }
 
-export function AnalyticsPage({ onAction, canManage }: AnalyticsPageProps) {
+export function AnalyticsPage({ onAction, canManage, searchTarget, onSearchConsumed }: AnalyticsPageProps) {
   const [integration, setIntegration] = useState<AnalyticsIntegrationPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState<"analytics" | "warehouse" | "feishu" | "dingtalk" | null>(null);
@@ -108,6 +121,25 @@ export function AnalyticsPage({ onAction, canManage }: AnalyticsPageProps) {
     void loadAnalytics();
   }, []);
 
+  // 顶部智能找数：应用日期/渠道筛选并定位到经营区域
+  const searchFilters = searchTarget?.page === "analytics" ? searchTarget.filters : undefined;
+  const searchRequestId = searchTarget?.requestId;
+  useEffect(() => {
+    if (searchTarget?.page !== "analytics") return;
+    if (searchFilters?.channel) setSelectedChannel(searchFilters.channel);
+    if (searchFilters?.start || searchFilters?.end) {
+      void loadAnalytics({ start: searchFilters.start!, end: searchFilters.end! });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchRequestId]);
+
+  useSearchTarget(
+    searchTarget?.page === "analytics" ? searchTarget : null,
+    Boolean(integration?.dingtalk),
+    () => onSearchConsumed?.(),
+    () => onAction("已进入对应数据页", "目标区域暂未加载"),
+  );
+
   const dingtalk = integration?.dingtalk ?? null;
   const reporting = dingtalk?.reporting;
   const globalPeriod = dingtalk?.period.start && dingtalk.period.end
@@ -130,10 +162,6 @@ export function AnalyticsPage({ onAction, canManage }: AnalyticsPageProps) {
     ?? dingtalk?.refreshedAt;
   const chartChannels = useMemo(() => channelOptions(dingtalk), [dingtalk]);
   const activeChartChannel = selectedChannel === "all" || chartChannels.includes(selectedChannel) ? selectedChannel : "all";
-
-  const highestRefund = [...platforms].sort((left, right) => right.refundRate - left.refundRate)[0];
-  const highestFeeStore = [...stores].sort((left, right) => right.feeRate - left.feeRate)[0];
-  const leadingChannel = [...platforms].sort((left, right) => (right.channelShare || 0) - (left.channelShare || 0))[0];
 
   async function syncDashboard() {
     if (!canManage) {
@@ -207,9 +235,9 @@ export function AnalyticsPage({ onAction, canManage }: AnalyticsPageProps) {
       {error && <div className="mb-4 rounded-md border border-[var(--red)]/40 bg-[var(--red-bg)] px-3 py-2 text-xs text-[var(--red)]">{error}</div>}
 
       {loading && !dingtalk ? (
-        <Card><div className="py-16 text-center text-sm text-[var(--muted)]">正在读取钉钉经营数据...</div></Card>
+        <AnalyticsLoadingState />
       ) : dingtalk ? (
-        <PowerBiReplica period={globalPeriod} warehouse={integration?.warehouse ?? null} overview={
+        <PowerBiReplica period={globalPeriod} searchTarget={searchTarget?.page === "analytics" ? searchTarget : null} warehouse={integration?.warehouse ?? null} overview={
           viewMode === "layered" ? (
             <ExecutiveCommerceOverview
               dingtalk={viewDingtalk!}
@@ -218,10 +246,6 @@ export function AnalyticsPage({ onAction, canManage }: AnalyticsPageProps) {
             />
           ) : (
             <>
-              {reporting?.latestComparison && (
-                <div className="mb-5" data-testid="comparison-ticker"><ComparisonTicker comparison={reporting.latestComparison} /></div>
-              )}
-
               {reporting?.monthlyOverview && (
                 <section className="monthly-overview mb-5" data-testid="monthly-overview">
                   <div className="monthly-overview-heading">
@@ -261,26 +285,17 @@ export function AnalyticsPage({ onAction, canManage }: AnalyticsPageProps) {
 
               <Card title="店铺经营明细" className="mb-5" action={<StatusTag label={`${stores.length} 个店铺`} tone="blue" dot />}>
                 <TableShell minWidth={1260}>
-                  <thead><tr><th>排名</th><th>渠道</th><th>店铺</th><th>GMV</th><th>回款额</th><th>站内费额</th><th>费比</th><th>加购人数</th><th>回款率</th><th>退款金额</th><th>退款率</th><th>小红书推广费</th></tr></thead>
+                  <thead><tr><th>排名</th><th>渠道</th><th>店铺</th><th>GMV</th><th>回款额</th><th>回款额同比</th><th>站内费额</th><th>费比</th><th>加购人数</th><th>回款率</th><th>退款金额</th><th>退款率</th><th>小红书推广费</th></tr></thead>
                   <tbody>
                     {stores.map((item, index) => (
                       <tr key={`${item.platform}-${item.store}`}>
                         <td>{index + 1}</td><td><PlatformBadge platform={item.platform as Platform} /></td><td className="font-semibold">{item.store}</td>
-                        <td>{money(item.gmv)}</td><td>{money(item.netRevenue)}</td><td>{money(item.spend)}</td><td className={item.feeRate >= 0.5 ? "font-bold text-[var(--red)]" : ""}>{percent(item.feeRate)}</td>
+                        <td>{money(item.gmv)}</td><td>{money(item.netRevenue)}</td><td>{yoyCell(item.netRevenueYoy)}</td><td>{money(item.spend)}</td><td className={item.feeRate >= 0.5 ? "font-bold text-[var(--red)]" : ""}>{percent(item.feeRate)}</td>
                         <td>{count(item.addToCart)}</td><td>{percent(item.recoveryRate)}</td><td>{money(item.refund)}</td><td>{percent(item.refundRate)}</td><td>{item.offsiteSpend ? money(item.offsiteSpend) : "—"}</td>
                       </tr>
                     ))}
                   </tbody>
                 </TableShell>
-              </Card>
-
-              <Card title="当前经营提示">
-                  <div className="insight-grid">
-                    <div className="insight-row"><span>回款贡献最高</span><b>{leadingChannel?.platform ?? "—"} · {percent(leadingChannel?.channelShare)}</b></div>
-                    <div className="insight-row"><span>退款率最高渠道</span><b className="text-[var(--red)]">{highestRefund?.platform ?? "—"} · {percent(highestRefund?.refundRate)}</b></div>
-                    <div className="insight-row"><span>费比最高店铺</span><b className="text-[var(--orange)]">{highestFeeStore?.store ?? "—"} · {percent(highestFeeStore?.feeRate)}</b></div>
-                    <div className="insight-note">月度概览按所选结束日累计；最新播报使用最近完整日期。</div>
-                  </div>
               </Card>
             </>
           )

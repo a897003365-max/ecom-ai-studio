@@ -1,26 +1,66 @@
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { Sidebar } from "./components/Sidebar";
 import { NavIcon } from "./components/NavIcon";
 import { ToastStack } from "./components/ToastStack";
 import { Topbar } from "./components/Topbar";
+import { TopProgressBar } from "./components/TopProgressBar";
 import { navItems } from "./data/mock";
-import { AccessManagementPage } from "./pages/AccessManagementPage";
-import { AnalyticsPage } from "./pages/AnalyticsPage";
-import { ContentProductionPage } from "./pages/ContentProductionPage";
-import { DashboardPage } from "./pages/DashboardPage";
-import { ImageProcessingPage } from "./pages/ImageProcessingPage";
-import { IntelligencePage } from "./pages/IntelligencePage";
-import { LoginPage } from "./pages/LoginPage";
-import { ProductAssetsPage } from "./pages/ProductAssetsPage";
-import { ProductManagementPage } from "./pages/ProductManagementPage";
-import { SettingsPage } from "./pages/SettingsPage";
-import { TaskQueuePage } from "./pages/TaskQueuePage";
 import { getAuthStatus, logout } from "./services/authApi";
 import { getPersistedTasks, persistTask, persistTaskAction } from "./services/localApi";
 import type { PageId, QueueTask, RegenerationSuggestion, TaskCreateInput, ToastMessage } from "./types";
 import type { AuthStatus, AuthUser } from "./types/auth";
+import type { SearchTarget } from "./types/search";
 import { createId, nowStamp } from "./utils/format";
 import { clsx } from "./utils/format";
+
+const AccessManagementPage = lazy(() => import("./pages/AccessManagementPage").then((m) => ({ default: m.AccessManagementPage })));
+const AnalyticsPage = lazy(() => import("./pages/AnalyticsPage").then((m) => ({ default: m.AnalyticsPage })));
+const ContentProductionPage = lazy(() => import("./pages/ContentProductionPage").then((m) => ({ default: m.ContentProductionPage })));
+const DashboardPage = lazy(() => import("./pages/DashboardPage").then((m) => ({ default: m.DashboardPage })));
+const ImageProcessingPage = lazy(() => import("./pages/ImageProcessingPage").then((m) => ({ default: m.ImageProcessingPage })));
+const IntelligencePage = lazy(() => import("./pages/IntelligencePage").then((m) => ({ default: m.IntelligencePage })));
+const LoginPage = lazy(() => import("./pages/LoginPage").then((m) => ({ default: m.LoginPage })));
+const ProductAssetsPage = lazy(() => import("./pages/ProductAssetsPage").then((m) => ({ default: m.ProductAssetsPage })));
+const ProductManagementPage = lazy(() => import("./pages/ProductManagementPage").then((m) => ({ default: m.ProductManagementPage })));
+const SettingsPage = lazy(() => import("./pages/SettingsPage").then((m) => ({ default: m.SettingsPage })));
+const TaskQueuePage = lazy(() => import("./pages/TaskQueuePage").then((m) => ({ default: m.TaskQueuePage })));
+
+function PageSuspenseFallback() {
+  return (
+    <div className="page-suspense-fallback" aria-label="页面加载中" data-ui="page-suspense">
+      <span className="auth-loading-mark" />
+    </div>
+  );
+}
+
+type Theme = "light" | "dark";
+
+const DAY_THEME_START_HOUR = 7;
+const DAY_THEME_END_HOUR = 19;
+
+function getTimeBasedTheme(now = new Date()): Theme {
+  const hour = now.getHours();
+  return hour >= DAY_THEME_START_HOUR && hour < DAY_THEME_END_HOUR ? "light" : "dark";
+}
+
+function millisecondsUntilThemeBoundary(now = new Date()) {
+  const nextBoundary = new Date(now);
+  const hour = now.getHours();
+
+  if (hour < DAY_THEME_START_HOUR) {
+    nextBoundary.setHours(DAY_THEME_START_HOUR, 0, 0, 0);
+  } else if (hour < DAY_THEME_END_HOUR) {
+    nextBoundary.setHours(DAY_THEME_END_HOUR, 0, 0, 0);
+  } else {
+    nextBoundary.setDate(nextBoundary.getDate() + 1);
+    nextBoundary.setHours(DAY_THEME_START_HOUR, 0, 0, 0);
+  }
+
+  return Math.max(1000, nextBoundary.getTime() - now.getTime());
+}
+
+const initialTheme = getTimeBasedTheme();
+document.documentElement.dataset.theme = initialTheme;
 
 const pagePermissions: Record<PageId, string> = {
   dashboard: "dashboard.view",
@@ -37,12 +77,30 @@ const pagePermissions: Record<PageId, string> = {
 
 export default function App() {
   const [activePage, setActivePage] = useState<PageId>("dashboard");
+  const [theme, setTheme] = useState<Theme>(initialTheme);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [tasks, setTasks] = useState<QueueTask[]>([]);
   const [authStatus, setAuthStatus] = useState<AuthStatus | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [authError, setAuthError] = useState("");
+  const [searchTarget, setSearchTarget] = useState<SearchTarget | null>(null);
   const toastSeed = useRef(0);
+  const searchSeqRef = useRef(0);
+
+  useEffect(() => {
+    let timeoutId = 0;
+
+    const syncTheme = () => {
+      const now = new Date();
+      const nextTheme = getTimeBasedTheme(now);
+      document.documentElement.dataset.theme = nextTheme;
+      setTheme(nextTheme);
+      timeoutId = window.setTimeout(syncTheme, millisecondsUntilThemeBoundary(now));
+    };
+
+    syncTheme();
+    return () => window.clearTimeout(timeoutId);
+  }, []);
 
   useEffect(() => {
     getAuthStatus()
@@ -120,12 +178,36 @@ export default function App() {
     }
   }
 
+  function handleThemeToggle() {
+    const nextTheme = theme === "light" ? "dark" : "light";
+    document.documentElement.dataset.theme = nextTheme;
+    setTheme(nextTheme);
+  }
+
   function handleNavigate(page: PageId) {
     if (!hasPermission(pagePermissions[page])) {
       showToast("当前页面未授权", "请联系管理员开通该页面的访问权限", "orange");
       return;
     }
     setActivePage(page);
+  }
+
+  // 顶部智能找数：导航到目标页面并携带一次性 SearchTarget。
+  // requestId 在此集中生成：保证连续点击同一结果（或同页面内导航）都能重新触发
+  // 下游依赖 requestId 的 useEffect（筛选应用、滚动定位、高亮）。
+  function handleSearchNavigate(target: SearchTarget) {
+    const page = target.page;
+    if (!hasPermission(pagePermissions[page])) {
+      showToast("当前页面未授权", "请联系管理员开通该页面的访问权限", "orange");
+      return;
+    }
+    searchSeqRef.current += 1;
+    setSearchTarget({ ...target, requestId: `search-${Date.now()}-${searchSeqRef.current}` });
+    setActivePage(page);
+  }
+
+  function consumeSearchTarget() {
+    setSearchTarget(null);
   }
 
   function createTask(input: TaskCreateInput) {
@@ -246,13 +328,13 @@ export default function App() {
       return <ImageProcessingPage onAction={showToast} onCreateTask={createTask} />;
     }
     if (activePage === "analytics") {
-      return <AnalyticsPage canManage={hasPermission("analytics.manage")} onAction={showToast} onCreateTask={createTaskFromSuggestion} />;
+      return <AnalyticsPage canManage={hasPermission("analytics.manage")} onAction={showToast} onCreateTask={createTaskFromSuggestion} searchTarget={searchTarget?.page === "analytics" ? searchTarget : null} onSearchConsumed={consumeSearchTarget} />;
     }
     if (activePage === "intelligence") {
       return <IntelligencePage canManage={hasPermission("intelligence.manage")} onAction={showToast} onCreateTask={createTask} />;
     }
     if (activePage === "products") {
-      return <ProductManagementPage onAction={showToast} />;
+      return <ProductManagementPage onAction={showToast} searchTarget={searchTarget?.page === "products" ? searchTarget : null} onSearchConsumed={consumeSearchTarget} />;
     }
     if (activePage === "tasks") {
       return <TaskQueuePage onAction={showToast} onTaskAction={handleTaskAction} tasks={tasks} />;
@@ -282,16 +364,22 @@ export default function App() {
   if (!currentUser) return <div className="auth-loading-screen"><b>免登录模式初始化失败</b><button className="btn-primary" onClick={() => window.location.reload()} type="button">重新连接</button></div>;
 
   return (
-    <div className="app-shell">
-      <Sidebar activePage={activePage} items={allowedNavItems} onNavigate={handleNavigate} />
+    <div className="app-shell" data-ui="app-shell">
+      <TopProgressBar />
+      <Sidebar activePage={activePage} items={allowedNavItems} onNavigate={handleNavigate} onToggleTheme={handleThemeToggle} theme={theme} />
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar
           onAction={showToast}
           onLogout={() => void handleLogout()}
           onOpenSettings={hasPermission("settings.view") ? () => handleNavigate("settings") : undefined}
+          onSearchNavigate={handleSearchNavigate}
+          onToggleTheme={handleThemeToggle}
+          searchAllowedPages={new Set(allowedNavItems.map((item) => item.id))}
+          searchCanData={hasPermission("analytics.view") || hasPermission("products.view")}
+          theme={theme}
           user={currentUser}
         />
-        <div className="border-b border-[var(--border)] bg-[var(--bg-2)] px-4 py-3 lg:hidden">
+        <div className="border-b border-[var(--border)] bg-[var(--bg-2)] px-4 py-3 lg:hidden" data-ui="mobile-navigation">
           <div className="flex gap-2 overflow-x-auto">
             {allowedNavItems.map((item) => (
               <button
@@ -305,7 +393,11 @@ export default function App() {
             ))}
           </div>
         </div>
-        <main className="content-shell">{renderPage()}</main>
+        <main className="content-shell" data-ui="page-content">
+          <Suspense fallback={<PageSuspenseFallback />}>
+            {renderPage()}
+          </Suspense>
+        </main>
       </div>
       <ToastStack toasts={toasts} />
     </div>

@@ -170,6 +170,16 @@ export function SettingsPage({ onAction, canManage }: SettingsPageProps) {
         </div>
       </Card>
 
+      <Card title="业务管理后台" className="mb-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--border)] bg-white/[0.02] p-3">
+          <div>
+            <div className="text-[13.5px] font-bold">yudao 业务数据管理后台</div>
+            <div className="mt-1 text-xs leading-5 text-[var(--muted)]">商品档案、店铺渠道、竞品价格维护；本看板通过只读代理读取其数据。</div>
+          </div>
+          <a className="btn" href="http://127.0.0.1:48081" target="_blank" rel="noreferrer">打开后台 ↗</a>
+        </div>
+      </Card>
+
       <div className="mb-4 grid gap-4 xl:grid-cols-[1.25fr_0.75fr]">
         <Card title="数据接入与上传分级">
           <div className="grid gap-3 md:grid-cols-2">
