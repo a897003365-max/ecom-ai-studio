@@ -426,3 +426,66 @@ curl -s -X POST http://127.0.0.1:5173/api/search \
 - 端到端：yudao 建竞品价格测试行 → 看板测试实例（5199）读到且 `low30d` 字段映射正确 → 删除 → 看板回空态，全链路通过（2026-08-07）。
 - 只读账号越权写返回 403；yudao 停服时看板接口降级 200 不报错。
 - `npm run build`、`git diff --check` 通过；详细事件见 `docs/OPERATIONS-LOG.md` 2026-08-07 条目。
+
+## 13. 多机协作基线 + GitHub 安全加严（2026-08-17）
+
+> 本节是真值状态；详细命令、决策过程、历史归档见 [`docs/handoff/2026-08-17-multi-machine-collab.md`](handoff/2026-08-17-multi-machine-collab.md)。
+
+### 13.1 协作拓扑
+
+两台 Win 工作机通过 Tailscale 私网协作。**代码走 GitHub 私有仓库，真实业务数据走 Tailscale SSH 点对点**——两者物理隔离。
+
+| 节点 | Tailscale IP | 角色 | 服务 |
+| --- | --- | --- | --- |
+| l-user（本机） | 100.113.194.123 | 编辑 + push 接收方 + 5174 生产服务 | 5174 私域站（`--production` 跑 dist） |
+| l-user-1（另一台） | 100.122.239.33 | 主要编辑 + push 发送方 | 仅编辑器 |
+| l-user-2 | 100.115.250.53 | 备用 / 暂未使用 | — |
+
+### 13.2 协作流程（已选 B1：纯 Git）
+
+```text
+另一台电脑：编辑 → git add . → git commit → git push origin agent/publish-ecom-ai-studio
+本机：      git pull → npm run build → 杀 node 进程（看门狗 5s 自重启 5174）
+```
+
+**Tailscale SSH 暂未开**。如需 B3 混合（另一台用 VSCode Remote SSH 直连本机编辑）——本机执行 `tailscale up --ssh` 即可开启，开启后两台都能用脚本同步真实数据。
+
+### 13.3 真实数据不存 Git（已加严）
+
+客户/客服对话、爬虫结果、模型分析产物**永远不通过 Git 传输**：
+
+- 共享脚本：[`scripts/sync-local-data.ps1`](../scripts/sync-local-data.ps1)（Tailscale SSH + tar 流式管道，支持 `-WhatIf` 干跑）
+- 使用文档：[`docs/tailscale-data-sync.md`](tailscale-data-sync.md)
+- `.gitignore` 已加严（commit `b5b8857`）：167 个客户数据/测试产物/本地配置/根目录散落工件被忽略，**untracked 从 227 降到 60**
+
+### 13.4 关键文件
+
+| 文件 | 用途 |
+| --- | --- |
+| `scripts/sync-local-data.ps1` | push/pull `local-data/`，前置 Tailscale SSH 检查 |
+| `docs/tailscale-data-sync.md` | Tailscale SSH 启用、同步脚本用法、故障排查 |
+| `.gitignore` | 客户数据 / 本地 Claude / 测试产物 / 散落工件忽略规则 |
+| `local-data/` | 真实业务数据目录（gitignored） |
+
+### 13.5 GitHub 安全状态
+
+- 仓库：**PRIVATE**（个人账号 `a897003365-max`）
+- Token：OAuth `gho_*`（keyring 存储，scopes: `gist` / `read:org` / `repo` / `workflow`）
+- **2FA：用户已走到 GitHub 启用第 1 步（QR 码扫描 + 验证码）；recovery codes 待保存**——接手时第一件事是确认 2FA 实际生效
+- 历史已推 57 commits 全部为源码/文档/截图，**无 .env / token / 客户数据**（已验证）
+
+### 13.6 接手前检查
+
+- [ ] GitHub 账号 2FA 已开启：`https://github.com/settings/security` 看 "Two-factor authentication" 状态
+- [ ] 10 个 recovery codes 已保存到至少 2 个独立位置（纸 + 密码管理器），**不能只存在本机**
+- [ ] Tailscale SSH 状态（按需）：`tailscale status` 的 `SSHStatus` 字段 = `running` 时已开
+- [ ] 60 个 untracked（源码/文档/脚本/设计稿）按子目录分批 commit + push——见 `git ls-files --others --exclude-standard`
+
+### 13.7 验证
+
+- `git check-ignore -v agent_data.json chat_sessions.json` → 两个文件都被忽略
+- `git ls-files --others --exclude-standard | wc -l` → 60
+- 脚本：`pwsh -File scripts/sync-local-data.ps1 -Direction push -WhatIf` → 干跑不传数据
+- `npm run build` + `git diff --check` 通过
+- 详细决策树、命令清单、故障排查：见 [`docs/handoff/2026-08-17-multi-machine-collab.md`](handoff/2026-08-17-multi-machine-collab.md)
+- 真实数据流（push / pull）需在两台电脑 + Tailscale SSH 开启后实测
