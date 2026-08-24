@@ -51,6 +51,21 @@ class ProductIdentityAndChannelTransformTests(unittest.TestCase):
         self.assertEqual(transformed["商品ID"].to_list(), ["JD-ITEM"])
         self.assertEqual(transformed["产品名称"].to_list(), ["云栖青床垫"])
 
+    def test_catalog_accepts_product_code_and_image_link_aliases(self) -> None:
+        transformed = transform_source_file(
+            pl.DataFrame(
+                {
+                    "商品编码": ["MD5301"],
+                    "图片链接": ["https://img.pddpic.com/product.jpg"],
+                }
+            ),
+            _query_spec("05-旗舰店ID对照表"),
+            Path(__file__),
+        )
+
+        self.assertEqual(transformed["商家编码"].to_list(), ["MD5301"])
+        self.assertEqual(transformed["商品图片"].to_list(), ["https://img.pddpic.com/product.jpg"])
+
     def test_jushuitan_derives_pbix_channel_platform_from_site(self) -> None:
         sites = ["头条放心购", "京东厂家直送", "京东商城", "淘宝天猫", "淘宝天猫", "京东商城"]
         with patch(

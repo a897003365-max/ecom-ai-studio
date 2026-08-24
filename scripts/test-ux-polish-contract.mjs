@@ -58,7 +58,7 @@ for (const phrase of [
   assert.equal(visibleUi.includes(phrase), false, `developer-facing copy remains visible: ${phrase}`);
 }
 
-assert.match(dashboard, /汇总生产任务、异常与待确认项/);
+assert.match(dashboard, /看净回款进度、确认异常、安排核查/);
 assert.match(content, /任务统一进入生产队列/);
 assert.match(images, /集中处理需人工确认的图片/);
 assert.match(intelligence, /覆盖.*款竞品/);

@@ -1,6 +1,6 @@
 # ecom AI Studio 交接文档
 
-更新时间：2026-08-08（更新第 10 节实施状态；保留 2026-08-07 第 12 节 yudao 集成记录）
+更新时间：2026-08-22（新增第 16 节 舆情页面增强 + 抓取笔记持久化；保留历史节）
 项目路径：E:\Github\ecom-ai-studio
 
 ## 1. 服务与入口
@@ -98,6 +98,9 @@
 | 登录与权限 | server/auth.mjs、src/pages/LoginPage.tsx、src/pages/AccessManagementPage.tsx |
 | yudao 主数据代理 | server/yudao-client.mjs、server/index.mjs（/api/masterdata/*）、.env 的 YUDAO_* 配置 |
 | 运行记录 | docs/OPERATIONS-LOG.md、.learnings/SESSION-LOG.md |
+| Coze 工作流代理 | server/workflow-proxy.mjs、src/services/workflowApi.ts |
+| 舆情分析页面 | src/pages/SentimentPage.tsx、src/types/sentiment.ts |
+| Windows 自启动 | start-server.bat、Startup/ecom-ai-studio.vbs |
 
 ## 7. 已验证命令
 
@@ -489,3 +492,300 @@ curl -s -X POST http://127.0.0.1:5173/api/search \
 - `npm run build` + `git diff --check` 通过
 - 详细决策树、命令清单、故障排查：见 [`docs/handoff/2026-08-17-multi-machine-collab.md`](handoff/2026-08-17-multi-machine-collab.md)
 - 真实数据流（push / pull）需在两台电脑 + Tailscale SSH 开启后实测
+
+## 14. 小红书负面舆情分析 + 方舟 LLM 网关修复（2026-08-21）
+
+> 本节为新功能「小红书舆情分析」与方舟 LLM 调通的可执行状态。业务方需求：针对「麻大师床垫避雷」关键词的负面舆情，抓取小红书笔记正文并产出问题点分析与改善建议；视觉验收由 frontend-kimi 完成，全部 PASS。
+
+### 14.1 功能与访问地址
+
+- **私域访问地址（看门狗托管，绑定 tailscale）：http://100.113.194.123:5174/**，侧边栏「数据与监控」→「小红书舆情分析」。
+- 注意：该服务只绑定 tailscale IP（`100.113.194.123`），**127.0.0.1:5174 不通属正常**；本地如需访问用 tailscale 地址即可。
+- 页面：5 张 KPI 卡（笔记数 20 / 总互动 2921 / 风险等级 / 问题点 / 建议）→ 舆情摘要 → 问题点分析 → 改善建议 → 笔记明细表；运行中 4s 轮询进度。
+
+### 14.2 数据链路
+
+```
+参考文件/麻大师床垫避雷.txt（关键词笔记元数据，20 条）
+  → COZE_NOTE_DETAIL_WORKFLOW_ID=7631819451410907182  workflow（stream_run，input=笔记url）
+  → server/sentiment.mjs  抓取正文（并发 2 / 批次间隔 60s / 失败重试 1 次）
+  → 正文缓存 local-data/sentiment/notes-cache.json（重跑跳过 Coze，秒级）
+  → LLM 综合（DashScope 优先 / Ark 兜底）→ 结果落盘 local-data/sentiment/result.json
+  → GET /api/sentiment/status（status 含 notes + result）
+```
+
+- 前端页面：`src/pages/SentimentPage.tsx`；服务：`src/services/sentimentApi.ts`；类型：`src/types/sentiment.ts`
+- 后端：`server/sentiment.mjs`；路由：`GET /api/sentiment/notes`、`GET /api/sentiment/status`、`POST /api/sentiment/analyze`（server/index.mjs 已注册，权限挂 intelligence.view/manage）
+- 导航接入：`src/data/mock.ts`(navItems)、`src/components/NavIcon.tsx`(Megaphone)、`src/App.tsx`(pagePermissions + lazy)、`src/components/GlobalSearch.tsx`
+
+### 14.3 方舟 LLM 调通要点（踩坑，勿回退）
+
+- **端点**：`deepseek-v4-flash-ga-260731`（以及其它方舟模型）**只能走 coding 端点** `https://ark.cn-beijing.volces.com/api/coding/v3/chat/completions`；标准 `/api/v3/chat/completions` 报 `ModelNotOpen`，Anthropic `/api/v3/messages` 报 401。
+- **鉴权**：本仓库 `ARK_API_KEY` 是方舟账号 key（`ark-*`），用 `Authorization: Bearer`；`x-api-key` + Anthropic 头是旧写法，无效。
+- **格式**：chat/completions 需要 `messages` 数组，system 提示词并入首条 `{role:'system'}`；响应取 `choices[0].message.content`。
+- **模型**：默认 `deepseek-v4-flash-ga-260731`（sentiment 可被 `ARK_SENTIMENT_MODEL`、`SENTIMENT_MODEL` 覆盖）。方舟账号 2121568962 已开通该模型。
+- **arkProxy 曾有的死代码 bug**：上游响应对象只有 `{status, body}`，原 `if (!upstream.ok)` 恒真导致成功分支永不执行、`/api/ark/call` 从未真正成功过；已修为 `status !== 200`，现在实测返回正常。
+- 前端模型硬编码已同步：`src/services/volcengineClient.ts` `ARK_MODEL = deepseek-v4-flash-ga-260731`。
+
+### 14.4 密钥位置（均为 gitignored，勿提交）
+
+- Coze token：`local-data/source-config.json` 的 `coze.token`（`sat_*`）+ `coze.noteDetailWorkflowId`
+- 方舟 key：`.env` 的 `ARK_API_KEY`（`ark-*`）
+- DashScope key（可选，未配置）：`.env` 的 `DASHSCOPE_API_KEY`，配置后 DashScope 优先于 Ark
+
+### 14.5 运行/重跑
+
+- 页面点「开始舆情分析」或 `POST /api/sentiment/analyze`。正文已缓存（`notes-cache.json` 20 条），重跑不调 Coze、几秒内只调 LLM 出报告。
+- 修改 `server/*.mjs` 后**必须杀 node 重启**（看门狗 5s 内自拉起，绑回 tailscale）。端口只认 `PORT` 环境变量，不认 `--port` 参数。
+
+### 14.6 验证
+
+- `curl http://100.113.194.123:5174/api/sentiment/status` → status done、riskLevel high、problemPoints 4
+- `curl -X POST http://100.113.194.123:5174/api/ark/call`（body 含 system/messages）→ 返回 text「连通」
+- 双主题/响应式视觉验收：frontend-kimi 截图 `.playwright-mcp/`，9/10 PASS（另 1 项为开发态 Vite HMR 残留，生产无）
+- `npx tsc --noEmit`、`npm run build` 通过；当前 HEAD `d2a885b`（分支 agent/publish-ecom-ai-studio，工作区含大量未提交 WIP，提交范围待人类定）
+
+## 15. Coze 工作流集成 + 舆情分析页面增强 + Windows 自启动（2026-08-22）
+
+> 本节记录将 Coze workflow stream_run API 嵌入小红书舆情分析页面、多轮前后端增强以及 Windows 开机自启动的全过程。共 6 轮改动，`npx tsc --noEmit` + `npm run build` 全量通过。
+
+### 15.1 功能概述
+
+在 SentimentPage 顶部新增工作流搜索栏，用户输入关键词后通过 Coze workflow API 搜索小红书笔记，结果自动写入笔记明细表；后端自动逐条抓取笔记正文并显示预览；点「开始舆情分析」弹出筛选弹窗（关键词单选下拉 + 日期范围），确认后触发后端舆情分析。
+
+### 15.2 Coze Workflow API
+
+| 项目 | 值 |
+|------|------|
+| 端点 | `https://api.coze.cn/v1/workflow/stream_run` |
+| Token | `local-data/source-config.json` 的 `coze.token`（`sat_*`） |
+| 搜索 Workflow ID | `7675983801533644836`（硬编码在 `workflow-proxy.mjs`） |
+| 笔记详情 Workflow ID | `source-config.json` 的 `coze.noteDetailWorkflowId`（`7631819451410907182`） |
+| 请求体 | `{ "workflow_id": "...", "parameters": { "input": "用户输入文本" } }` |
+| 响应格式 | SSE（`data:` 行），`content` 字段为双重编码 JSON 字符串 |
+
+**笔记字段映射**（Coze → 前端类型）：
+`note_id→noteId`、`note_display_title→title`、`author_nick_name→author`、`note_liked_count→liked`、`comment_count→comment`、`collected_count→collected`、`shared_count→shared`、`note_url→url`
+
+### 15.3 新增 API 端点
+
+| 端点 | 方法 | 入参 | 出参 | 位置 |
+|------|------|------|------|------|
+| `/api/workflow/run` | POST | `{ input: string }` | `{ output: string }` 或 `{ error: string }` | `server/index.mjs` line ~903 |
+| `/api/note/detail` | POST | `{ url: string }` | `{ body: string, raw: string }` 或 `{ error: string }` | `server/index.mjs` line ~913 |
+
+两个路由均在 `handleApi` 函数内，404 fallback `return sendJson(response, 404, { error: "API 路径不存在" })` 在 `handleApi` 末尾。
+
+### 15.4 文件清单
+
+#### 新增（3 个）
+
+| 文件 | 职责 |
+|------|------|
+| `server/workflow-proxy.mjs` | Coze workflow API 代理：`httpsPostStream` + `extractStreamText` + `runWorkflow` + `cozeNoteDetailConfig` + `formatNoteBody` + `fetchNoteDetail`；从 `source-config.json` 读取 token 和 workflow ID |
+| `src/services/workflowApi.ts` | 前端工作流 API 封装：`runWorkflow(input)` 调 `/api/workflow/run`，`fetchNoteDetail(url)` 调 `/api/note/detail`；含 `NoteDetailResult` 接口 |
+| `start-server.bat` | Windows 启动脚本：`cd /d E:\Github\ecom-ai-studio` + 完整 node 路径执行 `server/index.mjs --production`，输出重定向到 `server-startup.log` |
+
+#### 修改（8 个）
+
+| 文件 | 改动 |
+|------|------|
+| `server/index.mjs`（1114 行） | import 含 `fetchNoteDetail`；新增 `POST /api/workflow/run` 和 `POST /api/note/detail` 路由 |
+| `src/pages/SentimentPage.tsx`（~485 行） | 全文重写：工作流搜索栏 + 笔记明细表（含正文预览/关键词/抓取时间/抓取状态列）+ 非阻塞自动抓取正文（并发 2/批次 3s）+ 弹窗（select 下拉+日期范围+确认/取消）+ `keywordOptions` 和 `tableNotes` 多分支 keyword fallback |
+| `src/types/sentiment.ts`（74 行） | `SentimentNoteMeta` 新增 `keyword?` 和 `crawledAt?`；`SentimentNotesPayload` 有 `keyword: string` 顶层字段；`SentimentStatus` 有 `keyword: string` 顶层字段 |
+| `src/App.tsx` | 移除 `WorkflowPage` 路由和 lazy import |
+| `src/types/index.ts` | 移除 `"workflow"` PageId |
+| `src/data/mock.ts` | 移除 workflow navItem |
+| `src/components/NavIcon.tsx` | 移除 `Zap` import 和 workflow 映射 |
+| `src/components/PageHeader.tsx` | `subtitle` 改为可选（`subtitle?: string`），条件渲染 |
+| `src/styles.css`（~5300 行） | 新增 `.workflow-*`、`.workflow-search-bar`、`.workflow-search-input`、`.analyze-filter-*`、`.analyze-modal-*` CSS 类 |
+
+#### 已弃用但未删除
+
+- `src/pages/WorkflowPage.tsx`：第一轮创建的独立工作流页面，第二轮合并到 SentimentPage 后不再引用，文件仍存在。
+
+### 15.5 六轮改动详情
+
+| 轮次 | 内容 | 验证 |
+|------|------|------|
+| R1 | 创建 workflow-proxy.mjs + workflowApi.ts + WorkflowPage.tsx，修改 App.tsx/mock.ts/types/index.ts/NavIcon.tsx/server/index.mjs/styles.css；修复 abortRef 错误 | tsc + build 通过；subagent 6 项隔离验收全部 PASS |
+| R2 | 合并工作流到舆情分析页面，移除独立 WorkflowPage 路由/导航/类型/图标 | tsc + build 通过 |
+| R3 | 全文重写 SentimentPage.tsx（工作流结果写入表格 + 关键词/抓取时间列 + 分析筛选栏）；云端 curl 测试 Coze API 成功 | tsc + build 通过；后端服务启动在 5173 |
+| R4 | workflow-proxy.mjs 新增 fetchNoteDetail + formatNoteBody；server/index.mjs 新增 POST /api/note/detail；workflowApi.ts 新增 fetchNoteDetail；SentimentPage 实现非阻塞自动抓取正文 + 正文预览列 | tsc + build 通过 |
+| R5 | 弹窗化「开始舆情分析」筛选 — 移除内联筛选 Card、新增弹窗（select 下拉+日期范围+确认/取消按钮）、新增 .analyze-modal-* CSS | tsc + build 通过 |
+| R6 | 修复关键词列显示「—」— keywordOptions 补充 `notesPayload.keyword` + `status.keyword` + `jobNotes` 关键词提取；tableNotes 的 `jobNotes` 分支和 `notesPayload.notes` 分支均加 keyword fallback | tsc + build 通过 |
+
+### 15.6 keyword fallback 策略
+
+后端返回的笔记数据有多个来源分支，每条笔记本身**不携带** `keyword` 字段，需要从顶层兜底：
+
+| 数据源 | 顶层 keyword 来源 | fallback 代码 |
+|--------|------------------|---------------|
+| `notesPayload.notes`（工作流搜索结果） | `notesPayload.keyword` | `n.keyword ?? notesPayload?.keyword` |
+| `jobNotes`（后端分析结果） | `status.keyword` | `n.keyword ?? status?.keyword` |
+| `wfNotes`（前端工作流搜索直出） | 搜索输入 `wfInput.trim()` | `keyword: wfInput.trim()` |
+
+`keywordOptions`（弹窗下拉选项）同样从以上三个来源去重提取。
+
+### 15.7 弹窗交互流程
+
+1. 用户点「开始舆情分析」→ `showAnalyzeModal = true`，弹窗出现
+2. 弹窗内含：关键词单选下拉（`keywordOptions` 去重列表）+ 日期范围（dateFrom / dateTo）
+3. 表格无笔记时下拉为空，但按钮可点击
+4. 用户选中关键词后点「开始分析」→ 关闭弹窗 + 触发 `startSentimentAnalyze()` 后端调用
+5. 点「取消」→ 仅关闭弹窗
+
+### 15.8 非阻塞正文抓取
+
+工作流搜索返回笔记列表后：
+1. 笔记立即写入表格，`detailState: "pending"`，解除 `wfLoading`
+2. 后台 IIFE 异步逐条调用 `fetchNoteDetail(note.url)`
+3. 并发 2、批次间隔 3s
+4. 每条完成后 `setWfNotes` 更新 `detailState`（"done"）、`bodyLength`、`noteBody`
+5. 表格「正文预览」列显示前 80 字 + 省略号，「抓取状态」列显示「成功 N字」/「待抓取」/「失败」
+
+### 15.9 Windows 开机自启动
+
+| 文件 | 路径 | 作用 |
+|------|------|------|
+| `ecom-ai-studio.vbs` | `C:\Users\Administrator\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\` | 开机登录后自动执行，隐藏窗口启动 Node 服务 |
+| `start-server.bat` | `E:\Github\ecom-ai-studio\start-server.bat` | 被早期 VBS 版本调用，含完整 node 路径 + 日志重定向 |
+
+**当前 VBS 内容**（最终版）：
+```vbs
+Set WshShell = CreateObject("WScript.Shell")
+WshShell.Run "cmd /c cd /d E:\Github\ecom-ai-studio && ""C:\Program Files\nodejs\node.exe"" server/index.mjs --production > server-startup.log 2>&1", 0, False
+Set WshShell = Nothing
+```
+
+- `0` = 隐藏窗口（无终端弹出），`False` = 不等待完成
+- Node 完整路径：`C:\Program Files\nodejs\node.exe`（`where node` 确认）
+- 日志输出：`E:\Github\ecom-ai-studio\server-startup.log`
+- 服务端口：**5173**（`--production` 模式，API 和 UI 共享端口）
+- 手动启动命令（CMD）：`cd /d E:\Github\ecom-ai-studio && node server/index.mjs --production`
+
+### 15.10 注意事项
+
+- **`server/*.mjs` 不热重载**：修改后端代码后必须重启 Node 进程（杀旧进程 + 重跑启动命令），否则前端请求会命中 404 `API 路径不存在`。
+- **生产服务端口为 5173**，与 §1 的 5180 和 §14.1 的 5174（看门狗 tailscale 绑定）不同；自启动 VBS 走 5173 直连模式。
+- **`edit_file` 在 Windows CRLF 文件上多行替换可能失败**：单行替换可行，复杂修改优先用 `write_file` 全文重写。
+- **bash/PowerShell 命令被沙箱高危拦截**：`npx tsc`、`npm run build`、`curl`、`wscript` 等均需用户确认卡片。
+- **Coze workflow SSE 响应解析**：`content` 字段为双重编码 JSON 字符串，需 `JSON.parse(JSON.parse(content))` 解析笔记列表。
+
+## 16. 舆情分析工作流重构：统一引擎 + 报告留档（2026-08-22）
+
+> 按方案落地：消除双抓取引擎/双缓存/假筛选，分析结果入档可翻查。核心文件 `server/sentiment.mjs`（全量重写）、`src/pages/SentimentPage.tsx`（全量重写）。
+
+### 16.1 架构（一个笔记库、一个抓取引擎、分析入档）
+
+```
+抓取笔记（页面搜索栏）→ POST /api/sentiment/crawl {keyword}
+  → 服务端调 Coze 搜索 workflow → 笔记 upsert 入库（待抓取）
+  → 服务端后台补抓正文（并发 2 / 批次间隔 3s / 每批落盘）
+  → 前端进度弹窗轮询 GET /api/sentiment/crawl/status
+
+开始舆情分析（弹窗真参数）→ POST /api/sentiment/analyze {keyword, dateFrom, dateTo}
+  → 从笔记库筛选：关键词精确 + 发布时间范围 + 正文抓取成功
+  → LLM 综合（DashScope 优先 / Ark 兜底，提示词含发布时间）
+  → 报告写入 local-data/sentiment/analyses/{id}.json + index.json
+
+历史笔记分析（页面按钮）→ GET /api/sentiment/analyses / analyses/{id}
+  → 弹窗列表切换任意历史报告，页面报告区/KPI 整体联动
+```
+
+### 16.2 数据与文件
+
+| 文件 | 说明 |
+|---|---|
+| `local-data/sentiment/crawled-notes.json` | 唯一笔记库（noteId+keyword 去重，上限 500，含正文/发布时间） |
+| `local-data/sentiment/analyses/index.json` | 报告索引（id/keyword/createdAt/noteCount/riskLevel/problemCount），按时间倒序 |
+| `local-data/sentiment/analyses/{id}.json` | 完整报告（summary/riskLevel/problemPoints/suggestions/noteIds/totalEngagement/period） |
+| `参考文件/麻大师床垫避雷.txt` | 保留作一次性导入源（启动时有"库中已含该关键词"守卫，不会重复导入），不参与运行时 |
+| `notes-cache.json`、`result.json` | 迁移完成后已删除，被笔记库和 analyses/ 取代 |
+
+### 16.3 API（server/index.mjs）
+
+| 端点 | 说明 |
+|---|---|
+| `POST /api/sentiment/crawl` | 服务端搜索+入库，返回 {added, pending}；进行中重复调用 409 |
+| `GET /api/sentiment/crawl/status` | 抓取进度 {running, keyword, total, ok, failed} |
+| `POST /api/sentiment/analyze` | 带参分析（keyword 必填 + 发布时间范围），无匹配笔记 409 |
+| `GET /api/sentiment/status` | 分析任务状态 {status, reportId, error} |
+| `GET /api/sentiment/analyses[/{id}]` | 历史列表 / 单份报告 |
+| `GET /api/sentiment/crawled` | 笔记库读取 |
+| 已删除 | `GET /api/sentiment/notes`（txt 运行时读取）、`POST /api/sentiment/crawled`（前端写入）、`POST /api/workflow/run` 与 `POST /api/note/detail`（页面直连工作流的过渡路由，改由 sentiment.mjs 内部调用 workflow-proxy）、`src/services/workflowApi.ts`（无消费者死代码） |
+
+权限沿用 `/api/sentiment` 前缀映射（GET → intelligence.view，POST → intelligence.manage）。
+
+### 16.4 页面变化
+
+- 「刷新笔记列表」按钮 → 「历史笔记分析（N）」：弹历史列表，点击切换报告区/KPI/摘要/问题点/建议。
+- 抓取进度弹窗改为轮询服务端状态；正文由服务端抓取并逐批落盘，关页/刷新不中断、不丢进度。
+- 分析弹窗参数真正生效：关键词单选 + 笔记发布时间范围（此前服务端忽略参数、只认 txt）。
+- 重抓同一关键词：已有正文的笔记保留，失败/待抓取的重新入队；页面不再出现重复行。
+- KPI/报告区绑定「当前选中报告」（默认最新），不再绑定最近一次运行。
+
+### 16.5 详情工作流升级 + 小红书号列（2026-08-22 晚）
+
+- 笔记详情工作流换为 `coze.noteDetailWorkflowId=7676769225382297634`（source-config.json）：返回 `author.author_info`（red_id/nick_name/fans/follows/desc/ip）+ `note.note`（note_desc 正文/note_create_time/note_tags）。
+- `fetchNoteDetail` 返回新增 `redId`、`fans`；正文模板新增「小红书号」「粉丝」行；`parseNoteDetail` 统一解析新旧嵌套层级。
+- 笔记库条目新增 `redId`/`fans` 字段（随正文抓取回填）；监控笔记明细新增「小红书号」列（列宽 110，表格 1540）。
+- 已验证：直调 fetchNoteDetail 返回 redId=5313889366/fans=121；新关键词「麻大师异味」爬 20 条，redId 20/20、publishTime 20/20；浏览器确认列显示正常。
+- 旧工作流 7631819451410907182 停用；旧笔记的 redId 为空显示「—」，重抓该关键词即可补齐。
+
+### 16.6 全局滚动条可拖动 + 白天模式可见性修复（2026-08-22 晚）
+
+- `src/styles.css` 全局滚动条：滑块 8px → 10px、圆角 5px、border 2px + background-clip: padding-box；hover 加深；白天主题（`:root[data-theme="light"]`）滑块改深色 rgba(15,42,53,0.45)、hover 0.7、轨道 0.06——修复白色 12% 滑块在浅色背景上肉眼不可见。
+- **关键坑**：`:root[data-theme="light"] ::-webkit-scrollbar-thumb`（后代选择器）匹配不到 html 自身的窗口级滚动条；舆情页等内容超长的页面滚在 window 级，深色滑块对它们不生效。已补 `:root[data-theme="light"]::-webkit-scrollbar-thumb`（无空格）双选择器。
+- Firefox：`html { scrollbar-width: thin; scrollbar-color }` + 白天 `color-scheme: light`。
+- 验证：GLM 视觉模型看图判定白天模式滑块「清晰可见、色差明显、约 6-8px 适合拖动」（窗口级 + 容器级两处）；有头 Chrome 真实鼠标拖动滑块 scrollY 0 → 3557。注意 headless 模式 CDP 鼠标事件拖不动浏览器滚动条属测试环境限制，非功能缺陷。
+
+### 16.7 相关关键词多选抓取 + 舆情词云（2026-08-22 深夜）
+
+- **相关关键词**：`POST /api/sentiment/related-keywords {keyword}` → `fetchRelatedKeywords`（workflow-proxy.mjs，Coze 工作流 `coze.keywordTopicsWorkflowId=7676780578120745010`，解析 `note.topic_list` → `[{name, viewNum}]` 去重上限 20）。页面搜索按钮改「获取相关关键词」，chips 多选（原始词默认选中，显示浏览量），「抓取所选（N）」批量抓取。
+- **多关键词抓取**：`startCrawl(keywords[])` 上限 10、自动去重；runCrawlJob 两阶段（先全部搜索入库 → 统一补抓正文）；`crawl/status` 增加 `keywords/keywordIndex/phase/errors`；单关键词搜索失败不中断任务。进度弹窗显示「第 k/N 个关键词」。
+- **舆情词云**：纯前端派生（无新接口）。`Intl.Segmenter('zh')` 分词 + 模块级停用词表 + 关键词自身词元排除 + 词频≥2 + Top40；字号对数映射 12~28px，三档色阶（Top3 绿 / Top4-10 青 / 其余蓝灰）；点击词联动明细表过滤。卡片默认跟随当前报告关键词。
+- 已验证：Playwright 端到端（20 chips、多选抓取 2 关键词 22 条 0 失败、词云 40 词最高频「黄麻」、点击词过滤 162→109、控制台零错误）；5V 视觉模型验收 chips 选中态与词云层次/配色/排除词全 PASS。
+- 词云停用词表在 `src/pages/SentimentPage.tsx` 的 `WORD_CLOUD_STOPWORDS`，按需增删。
+
+### 16.8 验收修复：redId/fans 保留 + 409 挂接加固（2026-08-22 深夜）
+
+- **bug（glm-5.3 subagent 发现）**：`upsertNotes` 的「已有正文保留」分支没回抄 `existing.redId/fans`，重抓同关键词会把小红书号清空且不会自动恢复（ok 笔记不重新进队列）。已修：合并对象补 `redId/fans`。存量数据已回填（102 条，现 9 个关键词 redId 覆盖 20/20~22/24，仅 2 条无标题笔记源数据抓不到）。
+- **409 挂接加固**：此前挂接「进行中任务」依赖错误文案 `msg.includes("正在进行中")`，响应体异常时会走错误分支显示「请求 /api/sentiment/crawl 失败：409」。现在 `fetchJson` 把 HTTP 状态码挂在 Error.status 上，抓取入口对 `status === 409` 一律挂接轮询（浏览器复现挂接正常，该加固为防御性）。
+- 代码层验收 13/13 PASS（边界/契约/死代码/旧签名残留全过）；视觉层 5V 验收 chips 与词云全 PASS（见 16.7）。
+- 回填脚本一次性执行后已删除，未入仓。
+
+### 16.9 明细表增强 + 舆论倾向 + LLM 推理拉满（2026-08-22 深夜二）
+
+- **词云关键词优先透出**：舆情词云下拉切换关键词时，监控笔记明细默认把该关键词的笔记排在最前（其余按库序）；用户点了列排序后以排序为准。
+- **明细表列排序**：关键词/作者/发布时间/赞/评论/收藏/转发/舆论倾向/抓取时间 9 列可点击表头升降序（再点切换方向，箭头指示；文本列中文 localeCompare）。
+- **舆论倾向列（固定算法，不接 LLM）**：领域情感词典打分（负面 ~74 词 + 正面 ~29 词，`SentimentPage.tsx` 的 `NEGATIVE_TERMS/POSITIVE_TERMS`，命中次数比较），负面>正面→负面(red)，反之正面(green)，相等或无正文→中性(muted)；悬停显示命中明细；可按倾向分排序（最负面在前）。选词典算法而非 LLM 的原因：204 条笔记即时计算零成本、可解释、确定性；逐条 LLM 分类成本/延迟高且整体态势已由分析报告覆盖；反讽/否定句是已知盲区，后续可升级批量 LLM 分类。实测分布：负面 108 / 正面 41 / 中性 55，降序首位为强负面笔记（合理）。
+- **分析 LLM 推理强度拉满**：`callArk` 请求加 `reasoning_effort: "max"`（已实测端点接受 max/xhigh/high；该模型默认带思维链）；配套 `max_tokens` 4096→16384、`LLM_TIMEOUT_MS` 120s→300s 防 max 推理截断/超时。实测「麻大师异味」20 条笔记分析 50s 完成、报告正常（问题点 6/建议 6）。
+- 表格列 13→14（舆论倾向），minWidth 1540→1650。
+
+### 16.11 大规模扩库 + 倾向算法优化（2026-08-22 深夜三）
+
+- **扩库战役**：笔记库上限 500→2000（`CRAWLED_MAX_NOTES`）；用相关关键词 API 从 4 个种子收集 42 个候选，剔除 6 个非品牌噪声（麻将/麻辣烫游戏等）取 36 个，4 批串行抓取约 60 分钟。最终笔记库 **992 条 / 38 个关键词 / 正文成功率 992/992**。
+- **倾向算法 v2**（三个机制 + 词典扩充）：
+  1. 最长匹配消耗式扫描（首字分桶）：修掉"骗人"同时命中"骗"、"千万别买"同时命中"别买"的双重计数；
+  2. 否定窗口：命中前 1~2 字为 不/没/无/毫无/并不/不太/没啥/从未 时不计分（"没有异味"不再算负面）；"无异味/没味道"等作为显式正面词先被消耗；
+  3. 标题命中权重 ×2（标题是最强立场信号）；
+  4. 词典扩到 负面 ~106 词 / 正面 ~48 词，含反转句式（"拯救塌陷""救了我的腰""后悔没早""相见恨晚"先于负面词被消耗，避免把好评误判成负面）。
+- **992 条实测分布**：负面 383（38.6%）/ 中性 398（40.1%）/ 正面 211（21.3%）；双向抽查明检率：负面关键词下判正面 13 条（多为 yyds/爆拆好评帖，判对）、推荐关键词下判负面 27 条（多为真踩雷帖，判对），误判率约 2~3%，集中在反讽与"过去腰疼vs现在"语境，属词典法已知边界。
+- 调参入口：`SentimentPage.tsx` 顶部 `NEGATIVE_TERMS/POSITIVE_TERMS`，改完 `npm run build` 即生效（纯前端，无需重启 Node）。
+
+### 16.12 报错笔记剔除 + 工作流失效识别（2026-08-23 凌晨）
+
+- **问题**：详情工作流 cookie 失效时返回 `{a_msg:"false…", cookie_status:false, author_info 全空}`，旧逻辑把原始 JSON 当正文入库——992 条中 345 条是报错笔记。
+- **修复**：`fetchNoteDetail` 新增 `isDetailErrorResponse`（a_msg/msg/n_msg 以 false 开头、cookie_status===false、无 desc/title/tags 任一内容 → 抛错按抓取失败处理，不再入库）；正文为空同样抛错。
+- **存量清理**：已从笔记库删除 345 条报错笔记（剩余 647 条真实笔记）；受影响关键词清单存 `local-data/tmp-affected-kws.json`（22 个）。
+- **搜索失效上报**：`runCrawlJob` 对搜索工作流返回 false/cookie_status:false 的关键词记入 `crawlJob.errors`（进度弹窗显示「部分关键词失败」），不再静默当作"没搜到笔记"。
+- **待人工处理**：搜索工作流（7675983801533644836）cookie 已失效（多次实测稳定返回 false、0 笔记；详情工作流 7676769225382297634 仍正常）。需在 Coze/服务方侧续期 cookie；恢复后重抓 22 个受影响关键词即可补回被删笔记（页面多选或用 tmp-affected-kws.json 清单）。
+
+### 16.10 重构初期验证记录（2026-08-22）
+
+- 迁移：txt 20 条 + 正文缓存 + 旧 result.json → 笔记库（当前 101 条 / 5 关键词，含验收期新增「麻大师甲醛」20 条）/ 首份历史报告（2026-08-21 那份，时间戳已修正为真实完成时间）。
+- Playwright + 系统 Chrome：历史弹窗切换新旧报告、带参分析生成新报告（麻大师床垫，20 条笔记）入档、刷新后报告保留、控制台零错误。
+- 服务端抓取引擎 API 级测试：新关键词「麻大师甲醛」入库 20 条，后台补抓 20/20 成功、发布时间 20/20，~45s 完成。
+- subagent 独立验收 18/18 PASS（功能重复消除、API 契约、前端接线、dist 一致性、tsc/build/git diff --check）；其指出的 workflowApi.ts 死代码与两条过渡路由已删除。
+- `npx tsc --noEmit`、`npm run build` 通过；5174 已部署。

@@ -20,6 +20,8 @@ import { SpuTrendCard } from "../components/product-management/SpuTrendCard";
 import { DailyTrendChart } from "../components/product-management/DailyTrendChart";
 import { SpuTrendLineChart, SPU_TREND_COLORS, type SpuTrendSeries } from "../components/product-management/SpuTrendLineChart";
 import { MatrixTable } from "../components/product-management/MatrixTable";
+import { HierarchyTable } from "../components/product-management/HierarchyTable";
+import { ProductStatusHierarchyTable } from "../components/product-management/ProductStatusHierarchyTable";
 
 interface DateRange {
   start: string;
@@ -475,18 +477,23 @@ export function ProductManagementPage({ onAction, searchTarget, onSearchConsumed
                 })()}
               </Card>
               <SpuTrendCard data={pm.spuSalesTrend} className="mt-4" selectedSpus={selectedSpus} onSelectedSpusChange={setSelectedSpus} />
-              <Card title={selectedSpus.length > 0 ? `产品名称 × 渠道销量（已联动 ${selectedSpus.length} 个 SPU）` : "产品名称 × 渠道销量（Top 30）"} className="mt-4">
+              <Card title={selectedSpus.length > 0 ? `产品名称 × 渠道销量（已联动 ${selectedSpus.length} 个 SPU）` : "产品名称 × 渠道销量（全量，按销量排序）"} className="mt-4">
                 {(() => {
                   const summaries = pm.spuSalesTrend?.summaries ?? [];
-                  const spuToProductName = new Map(summaries.map((s) => [s.spu, s.productName]));
+                  // 一个 SPU 商编可覆盖多个 pm 主表产品名称（如 M83 → 元气满满 + 元气满满2.0），
+                  // 用集合过滤矩阵，保证选中 SPU 后该 SPU 下所有产品行都显示、总量与趋势线一致。
+                  const spuToProductNames = new Map(summaries.map((s) => [
+                    s.spu,
+                    (s.productNames && s.productNames.length ? s.productNames : s.productName ? [s.productName] : []),
+                  ]));
                   const selectedNames = selectedSpus.length > 0
-                    ? new Set(selectedSpus.map((spu) => spuToProductName.get(spu)).filter(Boolean))
+                    ? new Set(selectedSpus.flatMap((spu) => spuToProductNames.get(spu) ?? []).filter(Boolean))
                     : null;
                   const matrix = pm.productChannelMatrix;
                   const filtered = selectedNames && selectedNames.size > 0
                     ? { ...matrix, rows: matrix.rows.filter((r) => selectedNames.has(r.rowKey)) }
                     : matrix;
-                  return <MatrixTable matrix={filtered} rowHeader="产品名称" minWidth={960} />;
+                  return <MatrixTable matrix={filtered} rowHeader="产品名称" minWidth={960} pageSize={15} />;
                 })()}
               </Card>
               <Card title="床垫类别 × 渠道销量" className="mt-4">
@@ -534,16 +541,17 @@ export function ProductManagementPage({ onAction, searchTarget, onSearchConsumed
             </Card>
             <Card title="仓配履约 · 产品名称维度的订单量与发货时效差异" className="mt-4">
               <div className="mb-3 text-[12px] text-[var(--muted)]">
-                时效 = 发货日期 − 订单日期
+                时效 = 发货日期 − 订单日期 · 点 ▶ 展开子名称明细
               </div>
-              <SortableTable
+              <HierarchyTable
                 minWidth={1220}
-                rowKey={(r) => r.productName}
-                rows={pm.fulfillmentByProduct}
+                rowKey={(r) => r.key}
+                nameColumnKey="productName"
+                rows={pm.fulfillmentByProductHierarchy.rows}
                 emptyHint="当前筛选条件下暂无可计算的产品订单"
                 columns={[
                   { key: "rank", label: "#", render: (_r, i) => <span className="text-[var(--muted)]">{i + 1}</span> },
-                  { key: "productName", label: "产品名称", sortValue: (r) => r.productName, render: (r) => <span className="font-semibold">{r.productName}</span> },
+                  { key: "productName", label: "产品名称", sortValue: (r) => r.name, render: (r) => <span className="font-semibold">{r.name}</span> },
                   { key: "orderCount", label: "订单量", align: "right", sortValue: (r) => r.orderCount, render: (r) => <span className="font-semibold text-[var(--green)]">{count(r.orderCount)}</span> },
                   { key: "avgShippingDays", label: "平均发货时效", align: "right", sortValue: (r) => r.avgShippingDays ?? -1, render: (r) => <span className={r.avgShippingDays === null ? "text-[var(--muted)]" : r.avgShippingDays >= 7 ? "font-semibold text-[var(--pink)]" : r.avgShippingDays >= 5 ? "font-semibold text-[var(--orange)]" : "font-semibold text-[var(--green)]"}>{shippingDays(r.avgShippingDays)}</span> },
                   { key: "day3Share", label: "第3天发货占比", align: "right", sortValue: (r) => r.day3Share, render: (r) => percent(r.day3Share, 1) },
@@ -554,8 +562,13 @@ export function ProductManagementPage({ onAction, searchTarget, onSearchConsumed
                 ]}
               />
             </Card>
-            <Card title="产品名称 × 订单状态销售数量（Top 30）" className="mt-4">
-              <MatrixTable matrix={pm.productStatusMatrix} rowHeader="产品名称" minWidth={860} />
+            <Card title="产品名称 × 订单状态销售数量（全量）" className="mt-4">
+              <ProductStatusHierarchyTable
+                hierarchy={pm.productStatusHierarchy}
+                rowHeader="产品名称"
+                minWidth={860}
+                pageSize={15}
+              />
             </Card>
             </div>
           )}

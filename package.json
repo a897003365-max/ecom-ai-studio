@@ -16,6 +16,8 @@
     "sync:dingtalk:dry": "node scripts/sync-dingtalk.mjs --dry-run",
     "schedule:dingtalk": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/register-dingtalk-schedule.ps1",
     "schedule:devserver": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/register-devserver-schedule.ps1",
+    "export:jushuitan": "node scripts/sync-jushuitan-export.mjs",
+    "schedule:jushuitan": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/register-jushuitan-export-schedule.ps1",
     "extract:power-query": "node scripts/extract-power-query.mjs",
     "test:dingtalk": "node scripts/test-dingtalk-import.mjs",
     "test:dingtalk-api": "node scripts/test-dingtalk-api.mjs",

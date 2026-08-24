@@ -96,4 +96,62 @@ assert(types.includes("powerbiPages"), "前端数据类型缺少 PowerBI 页面�
 assert(types.includes("taokeSpend"), "PowerBI 日汇总缺少淘客费用字段");
 assert(warehouse.includes("_build_powerbi_pages") && warehouse.includes("AS taokeSpend"), "数仓未生成完整 PowerBI 页面聚合数据");
 
+// ===== 竞品推广数据页（PBIX section 6 复刻） =====
+assert(replica.includes("竞品推广数据") && replica.includes("CompetitorPage"), "缺少竞品推广数据页签或 CompetitorPage 组件");
+assert(replica.includes('data-testid="competitor-brand-summary-table"') && replica.includes('data-testid="competitor-brand-channel-table"'), "竞品页缺少品牌汇总/品牌×渠道明细表格标识");
+assert(replica.includes("#12239E") && replica.includes("#E66C37") && replica.includes("#E044A7") && replica.includes("#6B007B"), "竞品柱状图缺少 PBIX 渠道配色（关键词/内容营销/全站/人群）");
+assert(replica.includes("rgba(214, 69, 80"), "竞品明细表消耗占比数据条未使用 PBIX #D64550 色系");
+assert(replica.includes("rgba(0, 235, 207"), "竞品明细表 ROI 数据条未使用 PBIX #00EBCF 色系");
+const competitorDetailStart = replica.indexOf('data-testid="competitor-brand-channel-table"');
+const competitorDetailEnd = replica.indexOf("</table>", competitorDetailStart);
+const competitorDetailMarkup = replica.slice(competitorDetailStart, competitorDetailEnd);
+const competitorDetailColumns = ["品牌", "渠道", "消耗(万)", "ROI(公式)", "消耗占比", "展现量(万)", "点击量(万)", "点击率(竞品)", "访问人群成本", "兴趣人群成本", "首购人群成本", "复购人群成本"];
+previousColumnIndex = -1;
+for (const column of competitorDetailColumns) {
+  const columnIndex = competitorDetailMarkup.indexOf(`label="${column}"`);
+  assert(columnIndex > previousColumnIndex, `竞品明细表列缺失或顺序不符合 PBIX：${column}`);
+  previousColumnIndex = columnIndex;
+}
+const competitorSummaryStart = replica.indexOf('data-testid="competitor-brand-summary-table"');
+const competitorSummaryEnd = replica.indexOf("</table>", competitorSummaryStart);
+const competitorSummaryMarkup = replica.slice(competitorSummaryStart, competitorSummaryEnd);
+const competitorSummaryColumns = ["品牌", "消耗(万)", "ROI(公式)", "展现量(万)", "点击量(万)", "点击率(竞品)", "成交金额(万)", "访问人群成本", "兴趣人群成本", "首购人群成本", "复购人群成本"];
+previousColumnIndex = -1;
+for (const column of competitorSummaryColumns) {
+  const columnIndex = competitorSummaryMarkup.indexOf(`label="${column}"`);
+  assert(columnIndex > previousColumnIndex, `竞品品牌汇总表列缺失或顺序不符合 PBIX：${column}`);
+  previousColumnIndex = columnIndex;
+}
+assert(types.includes("interface PowerBiCompetitorDaily") && types.includes("competitorDaily: PowerBiCompetitorDaily[]"), "前端类型未接入竞品推广数据集 competitorDaily");
+assert(warehouse.includes("_build_competitor_daily") && warehouse.includes('"competitorDaily"'), "数仓未生成 competitorDaily 页面数据");
+assert(warehouse.includes('_model_view(connection, "14-推广竞品数据")'), "竞品数据未引用 PBIX 14-推广竞品数据 模型视图");
+assert(
+  warehouse.includes("revenue / nullif(spend, 0) AS roi") &&
+    warehouse.includes("clicks / nullif(impressions, 0) AS ctr") &&
+    warehouse.includes("spend / nullif(sum(spend) OVER (PARTITION BY period, brand), 0) AS spendShare"),
+  "竞品派生字段公式与 TMDL 度量口径不一致（ROI/点击率/消耗占比）",
+);
+assert(replica.includes("competitorWan") && replica.includes(".toFixed(2)}万"), "竞品数值格式未使用 x.xx万 口径");
+assert(replica.includes("pages.competitorDaily ?? []"), "竞品数据未对旧快照做 ?? [] 容错");
+assert(styles.includes("pb-competitor-layout") && styles.includes("pb-competitor-brand-chip"), "竞品页缺少 pb-competitor-* 布局与切片器样式");
+
+// ===== 客服每日看板（天猫/京东）契约 =====
+assert(replica.includes("客服数据") && replica.includes("CustomerServiceWorkspace"), "缺少客服数据工作区或 CustomerServiceWorkspace");
+assert(replica.includes("天猫每日客服") && replica.includes("京东每日客服"), "客服看板缺少天猫/京东子看板切换");
+assert(replica.includes("servicePeriodRange") && replica.includes("globalPeriod"), "客服看板未接入全局日期筛选器联动");
+assert(replica.includes('data-testid="tmall-service-agent-table"') && replica.includes('data-testid="jd-service-agent-table"'), "客服明细表缺少天猫/京东测试标识");
+assert(replica.includes("usePagination(tableRows") && replica.includes(", 10)"), "客服明细表未启用每页 10 行翻页");
+assert(replica.includes("pb-chart-tooltip") && replica.includes("tooltipFormat"), "客服趋势图缺少悬停明细 tooltip");
+assert(replica.includes("servicePeriodRange") && replica.includes("没有交集"), "客服数据无交集缺少空态文案");
+assert(!replica.includes("选择客服日期"), "客服模块不应保留内置日期筛选（应全部联动全局筛选器）");
+assert(replica.includes("setSelectedAgent") && replica.includes("is-selected") && replica.includes("已筛选"), "客服明细表缺少点击行联动（选中客服/清除）能力");
+assert(replica.includes("previousRangeFor") && replica.includes("较上期环比"), "客服 KPI 缺少较上期环比口径");
+assert(replica.includes('data-testid="tmall-service-agent-table"') && replica.indexOf("onClick={() => setSelectedAgent") > -1, "客服明细行缺少点击联动回调");
+assert(replica.includes("pb-selected-agent-chip") && replica.includes("is-selected"), "客服联动缺少筛选 chip 或选中行高亮样式类");
+assert(replica.includes("unavailable") && replica.includes('value={tile.unavailable ? "—"'), "客服联动 KPI 缺少客服维度占位（unavailable 显示 —）");
+assert(replica.includes('"salesAmountWan"') && replica.includes('"inquiryConvRate"') && replica.includes('"inquiryConversionRate"'), "客服整体/客服模式趋势图字段映射缺失");
+assert(types.includes("interface PowerBiCustomerService") && types.includes("customerService: PowerBiCustomerService"), "前端类型未接入客服数据 customerService");
+assert(warehouse.includes("_build_customer_service") && warehouse.includes('"customerService"'), "数仓未生成 customerService 客服页面数据");
+assert(styles.includes("pb-chart-tooltip") && styles.includes("translateX(-50%)"), "客服趋势图 tooltip 缺少本地坐标居中样式");
+
 console.log("powerbi replica contract ok");

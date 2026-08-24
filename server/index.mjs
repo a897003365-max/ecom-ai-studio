@@ -35,6 +35,8 @@ import {
   updateTaskAction,
   upsertTask,
 } from "./storage.mjs";
+import { getAnalysis, getAnalysisStatus, getCrawlStatus, listAnalyses, listCrawledNotes, startAnalysis, startCrawl } from "./sentiment.mjs";
+import { fetchRelatedKeywords } from "./workflow-proxy.mjs";
 import { getWorkflowStatus, queueWorkflowEnvelope, workflowEnvelopePaths } from "./workflow.mjs";
 import { requiredTaskPermission } from "./task-permissions.mjs";
 
@@ -289,6 +291,7 @@ function requiredPermissionForApi(method, path) {
     ? ["tasks.view", "content.view", "images.view", "intelligence.view"]
     : null;
   if (path.startsWith("/api/intelligence")) return method === "GET" ? "intelligence.view" : "intelligence.manage";
+  if (path.startsWith("/api/sentiment")) return method === "GET" ? "intelligence.view" : "intelligence.manage";
   return "dashboard.view";
 }
 
@@ -900,6 +903,59 @@ async function handleApi(request, response, url) {
     } catch (error) {
       return sendJson(response, 400, { error: errorMessage(error) });
     }
+  }
+  // 小红书舆情分析（服务端统一引擎：抓取 / 分析 / 历史报告）
+  if (request.method === "GET" && path === "/api/sentiment/crawled") {
+    return sendJson(response, 200, { notes: listCrawledNotes() });
+  }
+  if (request.method === "POST" && path === "/api/sentiment/related-keywords") {
+    try {
+      const body = await readJson(request);
+      const keyword = typeof body?.keyword === "string" ? body.keyword.trim() : "";
+      if (!keyword) return sendJson(response, 400, { error: "关键词不能为空" });
+      const items = await fetchRelatedKeywords(keyword);
+      return sendJson(response, 200, { items });
+    } catch (error) {
+      return sendJson(response, 500, { error: errorMessage(error) });
+    }
+  }
+  if (request.method === "POST" && path === "/api/sentiment/crawl") {
+    try {
+      const body = await readJson(request);
+      const keywords = Array.isArray(body?.keywords) ? body.keywords : body?.keyword ? [body.keyword] : [];
+      const result = startCrawl(keywords);
+      return sendJson(response, 202, result);
+    } catch (error) {
+      return sendJson(response, 409, { error: errorMessage(error) });
+    }
+  }
+  if (request.method === "GET" && path === "/api/sentiment/crawl/status") {
+    return sendJson(response, 200, getCrawlStatus());
+  }
+  if (request.method === "GET" && path === "/api/sentiment/status") {
+    return sendJson(response, 200, getAnalysisStatus());
+  }
+  if (request.method === "POST" && path === "/api/sentiment/analyze") {
+    try {
+      const body = await readJson(request);
+      const started = startAnalysis({
+        keyword: typeof body?.keyword === "string" ? body.keyword : "",
+        dateFrom: typeof body?.dateFrom === "string" ? body.dateFrom : "",
+        dateTo: typeof body?.dateTo === "string" ? body.dateTo : "",
+      });
+      return sendJson(response, 202, started);
+    } catch (error) {
+      return sendJson(response, 409, { error: errorMessage(error) });
+    }
+  }
+  if (request.method === "GET" && path === "/api/sentiment/analyses") {
+    return sendJson(response, 200, { items: listAnalyses() });
+  }
+  if (request.method === "GET" && path.startsWith("/api/sentiment/analyses/")) {
+    const id = decodeURIComponent(path.slice("/api/sentiment/analyses/".length));
+    const report = getAnalysis(id);
+    if (!report) return sendJson(response, 404, { error: "分析报告不存在" });
+    return sendJson(response, 200, report);
   }
   if (request.method === "POST" && path === "/api/uploads") {
     const body = await readJson(request);

@@ -84,8 +84,9 @@ try {
     pages.productNameOverview.some((row) => typeof row.imageUrl === "string"),
     "当前产品汇总中应至少存在一张确定匹配的商品图",
   );
+  const allowedImagePrefixes = ["https://img.alicdn.com/", "https://img.pddpic.com/", "https://h2.appsimg.com/"];
   assert.ok(
-    pages.productNameOverview.every((row) => row.imageUrl === null || row.imageUrl.startsWith("https://img.alicdn.com/")),
+    pages.productNameOverview.every((row) => row.imageUrl === null || allowedImagePrefixes.some((prefix) => row.imageUrl.startsWith(prefix))),
     "商品画册图片必须全部来自允许的 CDN",
   );
   for (const row of pages.productOverview) {

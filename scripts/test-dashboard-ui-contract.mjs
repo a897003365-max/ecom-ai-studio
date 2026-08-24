@@ -98,6 +98,17 @@ assert.match(channelPerformance, /data-testid="channel-performance-charts"/, "�
 assert.match(funnel, /metric-card card-glow funnel-card/, "转化漏斗未复用全局指标卡视觉");
 assert.match(funnel, /funnel-stage/, "转化漏斗缺少逐层交互状态");
 assert.match(styles, /\.funnel-fill/, "转化漏斗缺少与全局动效一致的填充动画");
+// 靠动画显现的元素，基础样式必须保持可见终态，隐藏只允许写在 keyframes from 里；
+// 否则 prefers-reduced-motion 禁用动画后内容永久不可见（日经营趋势折线图曾因此整条消失，加粗 stroke-width 无效）
+assert.match(styles, /\.exec-line \{[^}]*stroke-dashoffset:\s*0/, ".exec-line 基础态必须可见（stroke-dashoffset: 0），隐藏只能写在 keyframes from 里");
+assert.match(styles, /@keyframes exec-line-draw \{[^}]*from \{ stroke-dashoffset:\s*1/, "exec-line-draw 的隐藏态必须只存在于 keyframes from");
+assert.doesNotMatch(styles, /\.exec-target-band \{[^}]*opacity:\s*0/, ".exec-target-band 基础态不允许 opacity: 0，隐藏只能写在 keyframes from 里");
+assert.match(styles, /@keyframes exec-band-in \{[^}]*from \{ opacity:\s*0/, "exec-band-in 的隐藏态必须只存在于 keyframes from");
+// 带 animation-delay 的入场动画必须用 both：延迟期间套用 from（隐藏），否则基础态会先闪现再重播
+assert.match(styles, /\.exec-line \{[^}]*animation:\s*exec-line-draw [^;]*\bboth\b/, ".exec-line 带延迟的描边动画必须使用 fill-mode both，避免延迟期间基础态闪现");
+assert.doesNotMatch(productGalleryStyles, /\.product-gallery-card \{[^}]*opacity:\s*0/, ".product-gallery-card 基础态不允许 opacity: 0，隐藏只能写在 product-gallery-enter 的 from 里");
+assert.match(productGalleryStyles, /@keyframes product-gallery-enter \{[^}]*from \{ opacity:\s*0/, "product-gallery-enter 的隐藏态必须只存在于 keyframes from");
+assert.match(productGalleryStyles, /\.product-gallery-card \{[^}]*animation:\s*product-gallery-enter [^;]*\bboth\b/, ".product-gallery-card 交错延迟动画必须使用 fill-mode both");
 for (const testId of ["product-gallery", "product-card", "product-detail-drawer", "product-sku-table"]) {
   assert.match(productGallery, new RegExp(`data-testid=["'{\\s]*${testId}`), `商品画册缺少 ${testId} 稳定定位`);
 }

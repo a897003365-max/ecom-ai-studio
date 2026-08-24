@@ -128,6 +128,26 @@ npm run schedule:dingtalk
 
 计划任务名为 `EcomAIStudio-DingTalk-Sync`。它只读取工作表并保存脱敏聚合，不回写钉钉；注册后使用 S4U 身份运行，不依赖用户交互登录，网络恢复后自动补跑，失败最多自动重启 3 次。每次运行的状态会写入 `local-data/runtime/dingtalk-sync-health.json`，并可从 `/api/health` 查看。
 
+### 聚水潭商品数据每日导出（9:45）
+
+`15-聚水潭商品数据` 查询每天 9:45 自动同步并导出到 `D:\麻大师\日更数据\商品管理\15-聚水潭商品数据.xlsx`，替代旧文件（每日覆盖固定名）。**输出带文档加密**（打开密码、编辑密码）。
+
+```bash
+npm run export:jushuitan    # 手动跑一次（Node 包装脚本：锁 + sync + 加密导出 + health）
+npm run schedule:jushuitan  # 注册 9:45 每日计划任务
+```
+
+- 计划任务名 `EcomAIStudio-Jushuitan-Export`：S4U 身份运行（session 0 下 Excel/WPS COM 可用，加密另存已验证）。
+- 与 `EcomAIStudio-Warehouse-Sync` 共享 `warehouse-sync.lock`，9:45 不会和 11:00 / 18:00 全量同步撞车。
+- **文档加密**：打开密码 `JUSHUITAN_OPEN_PASSWORD`、编辑密码 `JUSHUITAN_WRITE_PASSWORD`（用户级环境变量，不写代码/日志）。加密流程：明文临时 → Excel/WPS COM 加密另存 → `os.replace` 原子替换。
+- **占用冲突重试**：9:45 目标文件被 WPS/Excel 打开时（`WinError 5/32`），每 10 分钟重试到 10:30，health 标记 `waiting_file_unlock`；关掉 WPS 后自动补上。
+- 原子覆盖三层保护：锁竞争跳过 → sync 失败不写 → export 中途崩溃靠 `os.replace` 保留旧文件。
+- 输出 39 列（对齐 PBIX `15-聚水潭商品数据` 查询，含产品信息列：SPU产品商编/产品名称/床垫类别/厚度/尺寸/成本），v/w/x（付款/发货/确认收货日期）为短日期格式，单 sheet `15-聚水潭商品数据`。
+- **数据新鲜度检查**：导出后校验最新付款日期是否 ≥ 昨天；若缺失（源文件/导出滞后），自动通过飞书 webhook 通知。webhook 地址 `FEISHU_JUSHUITAN_WEBHOOK_URL`、签名密钥 `FEISHU_JUSHUITAN_WEBHOOK_SECRET`（用户级环境变量，HMAC-SHA256 加签）。
+- 运行状态写入 `local-data/runtime/jushuitan-export-health.json`（含 `max_payment_date`/`data_fresh`）；日志 `local-data/logs/jushuitan-export.log`。
+- 单独导出（不跑 sync）：`python pipeline/sync.py export-jushuitan`；带 sync：加 `--sync`；加密：加 `--open-password <pw> --write-password <pw>`（默认读环境变量）。
+- 目标路径可用环境变量 `JUSHUITAN_EXPORT_TARGET` 覆盖。
+
 ### 飞书只读聚合
 
 飞书 URL 可放入已忽略的 `local-data/source-config.json`，或使用 `FEISHU_PR_SHEET_URL`、`FEISHU_CONTENT_SHEET_URL` 环境变量。网页仅展示平台、日期、产品和效果指标的聚合结果，不展示访问令牌、手机号或原始链接。

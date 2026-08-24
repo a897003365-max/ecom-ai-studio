@@ -558,6 +558,13 @@ def build_spu_sales_trend(
     q18_spu_expr = 'trim(cast(q18."SPU产品商编" AS VARCHAR))' if has_q18 else "NULL::VARCHAR"
     q18_name_expr = 'q18."产品名称"' if (has_q18 and "产品名称" in q18_columns) else "NULL::VARCHAR"
     pm_cat_expr = 'pm."床垫类别"' if (has_pm and "床垫类别" in pm_columns) else "NULL::VARCHAR"
+    # SPU 覆盖的 pm 主表产品名称（与「产品名称 × 渠道销量」矩阵行键同源），
+    # 供前端联动时显示该 SPU 下所有产品行，避免一个 SPU 对应多个产品名称时漏行。
+    pm_name_expr = (
+        'nullif(trim(cast(pm."产品名称" AS VARCHAR)), \'\')'
+        if (has_pm and "产品名称" in pm_columns)
+        else "NULL::VARCHAR"
+    )
     joins = ""
     if has_q18:
         joins += f' LEFT JOIN {q18_view} q18 ON s."商品编码" = q18."商家规编（后台）"'
@@ -573,7 +580,8 @@ def build_spu_sales_trend(
           coalesce(nullif(trim(cast(s."渠道平台" AS VARCHAR)), ''), '(未设定)') AS channel,
           coalesce(nullif({q18_spu_expr}, ''), '未识别 SPU') AS spu,
           coalesce(nullif(trim(cast({q18_name_expr} AS VARCHAR)), ''), '') AS spu_product_name,
-          coalesce(nullif(trim(cast({pm_cat_expr} AS VARCHAR)), ''), '(未分类)') AS cat
+          coalesce(nullif(trim(cast({pm_cat_expr} AS VARCHAR)), ''), '(未分类)') AS cat,
+          {pm_name_expr} AS pm_pn
         FROM {view} s{joins}
       )
     """
@@ -591,16 +599,33 @@ def build_spu_sales_trend(
         SELECT spu, any_value(spu_product_name) AS productName, count(*) AS orderLines, sum(qty) AS salesUnits, sum(recv) AS receivedAmount
         FROM enriched GROUP BY spu ORDER BY sum(recv) DESC""",
     )
-    summaries = [
-        {
-            "spu": r["spu"],
-            "productName": r.get("productName") or "",
-            "orderLines": int(r["orderLines"]),
-            "salesUnits": float(r["salesUnits"] or 0),
-            "receivedAmount": float(r["receivedAmount"] or 0),
-        }
-        for r in spu_rows
-    ]
+    # SPU 覆盖的 pm 主表产品名称列表（按销量降序去重）。订单在 q18 有 SPU 但 pm 主表
+    # 名称缺失时回退到 q18 名称，保证前端联动过滤有兜底。
+    pn_rows = _fetch_records(
+        connection,
+        f"""{enriched}
+        SELECT spu, pm_pn, sum(qty) AS salesUnits
+        FROM enriched WHERE pm_pn IS NOT NULL
+        GROUP BY 1, 2 ORDER BY 1, 3 DESC""",
+    )
+    product_names_map: dict[str, list[str]] = {}
+    for row in pn_rows:
+        product_names_map.setdefault(row["spu"], []).append(row["pm_pn"])
+
+    summaries = []
+    for r in spu_rows:
+        names = product_names_map.get(r["spu"]) or ([r["productName"]] if r.get("productName") else [])
+        summaries.append(
+            {
+                "spu": r["spu"],
+                # 主显示名取销量最大的 pm 产品名称，避免 q18 any_value 不稳定。
+                "productName": names[0] if names else (r.get("productName") or ""),
+                "productNames": names,
+                "orderLines": int(r["orderLines"]),
+                "salesUnits": float(r["salesUnits"] or 0),
+                "receivedAmount": float(r["receivedAmount"] or 0),
+            }
+        )
     default_spus = [r["spu"] for r in spu_rows if r["spu"] != "未识别 SPU"][:15]
     available_spus = [r["spu"] for r in spu_rows]
 

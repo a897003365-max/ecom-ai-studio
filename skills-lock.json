@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "skills": {
+    "fit-ride-studio": {
+      "source": "op7418/guizang-sports-skill",
+      "sourceType": "github",
+      "skillPath": "SKILL.md",
+      "computedHash": "cf020441aa9d23acb23c146547f103e8e2c6c992c9d4709e4cf1da96039ff171"
+    },
+    "magicpath": {
+      "source": "magicpathai/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/magicpath/SKILL.md",
+      "computedHash": "9fc23598ebd385bcc5f1bb19726a78b76ce825122e55cc8fab680e82f2da7443"
+    }
+  }
+}

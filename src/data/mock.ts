@@ -28,6 +28,8 @@ export const navItems: NavItem[] = [
   { id: "tasks", label: "任务队列", icon: "✅", group: "内容生产" },
   { id: "analytics", label: "运营数据看板", icon: "📊", group: "数据与监控" },
   { id: "intelligence", label: "竞品情报 / TOP100", icon: "🕸️", group: "数据与监控" },
+  { id: "sentiment", label: "小红书舆情分析", icon: "📡", group: "数据与监控" },
+
   { id: "products", label: "商品管理", icon: "🏷️", group: "数据与监控" },
   { id: "settings", label: "系统设置", icon: "⚙️", group: "系统" },
   { id: "access", label: "用户与权限", icon: "🛡️", group: "系统" },

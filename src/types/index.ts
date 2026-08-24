@@ -7,6 +7,7 @@ export type PageId =
   | "images"
   | "analytics"
   | "intelligence"
+  | "sentiment"
   | "tasks"
   | "products"
   | "settings"

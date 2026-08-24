@@ -1,0 +1,1 @@
+示例文件 meta [IsParameterQuery=true, BinaryIdentifier=示例文件, Type="Binary", IsParameterQueryRequired=true]

@@ -208,6 +208,85 @@ export interface PowerBiPromotionDaily {
   consultations: number;
 }
 
+export interface PowerBiCompetitorDaily {
+  period: string;
+  brand: string;
+  channel: string;
+  spendWan: number;
+  impressionsWan: number;
+  clicksWan: number;
+  revenueWan: number;
+  roi: number | null;
+  ctr: number | null;
+  spendShare: number | null;
+  visitCost: number | null;
+  interestCost: number | null;
+  firstPurchaseCost: number | null;
+  repurchaseCost: number | null;
+  cartCount?: number;
+  orders?: number;
+  cartRate?: number | null;
+  convRate?: number | null;
+  cpc?: number | null;
+  cartCost?: number | null;
+}
+
+export interface PowerBiCustomerServiceDaily {
+  date: string;
+  agentCount?: number;
+  effectiveReceived?: number;
+  todayInquiry?: number;
+  salesPeople?: number;
+  netSales?: number;
+  unitPrice?: number;
+  inquiryConversionRate?: number | null;
+  firstResponse?: number;
+  avgResponse?: number;
+  answerRatio?: number | null;
+  satisfactionRate?: number | null;
+  received?: number;
+  response30s?: number | null;
+  orderAmount?: number;
+  conversionRate?: number | null;
+  goodReviews?: number;
+  badReviews?: number;
+}
+
+export interface PowerBiCustomerServiceAgent {
+  date: string;
+  agent: string;
+  groupName?: string;
+  skillGroup?: string;
+  effectiveReceived?: number;
+  salesAmountWan?: number;
+  firstResponse?: number;
+  answerRatio?: number | null;
+  avgResponse?: number;
+  unitPrice?: number;
+  inquiryConvRate?: number | null;
+  satisfactionRate?: number | null;
+  received?: number;
+  orderAmount?: number;
+  conversionRate?: number | null;
+  goodReviews?: number;
+  badReviews?: number;
+}
+
+export interface PowerBiCustomerService {
+  period: { start: string; end: string } | null;
+  tmall: {
+    daily: PowerBiCustomerServiceDaily[];
+    byAgent: PowerBiCustomerServiceAgent[];
+    groups: string[];
+  } | null;
+  jd: {
+    daily: PowerBiCustomerServiceDaily[];
+    serviceDaily: PowerBiCustomerServiceDaily[];
+    byAgent: PowerBiCustomerServiceAgent[];
+    groups: string[];
+  } | null;
+}
+
 export interface PowerBiPages {
   source: "powerbi_local_logic";
   period: { start: string; end: string } | null;
@@ -217,6 +296,8 @@ export interface PowerBiPages {
   productDailyPriorYear: Array<{ productId: string; payAmount: number; refund: number }>;
   promotionSceneDaily: PowerBiPromotionDaily[];
   promotionProductDaily: PowerBiPromotionDaily[];
+  competitorDaily: PowerBiCompetitorDaily[];
+  customerService: PowerBiCustomerService;
   products: Array<{
     productId: string;
     productName: string;
@@ -405,6 +486,26 @@ export interface ProductFulfillmentByProductItem {
   within15DayShare: number;
 }
 
+/** 仓配履约 · 产品名称维度的订单量与发货时效差异（按子名称展开）。父行 = 产品名称（指标为全量子名称汇总），子行 = 子名称明细。 */
+export interface ProductFulfillmentHierarchyRow {
+  key: string;
+  name: string;
+  orderCount: number;
+  shippedOrderCount: number;
+  avgShippingDays: number | null;
+  day3Share: number;
+  day5Share: number;
+  day7Share: number;
+  day10Share: number;
+  within15DayShare: number;
+  hasChildren: boolean;
+  children?: ProductFulfillmentHierarchyRow[];
+}
+
+export interface ProductFulfillmentHierarchy {
+  rows: ProductFulfillmentHierarchyRow[];
+}
+
 export interface ProductManagementPages {
   source: "jushuitan_local_logic";
   period: { start: string; end: string } | null;
@@ -425,6 +526,7 @@ export interface ProductManagementPages {
   returnDarenBreakdown: ProductReturnDimensionBreakdownItem[];
   returnCategoryBreakdown: ProductReturnDimensionBreakdownItem[];
   fulfillmentByProduct: ProductFulfillmentByProductItem[];
+  fulfillmentByProductHierarchy: ProductFulfillmentHierarchy;
   monthlyComparison: ProductMonthlyComparison | null;
   categoryChannelMatrix: ProductMatrix;
   warehouseStatusMatrix: ProductMatrix;
@@ -435,6 +537,7 @@ export interface ProductManagementPages {
   dailyStatusMatrix: ProductMatrix;
   productChannelMatrix: ProductMatrix;
   productStatusMatrix: ProductMatrix;
+  productStatusHierarchy: ProductStatusHierarchy;
   productChannelRevenueMatrix: ProductMatrix;
   productChannelRefundMatrix: ProductMatrix;
   channelStatusMatrix: ProductMatrix;
@@ -463,6 +566,26 @@ export interface ProductMonthlyComparison {
 export interface ProductMatrix {
   columns: string[];
   rows: Array<{ rowKey: string; values: Record<string, number | null>; total: number | null }>;
+}
+
+// 产品名称 × 子名称 × 订单状态（销售数量）层级矩阵：父=产品名称，子=子名称
+export interface ProductStatusChildRow {
+  subName: string;
+  values: Record<string, number | null>;
+  total: number | null;
+}
+
+export interface ProductStatusParentRow {
+  productName: string;
+  values: Record<string, number | null>;
+  total: number | null;
+  children: ProductStatusChildRow[];
+  hasChildren: boolean;
+}
+
+export interface ProductStatusHierarchy {
+  columns: string[];
+  rows: ProductStatusParentRow[];
 }
 
 // ---- 商品管理新增四模块：价格 / 尺寸 / SPU 销量 / 定制结构（推导）----
@@ -578,6 +701,8 @@ export interface ProductCategoryDailyPoint {
 export interface ProductSpuSummary {
   spu: string;
   productName: string;
+  /** 该 SPU 覆盖的 pm 主表产品名称列表（按销量降序），供联动矩阵/搜索显示该 SPU 下所有产品。 */
+  productNames?: string[];
   orderLines: number;
   salesUnits: number;
   receivedAmount: number;

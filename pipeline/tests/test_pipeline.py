@@ -103,16 +103,19 @@ class TransformTests(unittest.TestCase):
 
         transformed = transform_source_file(frame, spec, source)
 
-        self.assertEqual(transformed["内部订单号"].to_list(), [row[0] for row in rows[:7]])
+        # 买家实付 >= 50 硬过滤已取消（2026-08-19 业务决策），低实付行保留；
+        # 其余剔除规则不变（非普通订单、0.01链接、排除店铺、返修单）。
+        retained = rows[:7] + [rows[9]]
+        self.assertEqual(transformed["内部订单号"].to_list(), [row[0] for row in retained])
         self.assertEqual(
             transformed["订单状态明细"].to_list(),
-            ["已发货", "交易关闭（仅退款）", "交易关闭（退货退款）", "等通知", "指定日", "待发货", "未付款"],
+            ["已发货", "交易关闭（仅退款）", "交易关闭（退货退款）", "等通知", "指定日", "待发货", "未付款", "已发货"],
         )
         self.assertEqual(
             transformed["订单状态汇总"].to_list(),
-            ["已发", "未付款或交易关闭", "未付款或交易关闭", "待发", "待发", "待发", "未付款或交易关闭"],
+            ["已发", "未付款或交易关闭", "未付款或交易关闭", "待发", "待发", "待发", "未付款或交易关闭", "已发"],
         )
-        self.assertEqual(transformed["销售数量"].to_list(), [2.0] * 7)
+        self.assertEqual(transformed["销售数量"].to_list(), [2.0] * 8)
         self.assertTrue({"买家留言", "售后分类", "小旗"}.isdisjoint(transformed.columns))
 
 

@@ -22,6 +22,7 @@ const IntelligencePage = lazy(() => import("./pages/IntelligencePage").then((m) 
 const LoginPage = lazy(() => import("./pages/LoginPage").then((m) => ({ default: m.LoginPage })));
 const ProductAssetsPage = lazy(() => import("./pages/ProductAssetsPage").then((m) => ({ default: m.ProductAssetsPage })));
 const ProductManagementPage = lazy(() => import("./pages/ProductManagementPage").then((m) => ({ default: m.ProductManagementPage })));
+const SentimentPage = lazy(() => import("./pages/SentimentPage").then((m) => ({ default: m.SentimentPage })));
 const SettingsPage = lazy(() => import("./pages/SettingsPage").then((m) => ({ default: m.SettingsPage })));
 const TaskQueuePage = lazy(() => import("./pages/TaskQueuePage").then((m) => ({ default: m.TaskQueuePage })));
 
@@ -69,6 +70,7 @@ const pagePermissions: Record<PageId, string> = {
   images: "images.view",
   analytics: "analytics.view",
   intelligence: "intelligence.view",
+  sentiment: "intelligence.view",
   tasks: "tasks.view",
   products: "products.view",
   settings: "settings.view",
@@ -332,6 +334,9 @@ export default function App() {
     }
     if (activePage === "intelligence") {
       return <IntelligencePage canManage={hasPermission("intelligence.manage")} onAction={showToast} onCreateTask={createTask} />;
+    }
+    if (activePage === "sentiment") {
+      return <SentimentPage canManage={hasPermission("intelligence.manage")} onAction={showToast} />;
     }
     if (activePage === "products") {
       return <ProductManagementPage onAction={showToast} searchTarget={searchTarget?.page === "products" ? searchTarget : null} onSearchConsumed={consumeSearchTarget} />;

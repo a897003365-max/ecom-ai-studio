@@ -37,6 +37,7 @@ MANUAL_RENAMES: dict[str, dict[str, str]] = {
         "花费": "花费（未含达人）",
         "加购率": "加购率（固数）",
     },
+    "05-旗舰店ID对照表": {"商品编码": "商家编码", "图片链接": "商品图片"},
     "10-1淘宝客服绩效明细": {"答问比": "淘宝答问比"},
     "接待数据": {
         "平均响应时长(新标)": "新平均响应时间",
@@ -512,12 +513,11 @@ def _transform_jushuitan(frame: pl.DataFrame, path: Path) -> pl.DataFrame:
     product_name = pl.col("线上商品名").cast(pl.String, strict=False)
     store = pl.col("店铺").cast(pl.String, strict=False)
     buyer_memo = pl.col("买家留言").cast(pl.String, strict=False)
-    payment = pl.col("买家实付").cast(pl.Float64, strict=False)
 
-    # 聚水潭商品数据_全量处理: 普通订单、有效实付、排除三家店铺与返修单。
+    # 聚水潭商品数据_全量处理: 普通订单、排除三家店铺与返修单。
+    # （买家实付 >= 50 的硬过滤已取消，低金额订单也计入；垃圾单仍由下方标题规则剔除）
     valid_business_row = (
         (pl.col("订单类型").cast(pl.String, strict=False) == "普通订单")
-        & ((payment >= 50).fill_null(False) | product_name.str.contains("0.01", literal=True).fill_null(False))
         & (~store.is_in(JUSHUITAN_EXCLUDED_STORES)).fill_null(True)
         & (~buyer_memo.str.contains("返修", literal=True)).fill_null(True)
     )

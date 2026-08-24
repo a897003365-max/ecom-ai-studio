@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import time
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
@@ -410,11 +411,190 @@ def _matrix(
     return {"columns": col_keys_sorted, "rows": result_rows}
 
 
+def _product_status_hierarchy(
+    connection: duckdb.DuckDBPyConnection,
+    view: str,
+    pm_join: str,
+    product_name_expr: str,
+    has_master: bool,
+    master_columns: set[str],
+) -> dict[str, Any]:
+    """产品名称 × 子名称 × 订单状态（销售数量）的层级矩阵。
+
+    父节点 = 产品名称（合计 = 子名称之和，与 productStatusMatrix 对齐），
+    子节点 = 子名称（来自商品主数据 pm.子名称）。无子名称的产品作为单行叶子。
+    列按全表总计降序排列。
+    """
+    sub_name_expr = (
+        'coalesce(nullif(trim(cast(pm."子名称" AS VARCHAR)), \'\'), \'\')'
+        if has_master and "子名称" in master_columns
+        else "\'\'"
+    )
+    top_products_sql = (
+        f"SELECT {product_name_expr} AS pname FROM {view} s {pm_join} "
+        f"WHERE {product_name_expr} <> '(未命名)' "
+        f"GROUP BY 1 ORDER BY sum(coalesce(try_cast(s.\"销售数量\" AS DOUBLE),0)) DESC"
+    )
+    sql = f"""
+        PIVOT (
+          SELECT {product_name_expr} AS pname,
+                 {sub_name_expr} AS subName,
+                 coalesce(cast(s."订单状态明细" AS VARCHAR), '(未知)') AS status,
+                 coalesce(try_cast(s."销售数量" AS DOUBLE),0) AS units
+          FROM {view} s {pm_join}
+          WHERE {product_name_expr} IN ({top_products_sql})
+            AND {product_name_expr} <> '(未命名)'
+        ) ON status USING sum(units)
+    """
+    rows = _records(connection, sql)
+    if not rows:
+        return {"columns": [], "rows": []}
+    col_keys = [k for k in rows[0].keys() if k not in ("pname", "subName")]
+    col_totals: dict[str, float] = {k: 0.0 for k in col_keys}
+    tree: dict[str, dict[str, dict[str, float]]] = {}
+    for record in rows:
+        pname = str(record["pname"]) if record["pname"] is not None else "(未命名)"
+        sub = str(record["subName"]) if record["subName"] else ""
+        values = {k: float(record.get(k) or 0) for k in col_keys}
+        for k in col_keys:
+            col_totals[k] += values[k]
+        tree.setdefault(pname, {})[sub] = values
+    columns = sorted(col_keys, key=lambda k: col_totals[k], reverse=True)
+    hierarchy_rows: list[dict[str, Any]] = []
+    for pname, subs in tree.items():
+        children = []
+        parent_values = {k: 0.0 for k in col_keys}
+        for sub, values in subs.items():
+            for k in col_keys:
+                parent_values[k] += values.get(k, 0.0) or 0.0
+            children.append({
+                "subName": sub,
+                "values": values,
+                "total": sum(values.values()),
+            })
+        children.sort(key=lambda c: (c["total"] or 0), reverse=True)
+        hierarchy_rows.append({
+            "productName": pname,
+            "values": parent_values,
+            "total": sum(parent_values.values()),
+            "children": children,
+            # 多子名称、或唯一子名称非空 → 可展开；仅一个空子名称 → 单行叶子
+            "hasChildren": len(children) > 1 or any(c["subName"] for c in children),
+        })
+    hierarchy_rows.sort(key=lambda r: (r["total"] or 0), reverse=True)
+    return {"columns": columns, "rows": hierarchy_rows}
+
+
+def _fulfillment_hierarchy(
+    connection: duckdb.DuckDBPyConnection,
+    view: str,
+    pm_join: str,
+    product_name_expr: str,
+    order_id_expr: str,
+    order_date_expr: str,
+    ship_date_expr: str,
+    has_master: bool,
+    master_columns: set[str],
+    fulfillment_by_product: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """产品名称 × 子名称 × 发货时效指标的层级矩阵。
+
+    父节点 = 产品名称（指标沿用现有 fulfillmentByProduct 的合计，保证与卡面原值一致），
+    子节点 = 子名称（来自商品主数据 pm.子名称），在 (产品名称, 子名称) 粒度重算订单量、
+    平均发货时效与各天发货占比。无子名称的产品作为单行叶子。
+    """
+    sub_name_expr = (
+        'coalesce(nullif(trim(cast(pm."子名称" AS VARCHAR)), \'\'), \'\')'
+        if has_master and "子名称" in master_columns
+        else "\'\'"
+    )
+    sql = f"""
+        WITH order_sub AS (
+          SELECT
+            {product_name_expr} AS productName,
+            {order_id_expr} AS orderId,
+            max({sub_name_expr}) AS subName,
+            min({order_date_expr}) AS orderDate,
+            min({ship_date_expr}) AS shipDate
+          FROM {view} s {pm_join}
+          WHERE {product_name_expr} <> '(未命名)'
+            AND {order_id_expr} IS NOT NULL
+          GROUP BY 1, 2
+        ), shipping_durations AS (
+          SELECT
+            productName,
+            subName,
+            CASE WHEN shipDate >= orderDate THEN datediff('day', orderDate, shipDate) END AS shippingDays
+          FROM order_sub
+        )
+        SELECT
+          productName,
+          subName,
+          count(*) AS orderCount,
+          count(shippingDays) AS shippedOrderCount,
+          round(avg(shippingDays), 2) AS avgShippingDays,
+          cast(sum(CASE WHEN shippingDays = 3 THEN 1 ELSE 0 END) AS DOUBLE) / count(*) AS day3Share,
+          cast(sum(CASE WHEN shippingDays = 5 THEN 1 ELSE 0 END) AS DOUBLE) / count(*) AS day5Share,
+          cast(sum(CASE WHEN shippingDays = 7 THEN 1 ELSE 0 END) AS DOUBLE) / count(*) AS day7Share,
+          cast(sum(CASE WHEN shippingDays = 10 THEN 1 ELSE 0 END) AS DOUBLE) / count(*) AS day10Share,
+          cast(sum(CASE WHEN shippingDays BETWEEN 0 AND 15 THEN 1 ELSE 0 END) AS DOUBLE) / count(*) AS within15DayShare
+        FROM shipping_durations
+        GROUP BY 1, 2
+    """
+    rows = _records(connection, sql)
+    children_by_product: dict[str, list[dict[str, Any]]] = {}
+    sub_nonempty_by_product: dict[str, bool] = {}
+    for rec in rows:
+        pname = str(rec["productName"])
+        sub = str(rec["subName"]) if rec["subName"] else ""
+        if sub:
+            sub_nonempty_by_product[pname] = True
+        child = {
+            "key": f"{pname}|{sub}" if sub else pname,
+            "name": sub if sub else pname,
+            "orderCount": rec["orderCount"],
+            "shippedOrderCount": rec["shippedOrderCount"],
+            "avgShippingDays": rec["avgShippingDays"],
+            "day3Share": rec["day3Share"],
+            "day5Share": rec["day5Share"],
+            "day7Share": rec["day7Share"],
+            "day10Share": rec["day10Share"],
+            "within15DayShare": rec["within15DayShare"],
+        }
+        children_by_product.setdefault(pname, []).append(child)
+    hierarchy_rows: list[dict[str, Any]] = []
+    for parent in fulfillment_by_product:
+        pname = parent["productName"]
+        children = children_by_product.get(pname, [])
+        children.sort(key=lambda c: c["orderCount"], reverse=True)
+        has_children = len(children) > 1 or bool(sub_nonempty_by_product.get(pname, False))
+        hierarchy_rows.append({
+            "key": pname,
+            "name": pname,
+            "orderCount": parent["orderCount"],
+            "shippedOrderCount": parent["shippedOrderCount"],
+            "avgShippingDays": parent["avgShippingDays"],
+            "day3Share": parent["day3Share"],
+            "day5Share": parent["day5Share"],
+            "day7Share": parent["day7Share"],
+            "day10Share": parent["day10Share"],
+            "within15DayShare": parent["within15DayShare"],
+            "hasChildren": has_children,
+            "children": children,
+        })
+    return {"rows": hierarchy_rows}
+
+
 def _safe_product_image(value: Any) -> str | None:
     """Allow only the catalog image CDN in the public PowerBI snapshot."""
 
     text = str(value or "").strip()
-    return text if text.lower().startswith("https://img.alicdn.com/") else None
+    allowed_prefixes = (
+        "https://img.alicdn.com/",
+        "https://img.pddpic.com/",
+        "https://h2.appsimg.com/",
+    )
+    return text if text.lower().startswith(allowed_prefixes) else None
 
 
 def _has_cjk(text: str) -> bool:
@@ -498,6 +678,120 @@ def _load_pbix_store_rank_daily(paths: WarehousePaths) -> dict[str, str]:
     return ranks
 
 
+_COMPETITOR_PERIOD_DATE_PATTERN = re.compile(r"(?:(\d{4})年)?(\d{1,2})月(\d{1,2})日")
+
+
+def _competitor_period_sort_key(label: str) -> tuple[date, str]:
+    """时间段标签按起始日期排序。
+
+    数据区间为 2025-12 至 2026-08：仅 '2025年12月29日-2026年01月01日' 带显式年份，
+    其余 'MM月DD日-MM月DD日' 默认落在 2026 年。无日期的标签排在最后。
+    """
+
+    match = _COMPETITOR_PERIOD_DATE_PATTERN.search(label)
+    if match:
+        year = int(match.group(1)) if match.group(1) else 2026
+        try:
+            return (date(year, int(match.group(2)), int(match.group(3))), label)
+        except ValueError:
+            pass
+    return (date(9999, 12, 31), label)
+
+
+def _build_competitor_daily(connection: duckdb.DuckDBPyConnection) -> list[dict[str, Any]]:
+    """PBIX「竞品推广数据」页行级数据：品牌×渠道×时间段 + 派生指标。
+
+    度量口径对齐 migration/powerbi-tmdl/tables/14-推广竞品数据.tmdl：
+    - 消耗/展现量/点击量/成交金额（万）= SUM(列) / 10000；
+    - ROI（公式）= 成交金额 / 消耗；点击率（竞品）= 点击量 / 展现量；
+    - 消耗占比 = SUM(消耗) / CALCULATE(SUM(消耗), ALL(渠道))，即同时间段同品牌各渠道合计。
+    四个人群成本列在 PBIX 视觉中按 Sum 聚合，这里保留行级原值供前端按相同口径求和。
+    时间段为空的 4 个单日快照文件用 Source.Name（去 .xlsx）作为时间段标签。
+    """
+
+    try:
+        view = _model_view(connection, "14-推广竞品数据")
+    except ValueError:
+        return []
+    rows = _records(
+        connection,
+        f"""
+        WITH base AS (
+          SELECT * EXCLUDE (_snapshot_rank) FROM (
+            SELECT
+              coalesce(
+                nullif(trim(cast("时间段" AS VARCHAR)), ''),
+                regexp_replace(coalesce(cast("Source.Name" AS VARCHAR), ''), '\\.xlsx$', '')
+              ) AS period,
+              trim(cast("品牌" AS VARCHAR)) AS brand,
+              trim(cast("渠道" AS VARCHAR)) AS channel,
+              coalesce(try_cast("消耗" AS DOUBLE), 0) AS spend,
+              coalesce(try_cast("展现量" AS DOUBLE), 0) AS impressions,
+              coalesce(try_cast("点击量" AS DOUBLE), 0) AS clicks,
+              coalesce(try_cast("收藏加购量" AS DOUBLE), 0) AS cartCount,
+              coalesce(try_cast("成交量" AS DOUBLE), 0) AS orders,
+              coalesce(try_cast("成交金额" AS DOUBLE), 0) AS revenue,
+              try_cast("新增单个访问人群成本" AS DOUBLE) AS visitCost,
+              try_cast("新增单个兴趣人群成本" AS DOUBLE) AS interestCost,
+              try_cast("新增单个首购人群成本" AS DOUBLE) AS firstPurchaseCost,
+              try_cast("新增单个复购人群成本" AS DOUBLE) AS repurchaseCost,
+              try_cast("收藏加购率" AS DOUBLE) AS cartRate,
+              try_cast("成交转化率" AS DOUBLE) AS convRate,
+              try_cast("单次点击成本" AS DOUBLE) AS cpc,
+              try_cast("单次收加成本" AS DOUBLE) AS cartCost,
+              -- 对齐 PBIX M 层 Table.Distinct(时间,品牌,渠道,时间段) 的去重语义：
+              -- 同 (period,brand,channel) 重复源行保留最新一份（mtime 优先），再聚合。
+              row_number() OVER (
+                PARTITION BY
+                  coalesce(
+                    nullif(trim(cast("时间段" AS VARCHAR)), ''),
+                    regexp_replace(coalesce(cast("Source.Name" AS VARCHAR), ''), '\\.xlsx$', '')
+                  ),
+                  trim(cast("品牌" AS VARCHAR)),
+                  trim(cast("渠道" AS VARCHAR))
+                ORDER BY "_source_mtime_ns" DESC, "_source_path" DESC
+              ) AS _snapshot_rank
+            FROM {view}
+            WHERE coalesce(trim(cast("品牌" AS VARCHAR)), '') <> ''
+              AND coalesce(trim(cast("渠道" AS VARCHAR)), '') <> ''
+          ) WHERE _snapshot_rank = 1
+        ), grouped AS (
+          SELECT period, brand, channel,
+                 sum(spend) AS spend,
+                 sum(impressions) AS impressions,
+                 sum(clicks) AS clicks,
+                 sum(cartCount) AS cartCount,
+                 sum(orders) AS orders,
+                 sum(revenue) AS revenue,
+                 any_value(visitCost) AS visitCost,
+                 any_value(interestCost) AS interestCost,
+                 any_value(firstPurchaseCost) AS firstPurchaseCost,
+                 any_value(repurchaseCost) AS repurchaseCost,
+                 any_value(cartRate) AS cartRate,
+                 any_value(convRate) AS convRate,
+                 any_value(cpc) AS cpc,
+                 any_value(cartCost) AS cartCost
+          FROM base
+          GROUP BY 1, 2, 3
+        )
+        SELECT
+          period, brand, channel,
+          spend / 10000.0 AS spendWan,
+          impressions / 10000.0 AS impressionsWan,
+          clicks / 10000.0 AS clicksWan,
+          revenue / 10000.0 AS revenueWan,
+          revenue / nullif(spend, 0) AS roi,
+          clicks / nullif(impressions, 0) AS ctr,
+          spend / nullif(sum(spend) OVER (PARTITION BY period, brand), 0) AS spendShare,
+          visitCost, interestCost, firstPurchaseCost, repurchaseCost,
+          cartCount, orders, cartRate, convRate, cpc, cartCost
+        FROM grouped
+        """,
+    )
+    rows.sort(key=lambda row: (_competitor_period_sort_key(str(row["period"])), str(row["brand"]), str(row["channel"])))
+    return rows
+
+
 def _build_powerbi_pages(
     connection: duckdb.DuckDBPyConnection,
     store_rank_daily: dict[str, str] | None = None,
@@ -534,7 +828,9 @@ def _build_powerbi_pages(
             "productDailyPriorYear": [],
             "promotionSceneDaily": [],
             "promotionProductDaily": [],
+            "competitorDaily": [],
             "products": [],
+            "customerService": {"period": None, "tmall": None, "jd": None},
         }
     period_end = max(latest_dates)
     period_start = period_end - timedelta(days=POWERBI_PAGE_WINDOW_DAYS - 1)
@@ -842,8 +1138,303 @@ def _build_powerbi_pages(
         "productDailyPriorYear": product_daily_prior_year,
         "promotionSceneDaily": promotion_scene_daily,
         "promotionProductDaily": promotion_product_daily,
+        "competitorDaily": _build_competitor_daily(connection),
         "products": products,
-        "privacy": {"rawRowsExposed": False, "sourcePathsExposed": False, "remoteImagesExposed": True},
+        "customerService": _build_customer_service(connection, period_start, period_end),
+        "privacy": {
+            "rawRowsExposed": False,
+            "sourcePathsExposed": False,
+            "remoteImagesExposed": True,
+            # 客服每日看板按用户要求复刻：customerService 暴露按 (日期, 客服) 聚合的效能指标
+            # （客服昵称/销售额/响应时长/评价），不含买家 ID/手机号/订单明细等买家隐私。
+            # 满意率口径：天梯按"有效接待人数"加权（率 × 接待 / 接待），京东按"好评量 / 评价量"计算。
+            "customerServiceRowsExposed": True,
+        },
+    }
+
+
+def _build_customer_service(
+    connection: duckdb.DuckDBPyConnection,
+    period_start: date,
+    period_end: date,
+) -> dict[str, Any]:
+    """PBIX「天猫每日客服数据」「京东每日客服数据」两页聚合数据。
+
+    口径对齐 migration/powerbi-tmdl/tables/10-*.tmdl 的 DAX 度量与报表投影：
+    - 数值卡 = SUM；响应时长/答问比卡 = AVERAGE；净销售额（万）= SUM / 10000；
+    - 询单转化率 = 1 - SUM(询单流失人数) / SUM(当日询单人数)；
+    - 客单价（客服）= SUM(促成下单商品金额) / SUM(促成下单人数)；
+    - 转化率京东客服 = SUM(促成下单人数) / SUM(售前接待人数)；
+    - 京东答问比 = SUM(客服总消息数) / SUM(客户总消息数)。
+    环比由前端对排序后的 daily 数组相邻天相减得到：PBIX 用 DATEADD(-1 day)
+    （前一天无数据时返回 0），这里取「上一个有数据的日期」——日期缺口时两者
+    口径不同，属于有意取舍，前端以此为准。
+    """
+    start_iso, end_iso = period_start.isoformat(), period_end.isoformat()
+    tmall = _build_tmall_customer_service(connection, start_iso, end_iso)
+    jd = _build_jd_customer_service(connection, start_iso, end_iso)
+    return {"period": {"start": start_iso, "end": end_iso}, "tmall": tmall, "jd": jd}
+
+
+def _customer_dedup_sql(view: str, start: str, end: str, keys: tuple[str, ...]) -> str:
+    """客服表去重公共子查询：按 (日期, 客服键) 取最新快照行，可作 FROM 别名 dedup。"""
+    partition = ", ".join(
+        f'try_cast("日期" AS DATE), cast({key} AS VARCHAR)' for key in keys
+    )
+    return f"""
+    (SELECT * EXCLUDE (_snapshot_rank) FROM (
+      SELECT *, row_number() OVER (
+        PARTITION BY {partition}
+        ORDER BY "_source_mtime_ns" DESC, "_source_path" DESC
+      ) AS _snapshot_rank
+      FROM {view}
+      WHERE try_cast("日期" AS DATE) BETWEEN '{start}' AND '{end}'
+    ) WHERE _snapshot_rank = 1) AS dedup"""
+
+
+def _build_tmall_customer_service(
+    connection: duckdb.DuckDBPyConnection,
+    start: str,
+    end: str,
+) -> dict[str, Any]:
+    try:
+        view = _model_view(connection, "10-1淘宝客服绩效明细")
+    except ValueError:
+        return {"daily": [], "byAgent": [], "groups": []}
+    dedup = _customer_dedup_sql(view, start, end, ("旺旺昵称",))
+    daily = _records(
+        connection,
+        f"""
+        SELECT
+          try_cast("日期" AS DATE) AS date,
+          count(DISTINCT cast("旺旺昵称" AS VARCHAR)) AS agentCount,
+          sum(coalesce(try_cast("有效接待人数" AS DOUBLE), 0)) AS effectiveReceived,
+          sum(coalesce(try_cast("当日询单人数" AS DOUBLE), 0)) AS todayInquiry,
+          sum(coalesce(try_cast("销售人数" AS DOUBLE), 0)) AS salesPeople,
+          sum(coalesce(try_cast("净销售额" AS DOUBLE), 0)) AS netSales,
+          avg(try_cast("客单价" AS DOUBLE)) AS unitPrice,
+          1 - sum(coalesce(try_cast("询单流失人数" AS DOUBLE), 0))
+              / nullif(sum(coalesce(try_cast("当日询单人数" AS DOUBLE), 0)), 0)
+            AS inquiryConversionRate,
+          avg(try_cast("首次响应时长（秒)" AS DOUBLE)) AS firstResponse,
+          avg(try_cast("平均响应时长（秒)" AS DOUBLE)) AS avgResponse,
+          avg(try_cast("淘宝答问比" AS DOUBLE)) AS answerRatio,
+          sum(coalesce(try_cast("客户满意率" AS DOUBLE), 0)
+              * coalesce(try_cast("有效接待人数" AS DOUBLE), 0))
+            / nullif(sum(coalesce(try_cast("有效接待人数" AS DOUBLE), 0)), 0)
+            AS satisfactionRate
+        FROM {dedup}
+        GROUP BY 1 ORDER BY 1
+        """,
+    )
+    by_agent = _records(
+        connection,
+        f"""
+        SELECT
+          try_cast("日期" AS DATE) AS date,
+          cast("旺旺昵称" AS VARCHAR) AS agent,
+          max(cast("旺旺分组" AS VARCHAR)) AS groupName,
+          sum(coalesce(try_cast("有效接待人数" AS DOUBLE), 0)) AS effectiveReceived,
+          sum(coalesce(try_cast("销售额" AS DOUBLE), 0)) / 10000 AS salesAmountWan,
+          sum(coalesce(try_cast("首次响应时长（秒)" AS DOUBLE), 0)) AS firstResponse,
+          sum(coalesce(try_cast("淘宝答问比" AS DOUBLE), 0)) AS answerRatio,
+          sum(coalesce(try_cast("平均响应时长（秒)" AS DOUBLE), 0)) AS avgResponse,
+          sum(coalesce(try_cast("客单价" AS DOUBLE), 0)) AS unitPrice,
+          sum(coalesce(try_cast("询单最终付款转化率" AS DOUBLE), 0)) AS inquiryConvRate,
+          sum(coalesce(try_cast("客户满意率" AS DOUBLE), 0)) AS satisfactionRate
+        FROM {dedup}
+        GROUP BY 1, 2 ORDER BY 1, 2
+        """,
+    )
+    groups = _records(
+        connection,
+        f"""
+        SELECT DISTINCT cast("旺旺分组" AS VARCHAR) AS value
+        FROM {view}
+        WHERE try_cast("日期" AS DATE) BETWEEN '{start}' AND '{end}'
+          AND trim(coalesce(cast("旺旺分组" AS VARCHAR), '')) <> ''
+        ORDER BY 1
+        """,
+    )
+    return {
+        "daily": daily,
+        "byAgent": by_agent,
+        "groups": [row["value"] for row in groups],
+    }
+
+
+def _build_jd_customer_service(
+    connection: duckdb.DuckDBPyConnection,
+    start: str,
+    end: str,
+) -> dict[str, Any]:
+    try:
+        workload_view = _model_view(connection, "10-2京东客服营销明细")
+        sales_view = _model_view(connection, "10-3京东客服绩效数据")
+        staff_view = _model_view(connection, "10-4客服员工日报统计")
+    except ValueError:
+        return {"daily": [], "serviceDaily": [], "byAgent": [], "groups": []}
+    workload_dedup = _customer_dedup_sql(workload_view, start, end, ("客服",))
+    sales_dedup = _customer_dedup_sql(sales_view, start, end, ("客服",))
+    # 10-4 真实粒度是 (日期, UID, 技能组)：同一 UID 同日有售前/售后多行，各带独立消息与评价。
+    # 去重键必须包含技能组，否则丢约一半消息/评价数据（transforms DEDUPE_KEYS 同口径）。
+    staff_dedup = _customer_dedup_sql(staff_view, start, end, ("UID", "技能组"))
+    daily = _records(
+        connection,
+        f"""
+        WITH workload AS (
+          SELECT
+            try_cast("日期" AS DATE) AS date,
+            count(DISTINCT cast("客服" AS VARCHAR)) AS agentCount,
+            sum(coalesce(try_cast("接待量" AS DOUBLE), 0)) AS received,
+            avg(try_cast("首次平均响应时间" AS DOUBLE)) AS firstResponse,
+            avg(try_cast("30s应答率" AS DOUBLE)) AS response30s
+          FROM {workload_dedup}
+          GROUP BY 1
+        ), sales AS (
+          SELECT
+            try_cast("日期" AS DATE) AS date,
+            sum(coalesce(try_cast("促成下单商品金额" AS DOUBLE), 0)) AS orderAmount,
+            sum(coalesce(try_cast("促成下单人数" AS DOUBLE), 0))
+              / nullif(sum(coalesce(try_cast("售前接待人数" AS DOUBLE), 0)), 0)
+            AS conversionRate,
+            sum(coalesce(try_cast("促成下单商品金额" AS DOUBLE), 0))
+              / nullif(sum(coalesce(try_cast("促成下单人数" AS DOUBLE), 0)), 0)
+            AS unitPrice
+          FROM {sales_dedup}
+          GROUP BY 1
+        ), staff AS (
+          SELECT
+            try_cast("日期" AS DATE) AS date,
+            sum(coalesce(try_cast("好评量" AS DOUBLE), 0)) AS goodReviews,
+            sum(coalesce(try_cast("差评量" AS DOUBLE), 0)) AS badReviews,
+            sum(coalesce(try_cast("客服总消息数" AS DOUBLE), 0))
+              / nullif(sum(coalesce(try_cast("客户总消息数" AS DOUBLE), 0)), 0)
+            AS answerRatio,
+            sum(coalesce(try_cast("好评量" AS DOUBLE), 0))
+              / nullif(
+                  sum(coalesce(try_cast("好评量" AS DOUBLE), 0))
+                  + sum(coalesce(try_cast("差评量" AS DOUBLE), 0)),
+                  0
+                )
+            AS satisfactionRate
+          FROM {staff_dedup}
+          GROUP BY 1
+        )
+        SELECT
+          coalesce(w.date, s.date, st.date) AS date,
+          coalesce(w.agentCount, 0) AS agentCount,
+          coalesce(w.received, 0) AS received,
+          coalesce(w.firstResponse, 0) AS firstResponse,
+          coalesce(w.response30s, 0) AS response30s,
+          coalesce(s.orderAmount, 0) AS orderAmount,
+          s.conversionRate, s.unitPrice,
+          coalesce(st.goodReviews, 0) AS goodReviews,
+          coalesce(st.badReviews, 0) AS badReviews,
+          st.answerRatio,
+          st.satisfactionRate
+        FROM workload w
+        FULL OUTER JOIN sales s ON w.date = s.date
+        FULL OUTER JOIN staff st ON coalesce(w.date, s.date) = st.date
+        ORDER BY 1
+        """,
+    )
+    service_daily = _records(
+        connection,
+        f"""
+        SELECT
+          try_cast("日期" AS DATE) AS date,
+          sum(coalesce(try_cast("好评量" AS DOUBLE), 0)) AS goodReviews,
+          sum(coalesce(try_cast("差评量" AS DOUBLE), 0)) AS badReviews,
+          sum(coalesce(try_cast("客服总消息数" AS DOUBLE), 0))
+            / nullif(sum(coalesce(try_cast("客户总消息数" AS DOUBLE), 0)), 0)
+          AS answerRatio,
+          sum(coalesce(try_cast("好评量" AS DOUBLE), 0))
+            / nullif(
+                sum(coalesce(try_cast("好评量" AS DOUBLE), 0))
+                + sum(coalesce(try_cast("差评量" AS DOUBLE), 0)),
+                0
+              )
+          AS satisfactionRate
+        FROM {staff_dedup}
+        GROUP BY 1 ORDER BY 1
+        """,
+    )
+    by_agent = _records(
+        connection,
+        f"""
+        WITH workload AS (
+          SELECT
+            try_cast("日期" AS DATE) AS date,
+            replace(cast("客服" AS VARCHAR), '-', '') AS agent,
+            sum(coalesce(try_cast("接待量" AS DOUBLE), 0)) AS received,
+            sum(coalesce(try_cast("首次平均响应时间" AS DOUBLE), 0)) AS firstResponse,
+            sum(coalesce(try_cast("平均响应时间" AS DOUBLE), 0)) AS avgResponse
+          FROM {workload_dedup}
+          GROUP BY 1, 2
+        ), sales AS (
+          SELECT
+            try_cast("日期" AS DATE) AS date,
+            replace(cast("客服" AS VARCHAR), '-', '') AS agent,
+            sum(coalesce(try_cast("促成下单商品金额" AS DOUBLE), 0)) AS orderAmount,
+            sum(coalesce(try_cast("促成下单人数" AS DOUBLE), 0))
+              / nullif(sum(coalesce(try_cast("售前接待人数" AS DOUBLE), 0)), 0)
+            AS conversionRate
+          FROM {sales_dedup}
+          GROUP BY 1, 2
+        ), staff AS (
+          SELECT
+            try_cast("日期" AS DATE) AS date,
+            replace(cast("UID" AS VARCHAR), '-', '') AS agent,
+            max(cast("技能组" AS VARCHAR)) AS skillGroup,
+            sum(coalesce(try_cast("好评量" AS DOUBLE), 0)) AS goodReviews,
+            sum(coalesce(try_cast("差评量" AS DOUBLE), 0)) AS badReviews,
+            sum(coalesce(try_cast("客服总消息数" AS DOUBLE), 0))
+              / nullif(sum(coalesce(try_cast("客户总消息数" AS DOUBLE), 0)), 0)
+            AS answerRatio,
+            sum(coalesce(try_cast("好评量" AS DOUBLE), 0))
+              / nullif(
+                  sum(coalesce(try_cast("好评量" AS DOUBLE), 0))
+                  + sum(coalesce(try_cast("差评量" AS DOUBLE), 0)),
+                  0
+                )
+            AS satisfactionRate
+          FROM {staff_dedup}
+          GROUP BY 1, 2
+        )
+        SELECT
+          coalesce(w.date, s.date, st.date) AS date,
+          coalesce(w.agent, s.agent, st.agent) AS agent,
+          coalesce(st.skillGroup, '') AS skillGroup,
+          coalesce(w.received, 0) AS received,
+          coalesce(s.orderAmount, 0) AS orderAmount,
+          w.firstResponse, w.avgResponse,
+          s.conversionRate, st.answerRatio,
+          coalesce(st.goodReviews, 0) AS goodReviews,
+          coalesce(st.badReviews, 0) AS badReviews,
+          coalesce(st.satisfactionRate, 0) AS satisfactionRate
+        FROM workload w
+        FULL OUTER JOIN sales s ON w.date = s.date AND w.agent = s.agent
+        FULL OUTER JOIN staff st ON coalesce(w.date, s.date) = st.date
+            AND coalesce(w.agent, s.agent) = st.agent
+        ORDER BY 1, 2
+        """,
+    )
+    groups = _records(
+        connection,
+        f"""
+        SELECT DISTINCT cast("技能组" AS VARCHAR) AS value
+        FROM {staff_view}
+        WHERE try_cast("日期" AS DATE) BETWEEN '{start}' AND '{end}'
+          AND trim(coalesce(cast("技能组" AS VARCHAR), '')) <> ''
+        ORDER BY 1
+        """,
+    )
+    return {
+        "daily": daily,
+        "serviceDaily": service_daily,
+        "byAgent": by_agent,
+        "groups": [row["value"] for row in groups],
     }
 
 
@@ -2094,7 +2685,7 @@ def _build_product_management_pages(
     else:
         daily_channel_margin_matrix = {"columns": [], "rows": []}
 
-    # 产品名称 × 渠道销量（产品主数据口径，Top 30）
+    # 产品名称 × 渠道销量（产品主数据口径，全量）
     product_channel_matrix = _matrix(
         connection,
         f"""
@@ -2105,14 +2696,14 @@ def _build_product_management_pages(
           WHERE {product_name_expr} IN (
             SELECT {product_name_expr} FROM {view} s {pm_join}
             WHERE {product_name_expr} <> '(未命名)'
-            GROUP BY 1 ORDER BY sum(coalesce(try_cast("销售数量" AS DOUBLE),0)) DESC LIMIT 30
+            GROUP BY 1 ORDER BY sum(coalesce(try_cast("销售数量" AS DOUBLE),0)) DESC
           )
         ) ON channel USING sum(units) ORDER BY row
         """,
         "row",
     )
 
-    # 产品名称 × 渠道商家实收（产品主数据口径，Top 30）
+    # 产品名称 × 渠道商家实收（产品主数据口径，全量）
     product_channel_revenue_matrix = _matrix(
         connection,
         f"""
@@ -2123,14 +2714,14 @@ def _build_product_management_pages(
           WHERE {product_name_expr} IN (
             SELECT {product_name_expr} FROM {view} s {pm_join}
             WHERE {product_name_expr} <> '(未命名)'
-            GROUP BY 1 ORDER BY sum(coalesce(try_cast("销售数量" AS DOUBLE),0)) DESC LIMIT 30
+            GROUP BY 1 ORDER BY sum(coalesce(try_cast("销售数量" AS DOUBLE),0)) DESC
           )
         ) ON channel USING sum(v) ORDER BY row
         """,
         "row",
     )
 
-    # 产品名称 × 渠道退货金额（产品主数据口径，Top 30）
+    # 产品名称 × 渠道退货金额（产品主数据口径，全量）
     product_channel_refund_matrix = _matrix(
         connection,
         f"""
@@ -2141,14 +2732,14 @@ def _build_product_management_pages(
           WHERE {product_name_expr} IN (
             SELECT {product_name_expr} FROM {view} s {pm_join}
             WHERE {product_name_expr} <> '(未命名)'
-            GROUP BY 1 ORDER BY sum(coalesce(try_cast("销售数量" AS DOUBLE),0)) DESC LIMIT 30
+            GROUP BY 1 ORDER BY sum(coalesce(try_cast("销售数量" AS DOUBLE),0)) DESC
           )
         ) ON channel USING sum(v) ORDER BY row
         """,
         "row",
     )
 
-    # 产品名称 × 订单状态（产品主数据口径，Top 30）
+    # 产品名称 × 订单状态（产品主数据口径，全量）
     product_status_matrix = _matrix(
         connection,
         f"""
@@ -2160,7 +2751,7 @@ def _build_product_management_pages(
           WHERE {product_name_expr} IN (
             SELECT {product_name_expr} FROM {view} s {pm_join}
             WHERE {product_name_expr} <> '(未命名)'
-            GROUP BY 1 ORDER BY sum(coalesce(try_cast("销售数量" AS DOUBLE),0)) DESC LIMIT 30
+            GROUP BY 1 ORDER BY sum(coalesce(try_cast("销售数量" AS DOUBLE),0)) DESC
           )
         ) ON status USING sum(units) ORDER BY row
         """,
@@ -2235,6 +2826,10 @@ def _build_product_management_pages(
         "returnDarenBreakdown": return_daren_breakdown,
         "returnCategoryBreakdown": return_category_breakdown,
         "fulfillmentByProduct": fulfillment_by_product,
+        "fulfillmentByProductHierarchy": _fulfillment_hierarchy(
+            connection, view, pm_join, product_name_expr, order_id_expr,
+            order_date_expr, ship_date_expr, has_master, master_columns, fulfillment_by_product
+        ),
         "monthlyComparison": monthly_comparison,
         "categoryChannelMatrix": category_channel_matrix,
         "warehouseStatusMatrix": warehouse_status_matrix,
@@ -2245,6 +2840,9 @@ def _build_product_management_pages(
         "dailyStatusMatrix": daily_status_matrix,
         "productChannelMatrix": product_channel_matrix,
         "productStatusMatrix": product_status_matrix,
+        "productStatusHierarchy": _product_status_hierarchy(
+            connection, view, pm_join, product_name_expr, has_master, master_columns
+        ),
         "productChannelRevenueMatrix": product_channel_revenue_matrix,
         "productChannelRefundMatrix": product_channel_refund_matrix,
         "channelStatusMatrix": channel_status_matrix,
@@ -2303,6 +2901,8 @@ def _build_unique_snapshot(
         },
         "privacy": {
             "webExposure": "domain_inventory_only",
+            # 客服每日看板复刻后，powerbiPages.customerService 暴露按 (日期, 客服) 聚合的
+            # 客服效能指标（昵称/绩效），不含买家隐私明细；原始客服源行仍不暴露。
             "rawCustomerServiceRowsExposed": False,
             "sourcePathsExposed": False,
         },

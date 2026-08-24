@@ -276,8 +276,9 @@
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-dasharray: 1;
-  stroke-dashoffset: 1;
-  animation: pc-line-draw 520ms 80ms var(--ease-out-expo) forwards;
+  /* 基础态可见，隐藏只写在 pc-line-draw 的 from；both 让延迟期间也套用 from */
+  stroke-dashoffset: 0;
+  animation: pc-line-draw 520ms 80ms var(--ease-out-expo) both;
 }
 .product-command .line-current { stroke: var(--brand); stroke-width: 3; }
 .product-command .line-previous { stroke: rgba(157, 179, 173, 0.72); stroke-dasharray: 7 6; stroke-width: 2; }
@@ -288,7 +289,7 @@
 .product-command .trend-hit-prev { fill: rgba(157, 179, 173, 0.95); stroke: var(--panel-solid); stroke-width: 1.5; }
 .product-command .trend-hit-refund { fill: var(--blue); stroke: var(--panel-solid); stroke-width: 1.5; }
 .product-command .trend-hit-margin { fill: var(--orange); stroke: var(--panel-solid); stroke-width: 1.5; }
-.product-command .trend-area { fill: rgba(166, 229, 54, 0.12); opacity: 0; animation: pc-fade-in 360ms 120ms ease forwards; }
+.product-command .trend-area { fill: rgba(166, 229, 54, 0.12); animation: pc-fade-in 360ms 120ms ease both; }
 .product-command .trend-foot {
   display: flex;
   min-height: 44px;
@@ -563,8 +564,8 @@
 }
 
 @keyframes pc-rise-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
-@keyframes pc-fade-in { to { opacity: 1; } }
-@keyframes pc-line-draw { to { stroke-dashoffset: 0; } }
+@keyframes pc-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes pc-line-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
 @keyframes pc-width-grow { from { opacity: 0.35; transform: scaleX(0); } to { opacity: 1; transform: scaleX(1); } }
 
 @media (max-width: 1280px) {

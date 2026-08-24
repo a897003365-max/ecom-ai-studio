@@ -27,7 +27,11 @@ export function SpuTrendCard({ data, className, selectedSpus: controlledSpus, on
   }, [v.defaultSpus, controlledSpus]);
 
   const options = useMemo(
-    () => v.summaries.map((s) => ({ spu: s.spu, productName: s.productName || "" })),
+    () => v.summaries.map((s) => ({
+      spu: s.spu,
+      productName: s.productName || "",
+      productNames: s.productNames && s.productNames.length ? s.productNames : undefined,
+    })),
     [v.summaries],
   );
 

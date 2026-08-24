@@ -10,7 +10,7 @@ import polars as pl
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from ecom_pipeline.warehouse import _build_product_management_pages  # noqa: E402
+from ecom_pipeline.warehouse import _build_product_management_pages, _safe_product_image  # noqa: E402
 
 
 class ProductStatusMetricTests(unittest.TestCase):
@@ -129,17 +129,18 @@ class ProductStatusMetricTests(unittest.TestCase):
         )
         catalog = pl.DataFrame(
             {
-                "商品ID": ["CAT-A", "CAT-B1", "CAT-B2", "CAT-C"],
-                "商品名称": ["产品 A 主图", "产品 B 图一", "产品 B 图二", "产品 C 主图"],
-                "商家编码": ["SPU-A", "SPU-B", "SPU-B", "SPU-C"],
+                "商品ID": ["CAT-A", "CAT-B1", "CAT-B2", "CAT-C", "CAT-C-PDD"],
+                "商品名称": ["产品 A 主图", "产品 B 图一", "产品 B 图二", "产品 C 旧图", "产品 C 拼多多主图"],
+                "商家编码": ["SPU-A", "SPU-B", "SPU-B", "SPU-C", "SPU-C"],
                 "商品图片": [
                     "https://img.alicdn.com/product-a.jpg",
                     "https://img.alicdn.com/product-b-1.jpg",
                     "https://img.alicdn.com/product-b-2.jpg",
                     "https://example.com/product-c.jpg",
+                    "https://img.pddpic.com/product-c.jpg",
                 ],
-                "30日销量": [30.0, 20.0, 10.0, 5.0],
-                "累计销量": [300.0, 200.0, 100.0, 50.0],
+                "30日销量": [30.0, 20.0, 10.0, 5.0, 5.0],
+                "累计销量": [300.0, 200.0, 100.0, 50.0, 50.0],
             }
         )
 
@@ -188,7 +189,12 @@ class ProductStatusMetricTests(unittest.TestCase):
             # 多候选时取首个——实际数据中同 SPU 多链接是常态，不匹配反而损失覆盖率
             self.assertIsNotNone(cards["产品 B"]["imageUrl"])
             self.assertTrue(cards["产品 B"]["imageUrl"].startswith("https://img.alicdn.com/"))
-            self.assertIsNone(cards["产品 C"]["imageUrl"])
+            self.assertEqual(cards["产品 C"]["imageUrl"], "https://img.pddpic.com/product-c.jpg")
+            self.assertIsNone(_safe_product_image("https://example.com/product-c.jpg"))
+            self.assertEqual(
+                _safe_product_image("https://h2.appsimg.com/product-c.jpg"),
+                "https://h2.appsimg.com/product-c.jpg",
+            )
 
             self.assertEqual(skus["SKU-A1"]["grossProfit"], 40.0)
             self.assertEqual(skus["SKU-A1"]["matchedReceived"], 100.0)

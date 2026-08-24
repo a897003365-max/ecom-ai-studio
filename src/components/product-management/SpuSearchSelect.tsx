@@ -3,6 +3,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 export interface SpuOption {
   spu: string;
   productName: string;
+  /** 该 SPU 覆盖的 pm 主表产品名称列表；一个 SPU 可能对应多个产品名称（如 M83 → 元气满满/元气满满2.0）。 */
+  productNames?: string[];
 }
 
 interface Props {
@@ -30,7 +32,12 @@ export function SpuSearchSelect({ options, selected, onChange, placeholder = "�
     const q = query.trim().toLowerCase();
     if (!q) return options.slice(0, 50);
     return options
-      .filter((o) => o.spu.toLowerCase().includes(q) || (o.productName || "").toLowerCase().includes(q))
+      .filter(
+        (o) =>
+          o.spu.toLowerCase().includes(q) ||
+          (o.productName || "").toLowerCase().includes(q) ||
+          (o.productNames ?? []).some((name) => name.toLowerCase().includes(q)),
+      )
       .slice(0, 50);
   }, [query, options]);
 
