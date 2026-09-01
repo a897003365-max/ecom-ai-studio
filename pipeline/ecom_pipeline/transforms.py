@@ -10,6 +10,7 @@ import pandas as pd
 import polars as pl
 
 from .catalog import QuerySpec
+from .readers import QuarantinedSourceError
 
 SUMMARY_LABELS = {
     "全店平均值",
@@ -41,6 +42,7 @@ MANUAL_RENAMES: dict[str, dict[str, str]] = {
     "10-1淘宝客服绩效明细": {"答问比": "淘宝答问比"},
     "接待数据": {
         "平均响应时长(新标)": "新平均响应时间",
+        "平均响应时长（新）": "新平均响应时间",
         "平均响应时长": "平均响应时间",
         "应答率": "回复率",
     },
@@ -79,6 +81,9 @@ FILENAME_DATE_QUERIES = {
     "10-3京东客服绩效数据",
     "考勤数据",
 }
+
+# 京东pop 日报（接待数据文件夹新格式）高置信判定所需的必需列
+JD_POP_REQUIRED_COLUMNS = ("客服", "接待量", "售前接待人数", "促成下单人数", "促成下单商品金额")
 
 JUSHUITAN_EXCLUDED_STORES = {
     "伊凯琳家具旗舰店-周飞-猫1",
@@ -319,6 +324,47 @@ def _add_filename_date(frame: pl.DataFrame) -> pl.DataFrame:
     if "日期" in frame.columns:
         return frame.with_columns(pl.coalesce("日期", "_filename_date").alias("日期")).drop("_filename_date")
     return frame.rename({"_filename_date": "日期"})
+
+
+def _apply_jd_reception_confidence(frame: pl.DataFrame, path: Path) -> pl.DataFrame:
+    """接待数据文件夹的置信度分级写入。
+
+    三种处置：
+    - 京东popYYYY-MM-DD.xlsx（POP 旗舰店日报）：高置信才写入——日期可解析、
+      必需列齐全、过滤汇总行后有有效客服行、接待量可数值化。满足则补 日期 +
+      店铺=京东POP；任一不满足抛 QuarantinedSourceError，文件不入仓。
+    - WaiterDimWorkload4Jingmai*（京麦旧取数逻辑周报，已停更）：兼容保留——
+      照常入仓但不赋日期，看板日期过滤自然排除，不上网页。
+    - 其他命名：低置信，隔离待人工确认。
+    """
+    name = path.name
+    if re.match(r"^京东pop", name, re.IGNORECASE):
+        reasons: list[str] = []
+        file_date = _parse_filename_date(name)
+        if file_date is None:
+            reasons.append("文件名日期不可解析")
+        missing = [column for column in JD_POP_REQUIRED_COLUMNS if column not in frame.columns]
+        if missing:
+            reasons.append(f"缺少必需列: {', '.join(missing)}")
+        if "客服" in frame.columns:
+            frame = frame.filter(
+                pl.col("客服").is_not_null() & (pl.col("客服").cast(pl.String, strict=False).str.strip_chars() != "")
+            )
+        if not missing and frame.height == 0:
+            reasons.append("过滤汇总行后无有效客服行")
+        if "接待量" in frame.columns and frame.height > 0:
+            received = frame.get_column("接待量").cast(pl.Float64, strict=False)
+            if not bool((received.is_not_null() & (received >= 0)).any()):
+                reasons.append("接待量列无可数值化的非负值")
+        if reasons:
+            raise QuarantinedSourceError(name, "；".join(reasons))
+        return frame.with_columns(
+            pl.lit(file_date).alias("日期"),
+            pl.lit("京东POP").alias("店铺"),
+        )
+    if re.match(r"^WaiterDimWorkload4Jingmai", name, re.IGNORECASE):
+        return frame
+    raise QuarantinedSourceError(name, "未识别的文件命名模式（既非 京东pop 日报也非京麦周报）")
 
 
 def _transform_targets(frame: pl.DataFrame, path: Path) -> pl.DataFrame:
@@ -761,6 +807,9 @@ def _apply_query_rules(frame: pl.DataFrame, spec: QuerySpec, path: Path) -> pl.D
     }
     if renames:
         frame = frame.rename(renames)
+
+    if spec.name == "接待数据":
+        frame = _apply_jd_reception_confidence(frame, path)
 
     if spec.name in FILENAME_DATE_QUERIES:
         frame = _add_filename_date(frame)

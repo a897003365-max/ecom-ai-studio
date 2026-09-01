@@ -27,7 +27,7 @@
 
 - Windows 任务：EcomAIStudio-DingTalk-Sync。
 - 任务属性：Ready、S4U、Limited、StartWhenAvailable、IgnoreNew、网络可用、失败重试 3 次、重试间隔 10 分钟。
-- 执行时间：10:30、13:00、17:30（Asia/Shanghai）。
+- 执行时间：11:00、13:00、17:30（Asia/Shanghai，2026-08-25 起早间由 10:30 调整为 11:00）。
 - 2026-07-14 06:03:50 启动的同步在 06:09:32 成功，读取 19 张表、7669 条记录。
 - 健康状态文件：local-data/runtime/dingtalk-sync-health.json。
 - 运行日志：local-data/logs/dingtalk-sync.log。
@@ -112,7 +112,7 @@
 
 ## 8. 接手前检查
 
-1. 访问 /api/health，确认 dingtalk healthy、schedule 为 10:30,13:00,17:30。
+1. 访问 /api/health，确认 dingtalk healthy、schedule 为 11:00,13:00,17:30。
 2. 确认 Windows 任务 EcomAIStudio-DingTalk-Sync 的 LastResult 为 0。
 3. 保留 local-data/runtime/dingtalk-sync-health.json 和 local-data/logs/dingtalk-sync.log，勿将它们清理为“临时文件”。
 4. 检查 MaterialId、ContentId、SKU 的映射是否仍与 PowerBI 快照一致。
@@ -781,6 +781,11 @@ Set WshShell = Nothing
 - **存量清理**：已从笔记库删除 345 条报错笔记（剩余 647 条真实笔记）；受影响关键词清单存 `local-data/tmp-affected-kws.json`（22 个）。
 - **搜索失效上报**：`runCrawlJob` 对搜索工作流返回 false/cookie_status:false 的关键词记入 `crawlJob.errors`（进度弹窗显示「部分关键词失败」），不再静默当作"没搜到笔记"。
 - **待人工处理**：搜索工作流（7675983801533644836）cookie 已失效（多次实测稳定返回 false、0 笔记；详情工作流 7676769225382297634 仍正常）。需在 Coze/服务方侧续期 cookie；恢复后重抓 22 个受影响关键词即可补回被删笔记（页面多选或用 tmp-affected-kws.json 清单）。
+
+### 16.13 KPI 五卡改版 + 明细表去重（2026-08-23）
+
+- **KPI 五卡新口径**（跟随舆情词云下拉选中的关键词，页面当前分析视角）：①分析笔记数 ②高风险笔记数（舆论倾向=负面）③高风险占比（条数，1 位小数）④总互动量 ⑤高风险互动量占比（负面笔记互动/总互动）。原"风险等级/问题点/建议"三卡信息仍在下方报告区展示。
+- **明细表按笔记去重**：同 noteId 跨关键词命中时只显示一行——关键词列取字数最多的关键词、抓取时间取最新、正文/发布时间/小红书号取最全；工具栏显示"已按笔记去重，合并 N 条"。实测 647 条库合并 383 条重复（107 组，热门笔记可命中 30+ 关键词）；去重仅影响表格展示，KPI/词云/分析仍按关键词口径。
 
 ### 16.10 重构初期验证记录（2026-08-22）
 

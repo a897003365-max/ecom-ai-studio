@@ -117,6 +117,8 @@ function cozeNoteDetailConfig() {
   return {
     token: process.env.COZE_TOKEN?.trim() || sourceConfig.coze?.token,
     workflowId: process.env.COZE_NOTE_DETAIL_WORKFLOW_ID?.trim() || sourceConfig.coze?.noteDetailWorkflowId,
+    // 候补详情工作流（结构扁平、无 red_id/fans），主工作流失效时自动降级
+    fallbackWorkflowId: process.env.COZE_NOTE_DETAIL_FALLBACK_WORKFLOW_ID?.trim() || sourceConfig.coze?.noteDetailFallbackWorkflowId,
   };
 }
 
@@ -157,6 +159,10 @@ export async function fetchRelatedKeywords(keyword) {
   } catch {
     return [];
   }
+  // 与搜索/详情一致：cookie 失效必须显式报错，不能静默返回空列表（前端会误判为关键词无结果）
+  if (isFalseMsg(parsed?.msg) || isFalseMsg(parsed?.a_msg) || parsed?.note?.cookie_status === false) {
+    throw new Error("获取相关关键词失败：工作流返回 false（cookie 失效）");
+  }
   const topics = parsed?.note?.topic_list;
   if (!Array.isArray(topics)) return [];
   const seen = new Set();
@@ -171,6 +177,9 @@ export async function fetchRelatedKeywords(keyword) {
   }
   return items;
 }
+
+// 工作流 cookie 失效的统一信号：msg 字段以 "false" 开头或 cookie_status === false
+const isFalseMsg = (s) => typeof s === "string" && s.trim().startsWith("false");
 
 // 详情工作流（coze.noteDetailWorkflowId）返回结构：
 // { a_msg, author: { author_info: { red_id, nick_name, fans, follows, desc, ... } },
@@ -222,12 +231,12 @@ function extractFans(rawText) {
 }
 
 // 失败响应识别：工作流 cookie 失效或笔记不可用时返回 a_msg/n_msg = "false..."、
-// cookie_status:false、author_info 全空 —— 绝不能当正文入库
+// cookie_status:false、正文/标题/标签全空 —— 绝不能当正文入库。
+// 兼容两种结构：主工作流 note.note 嵌套；候补工作流 note 扁平。
 function isDetailErrorResponse(parsed) {
-  const isFalseMsg = (s) => typeof s === "string" && s.trim().startsWith("false");
   if (isFalseMsg(parsed?.a_msg) || isFalseMsg(parsed?.msg) || isFalseMsg(parsed?.n_msg)) return true;
   if (parsed?.note?.cookie_status === false) return true;
-  const inner = parsed?.note?.note;
+  const inner = parsed?.note?.note ?? parsed?.note;
   if (!inner) return true;
   const hasContent = inner.note_desc || inner.note_display_title || (Array.isArray(inner.note_tags) && inner.note_tags.length > 0);
   return !hasContent;
@@ -235,39 +244,50 @@ function isDetailErrorResponse(parsed) {
 
 /**
  * 调用 Coze 笔记详情工作流，返回 { body, raw, publishTime, redId, fans }。
+ * 主工作流失败时自动降级到候补工作流（noteDetailFallbackWorkflowId）；
+ * 候补返回体无 author_info，redId/fans 恒为 null —— 缺失字段不写入，由调用方保留旧值。
  * @param {string} noteUrl - 笔记 URL
  * @returns {Promise<{ body: string, raw: string, publishTime: string | null, redId: string | null, fans: number | null }>}
  */
 export async function fetchNoteDetail(noteUrl) {
-  const { token, workflowId } = cozeNoteDetailConfig();
+  const { token, workflowId, fallbackWorkflowId } = cozeNoteDetailConfig();
   if (!token || !workflowId) {
     throw new Error("未配置 Coze token / noteDetailWorkflowId");
   }
-  const res = await httpsPostStream(
-    "https://api.coze.cn/v1/workflow/stream_run",
-    { workflow_id: workflowId, parameters: { input: noteUrl } },
-    { Authorization: `Bearer ${token}` },
-  );
-  if (res.status === 401 || res.status === 403) throw new Error("Coze 鉴权失败");
-  if (res.status !== 200) throw new Error(`Coze 上游返回 ${res.status}：${res.body.slice(0, 200)}`);
-  const text = extractStreamText(res.body);
-  if (!text) throw new Error("Coze 返回为空，无法解析笔记正文");
-  let parsed = null;
-  try {
-    parsed = JSON.parse(text);
-  } catch {
-    parsed = null;
+  const candidates = [...new Set([workflowId, fallbackWorkflowId].filter(Boolean))];
+  let lastError = null;
+  for (const wfId of candidates) {
+    try {
+      const res = await httpsPostStream(
+        "https://api.coze.cn/v1/workflow/stream_run",
+        { workflow_id: wfId, parameters: { input: noteUrl } },
+        { Authorization: `Bearer ${token}` },
+      );
+      if (res.status === 401 || res.status === 403) throw new Error("Coze 鉴权失败");
+      if (res.status !== 200) throw new Error(`Coze 上游返回 ${res.status}：${res.body.slice(0, 200)}`);
+      const text = extractStreamText(res.body);
+      if (!text) throw new Error("Coze 返回为空，无法解析笔记正文");
+      let parsed = null;
+      try {
+        parsed = JSON.parse(text);
+      } catch {
+        parsed = null;
+      }
+      if (!parsed || isDetailErrorResponse(parsed)) {
+        throw new Error("笔记详情抓取失败：工作流返回 false（cookie 失效或笔记不可用）");
+      }
+      const body = formatNoteBody(text);
+      if (!body || body === text) throw new Error("笔记详情解析为空");
+      return {
+        body,
+        raw: text,
+        publishTime: extractPublishTime(text),
+        redId: extractRedId(text),
+        fans: extractFans(text),
+      };
+    } catch (error) {
+      lastError = error;
+    }
   }
-  if (!parsed || isDetailErrorResponse(parsed)) {
-    throw new Error("笔记详情抓取失败：工作流返回 false（cookie 失效或笔记不可用）");
-  }
-  const body = formatNoteBody(text);
-  if (!body || body === text) throw new Error("笔记详情解析为空");
-  return {
-    body,
-    raw: text,
-    publishTime: extractPublishTime(text),
-    redId: extractRedId(text),
-    fans: extractFans(text),
-  };
+  throw lastError ?? new Error("笔记详情抓取失败");
 }

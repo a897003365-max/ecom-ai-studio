@@ -233,6 +233,8 @@ export interface PowerBiCompetitorDaily {
 
 export interface PowerBiCustomerServiceDaily {
   date: string;
+  /** 京东客服按店铺拆分（京东自营/京东POP/全部）；旧快照无此字段时视为自营口径 */
+  store?: string;
   agentCount?: number;
   effectiveReceived?: number;
   todayInquiry?: number;
@@ -255,6 +257,8 @@ export interface PowerBiCustomerServiceDaily {
 export interface PowerBiCustomerServiceAgent {
   date: string;
   agent: string;
+  /** 京东客服按店铺拆分；旧快照无此字段时视为自营口径 */
+  store?: string;
   groupName?: string;
   skillGroup?: string;
   effectiveReceived?: number;

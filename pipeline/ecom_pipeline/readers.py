@@ -19,6 +19,19 @@ class SourceReadError(RuntimeError):
     """Raised when a local source file cannot be decoded."""
 
 
+class QuarantinedSourceError(SourceReadError):
+    """文件可读但置信度不足：不写入分区，记入同步报告的 quarantined 列表。
+
+    与 SourceReadError（损坏/无法解析）区分开，便于同步结果分别统计
+    「读失败」和「置信度不足被保留待人工确认」。
+    """
+
+    def __init__(self, filename: str, reason: str) -> None:
+        super().__init__(f"{filename}: {reason}")
+        self.filename = filename
+        self.reason = reason
+
+
 def discover_files(paths: Iterable[Path]) -> list[Path]:
     files: list[Path] = []
     for source in paths:

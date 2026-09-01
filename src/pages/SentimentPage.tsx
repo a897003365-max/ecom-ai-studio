@@ -24,6 +24,7 @@ import type {
 } from "../types/sentiment";
 import type { Tone } from "../types";
 import { clsx } from "../utils/format";
+import { classifyNoteSentiment, type NoteSentiment } from "../lib/sentimentClassifier";
 
 interface SentimentPageProps {
   canManage: boolean;
@@ -179,105 +180,15 @@ function wordCloudFontSize(count: number, min: number, max: number) {
   return Math.round(12 + 16 * Math.min(1, Math.max(0, t)));
 }
 
-// ---------- 舆论倾向：领域情感词典固定算法（评估结论见 HANDOFF，不接 LLM） ----------
-// 打分规则：最长匹配消耗式扫描（避免"骗人"同时命中"骗"的双重计数）；
-// 命中前 1~2 字为否定词（不/没/无/毫无/并不…）则该次不计分（"没有异味"不算负面）；
-// "无异味/没有异味"等作为显式正面词先被最长匹配消耗；标题命中权重 ×2。
-
-const NEGATIVE_TERMS = [
-  "避雷", "踩雷", "后悔", "差评", "退货", "退款", "拔草", "劝退", "别买", "不要买", "千万别买", "避坑",
-  "坑", "韭菜", "智商税", "垃圾", "质量差", "太差", "很差", "差劲", "翻车", "破损", "瑕疵",
-  "虚假宣传", "虚假", "夸大", "骗", "欺骗", "假货", "山寨", "货不对版", "货不对板", "偷工减料", "减配",
-  "异味", "酸臭", "臭味", "味道大", "有味道", "很臭", "刺鼻", "难闻", "甲醛", "超标", "有毒", "头晕", "头疼",
-  "塌陷", "凹陷", "塌边", "塌腰", "变形", "起拱", "发霉", "生虫", "虫子", "开线", "断裂", "掉渣",
-  "过敏", "瘙痒", "起疹", "湿疹", "腰疼", "腰酸", "脖子疼", "落枕", "睡不好", "越睡越累", "难受",
-  "客服态度", "态度差", "不处理", "不退款", "拖延", "推诿", "投诉", "维权", "举报", "售后差", "售后难", "客服敷衍",
-  "不推荐", "不好用", "不舒服", "不满意", "不值得", "不建议", "别入手", "退了", "退掉", "换货",
-  "白花钱", "浪费钱", "上当", "被坑", "以次充好", "黑心棉", "旧棉", "发黄", "不结实", "软塌塌", "异响", "晃动",
-  "有味", "劣质", "次品", "腰突",
-];
-
-const POSITIVE_TERMS = [
-  "无异味", "没有异味", "没异味", "没味道", "无甲醛", "推荐", "种草", "好用", "好睡", "舒服", "舒适", "满意",
-  "超预期", "惊喜", "值得", "性价比", "划算", "回购", "复购", "无限回购", "真香", "安利", "放心", "靠谱",
-  "正品", "质量好", "很棒", "点赞", "五星", "好评", "天花板", "闭眼入", "支撑到位", "贴合", "睡得很香",
-  "一觉到天亮", "睡得香", "秒睡", "深度睡眠", "强烈推荐", "值得买", "买对了", "选对了", "超值", "爱了", "绝了",
-  // 反转句式：先被最长匹配消耗，避免正文里的"塌陷/腰疼/后悔"把好评误判成负面
-  "拯救塌陷", "救了我的腰", "解放了腰", "yyds", "后悔没早", "相见恨晚", "早买早享受",
-];
-
-interface SentimentTerm {
-  term: string;
-  negative: boolean;
-}
-
-const ALL_SENTIMENT_TERMS: SentimentTerm[] = [
-  ...NEGATIVE_TERMS.map((t) => ({ term: t, negative: true })),
-  ...POSITIVE_TERMS.map((t) => ({ term: t, negative: false })),
-].sort((a, b) => b.term.length - a.term.length);
-
-// 按首字分桶，减少逐位置扫描范围
-const TERMS_BY_FIRST_CHAR = new Map<string, SentimentTerm[]>();
-for (const t of ALL_SENTIMENT_TERMS) {
-  const head = t.term[0];
-  if (!TERMS_BY_FIRST_CHAR.has(head)) TERMS_BY_FIRST_CHAR.set(head, []);
-  TERMS_BY_FIRST_CHAR.get(head)!.push(t);
-}
-
-function isNegatedAt(text: string, index: number) {
-  const window = text.slice(Math.max(0, index - 2), index);
-  const last = window.slice(-1);
-  if (last === "不" || last === "没" || last === "无") return true;
-  return ["毫无", "并不", "不太", "没啥", "从未"].some((p) => window.endsWith(p));
-}
-
-function scanSentimentText(text: string, weight: number) {
-  let neg = 0;
-  let pos = 0;
-  let i = 0;
-  while (i < text.length) {
-    const bucket = TERMS_BY_FIRST_CHAR.get(text[i]);
-    if (bucket) {
-      let matched = false;
-      for (const t of bucket) {
-        if (text.startsWith(t.term, i)) {
-          if (!isNegatedAt(text, i)) {
-            if (t.negative) neg += weight;
-            else pos += weight;
-          }
-          i += t.term.length;
-          matched = true;
-          break;
-        }
-      }
-      if (matched) continue;
-    }
-    i += 1;
-  }
-  return { neg, pos };
-}
-
-export interface NoteSentiment {
-  label: "negative" | "positive" | "neutral";
-  neg: number;
-  pos: number;
-}
-
-function classifyNoteSentiment(note: SentimentCrawledNote): NoteSentiment {
-  const title = (note.title ?? "").trim();
-  const body = note.noteBody ?? "";
-  if (!title && !body) return { label: "neutral", neg: 0, pos: 0 };
-  const t = scanSentimentText(title, 2);
-  const b = scanSentimentText(body, 1);
-  const neg = t.neg + b.neg;
-  const pos = t.pos + b.pos;
-  if (neg > pos) return { label: "negative", neg, pos };
-  if (pos > neg) return { label: "positive", neg, pos };
-  return { label: "neutral", neg, pos };
-}
+// ---------- 舆论倾向：领域情感词典固定算法（规则与词表见 src/lib/sentimentClassifier.ts） ----------
 
 const sentimentLabelMap: Record<NoteSentiment["label"], string> = { negative: "负面", positive: "正面", neutral: "中性" };
 const sentimentToneMap: Record<NoteSentiment["label"], Tone> = { negative: "red", positive: "green", neutral: "muted" };
+
+// 分数可能带 .5（标签半权计分），展示时取整
+function fmtScore(v: number) {
+  return Number.isInteger(v) ? String(v) : v.toFixed(1);
+}
 
 interface CrawlModal {
   open: boolean;
@@ -286,11 +197,12 @@ interface CrawlModal {
   phase: "searching" | "filling" | "done" | "error";
   total: number;
   ok: number;
+  excluded: number;
   failed: number;
   message?: string;
 }
 
-const emptyCrawl: CrawlModal = { open: false, keywords: [], keywordIndex: 0, phase: "searching", total: 0, ok: 0, failed: 0 };
+const emptyCrawl: CrawlModal = { open: false, keywords: [], keywordIndex: 0, phase: "searching", total: 0, ok: 0, excluded: 0, failed: 0 };
 
 export function SentimentPage({ canManage, onAction }: SentimentPageProps) {
   const [libNotes, setLibNotes] = useState<SentimentCrawledNote[]>([]);
@@ -309,6 +221,7 @@ export function SentimentPage({ canManage, onAction }: SentimentPageProps) {
   const [crawl, setCrawl] = useState<CrawlModal>(emptyCrawl);
   const [wcKeyword, setWcKeyword] = useState("");
   const [noteQuery, setNoteQuery] = useState("");
+  const [sentimentFilter, setSentimentFilter] = useState<"all" | NoteSentiment["label"]>("negative");
   const [page, setPage] = useState(1);
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
@@ -368,6 +281,7 @@ export function SentimentPage({ canManage, onAction }: SentimentPageProps) {
                 keywordIndex: s.keywordIndex,
                 total: s.total,
                 ok: s.ok,
+                excluded: s.excluded ?? 0,
                 failed: s.failed,
                 message: s.errors.length ? s.errors.join("；") : undefined,
               };
@@ -378,6 +292,7 @@ export function SentimentPage({ canManage, onAction }: SentimentPageProps) {
               keywordIndex: s.keywordIndex,
               total: s.total,
               ok: s.ok,
+              excluded: s.excluded ?? 0,
               failed: s.failed,
             };
           });
@@ -426,7 +341,7 @@ export function SentimentPage({ canManage, onAction }: SentimentPageProps) {
     if (!keywords.length || crawlStarting) return;
     setCrawlStarting(true);
     setWfError(null);
-    setCrawl({ open: true, keywords, keywordIndex: 0, phase: "searching", total: 0, ok: 0, failed: 0 });
+    setCrawl({ open: true, keywords, keywordIndex: 0, phase: "searching", total: 0, ok: 0, excluded: 0, failed: 0 });
     try {
       await startCrawl(keywords);
       onAction("抓取已启动", `已选 ${keywords.length} 个关键词，服务端顺序搜索并抓取正文`);
@@ -448,6 +363,12 @@ export function SentimentPage({ canManage, onAction }: SentimentPageProps) {
     }
   }, [selectedKws, crawlStarting, onAction, startCrawlPolling]);
 
+  const sentimentMap = useMemo(() => {
+    const m = new Map<string, NoteSentiment>();
+    for (const n of libNotes) m.set(`${n.noteId}|${n.keyword}`, classifyNoteSentiment(n));
+    return m;
+  }, [libNotes]);
+
   const handleStart = useCallback(async () => {
     setShowAnalyzeModal(false);
     if (!canManage) {
@@ -458,8 +379,23 @@ export function SentimentPage({ canManage, onAction }: SentimentPageProps) {
     setStarting(true);
     setError(null);
     try {
-      const started = await startAnalysis(analyzeKeyword, dateFrom, dateTo);
-      onAction("舆情分析已启动", `关键词「${analyzeKeyword}」· ${started.noteCount} 条笔记进入 LLM 综合`);
+      // 分析对象 = 该关键词+时间范围内「词典判负」的笔记子集（服务端按 noteIds 白名单取交集）
+      const inScope = libNotes.filter((n) =>
+        n.keyword === analyzeKeyword &&
+        n.detailState === "ok" &&
+        (!dateFrom || String(n.publishTime ?? "").slice(0, 10) >= dateFrom) &&
+        (!dateTo || String(n.publishTime ?? "").slice(0, 10) <= dateTo));
+      const negativeIds = inScope
+        .filter((n) => sentimentMap.get(`${n.noteId}|${n.keyword}`)?.label === "negative")
+        .map((n) => n.noteId);
+      if (!negativeIds.length) {
+        const msg = `「${analyzeKeyword}」在该条件下没有判为负面的笔记，可放宽时间范围或先抓取更多笔记`;
+        setError(msg);
+        onAction("舆情分析未启动", msg);
+        return;
+      }
+      const started = await startAnalysis(analyzeKeyword, dateFrom, dateTo, negativeIds);
+      onAction("舆情分析已启动", `关键词「${analyzeKeyword}」· ${started.noteCount} 条负面笔记进入 LLM 综合（中性/正面已排除）`);
       setAnalyzing(true);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -468,7 +404,7 @@ export function SentimentPage({ canManage, onAction }: SentimentPageProps) {
     } finally {
       setStarting(false);
     }
-  }, [canManage, analyzeKeyword, dateFrom, dateTo, onAction]);
+  }, [canManage, analyzeKeyword, dateFrom, dateTo, libNotes, sentimentMap, onAction]);
 
   // 分析轮询：done 后加载新报告，error 后展示原因
   useEffect(() => {
@@ -528,12 +464,6 @@ export function SentimentPage({ canManage, onAction }: SentimentPageProps) {
     return buildWordCloud(notes, exclude);
   }, [libNotes, wcKeyword]);
 
-  const sentimentMap = useMemo(() => {
-    const m = new Map<string, NoteSentiment>();
-    for (const n of libNotes) m.set(`${n.noteId}|${n.keyword}`, classifyNoteSentiment(n));
-    return m;
-  }, [libNotes]);
-
   // KPI 五卡口径：跟随舆情词云下拉选中的关键词；高风险 = 舆论倾向判为负面
   const kpi = useMemo(() => {
     const notes = libNotes.filter((n) => n.keyword === wcKeyword);
@@ -578,7 +508,33 @@ export function SentimentPage({ canManage, onAction }: SentimentPageProps) {
             .some((f) => typeof f === "string" && f.toLowerCase().includes(q))
         )
       : libNotes;
-    let rows = filtered;
+    // 按笔记去重：同 noteId 多关键词命中时，关键词列取字数最多的，抓取时间取最新，正文等字段取最全的
+    const seen = new Map<string, SentimentCrawledNote>();
+    for (const n of filtered) {
+      const cur = seen.get(n.noteId);
+      if (!cur) {
+        seen.set(n.noteId, n);
+        continue;
+      }
+      seen.set(n.noteId, {
+        ...cur,
+        keyword: (n.keyword ?? "").length > (cur.keyword ?? "").length ? n.keyword : cur.keyword,
+        crawledAt: (n.crawledAt ?? "") > (cur.crawledAt ?? "") ? n.crawledAt : cur.crawledAt,
+        noteBody: cur.noteBody ?? n.noteBody,
+        detailState: cur.detailState === "ok" || n.detailState === "ok" ? "ok" : cur.detailState,
+        bodyLength: Math.max(cur.bodyLength, n.bodyLength),
+        publishTime: cur.publishTime ?? n.publishTime,
+        redId: cur.redId ?? n.redId,
+        fans: cur.fans ?? n.fans,
+      });
+    }
+    const deduped = [...seen.values()];
+    const labelOf = (n: SentimentCrawledNote): NoteSentiment["label"] =>
+      sentimentMap.get(`${n.noteId}|${n.keyword}`)?.label ?? "neutral";
+    // 倾向筛选计数（在筛选前统计，供筛选 chips 展示）
+    const counts = { all: deduped.length, negative: 0, positive: 0, neutral: 0 };
+    for (const n of deduped) counts[labelOf(n)] += 1;
+    let rows = sentimentFilter === "all" ? deduped : deduped.filter((n) => labelOf(n) === sentimentFilter);
     if (sortKey) {
       const dir = sortDir === "asc" ? 1 : -1;
       const value = (n: SentimentCrawledNote): string | number => {
@@ -587,6 +543,8 @@ export function SentimentPage({ canManage, onAction }: SentimentPageProps) {
           case "author": return n.author ?? "";
           case "publishTime": return n.publishTime ?? "";
           case "crawledAt": return n.crawledAt ?? "";
+          case "fans": return n.fans ?? -1;
+          case "engagement": return n.liked + n.comment + n.collected + n.shared;
           case "sentiment": {
             const s = sentimentMap.get(`${n.noteId}|${n.keyword}`);
             return s ? s.neg - s.pos : 0;
@@ -594,7 +552,7 @@ export function SentimentPage({ canManage, onAction }: SentimentPageProps) {
           default: return Number(n[sortKey as "liked" | "comment" | "collected" | "shared"] ?? 0);
         }
       };
-      rows = [...filtered].sort((a, b) => {
+      rows = [...rows].sort((a, b) => {
         const va = value(a);
         const vb = value(b);
         if (typeof va === "string" || typeof vb === "string") {
@@ -602,17 +560,21 @@ export function SentimentPage({ canManage, onAction }: SentimentPageProps) {
         }
         return (va - vb) * dir;
       });
+    } else if (sentimentFilter !== "all") {
+      // 倾向筛选视图默认按总互动量降序：发酵中的负面排最前
+      rows = [...rows].sort((a, b) =>
+        (b.liked + b.comment + b.collected + b.shared) - (a.liked + a.comment + a.collected + a.shared));
     } else {
       // 默认：舆情词云下拉选中的关键词优先透出，其余按库序
-      rows = [...filtered.filter((n) => n.keyword === wcKeyword), ...filtered.filter((n) => n.keyword !== wcKeyword)];
+      rows = [...deduped.filter((n) => n.keyword === wcKeyword), ...deduped.filter((n) => n.keyword !== wcKeyword)];
     }
-    return { rows, total: libNotes.length };
-  }, [libNotes, noteQuery, sortKey, sortDir, wcKeyword, sentimentMap]);
+    return { rows, total: libNotes.length, dedupRemoved: filtered.length - deduped.length, counts };
+  }, [libNotes, noteQuery, sortKey, sortDir, wcKeyword, sentimentMap, sentimentFilter]);
 
   // 筛选/排序条件变化时回到第一页
   useEffect(() => {
     setPage(1);
-  }, [noteQuery, sortKey, sortDir, wcKeyword]);
+  }, [noteQuery, sortKey, sortDir, wcKeyword, sentimentFilter]);
 
   // 分页派生：每页 NOTE_PAGE_SIZE 行
   const totalPages = Math.max(1, Math.ceil(tableNotes.rows.length / NOTE_PAGE_SIZE));
@@ -816,8 +778,29 @@ export function SentimentPage({ canManage, onAction }: SentimentPageProps) {
               <button className="notes-table-clear" onClick={() => setNoteQuery("")} type="button">清除</button>
             </span>
           )}
+          {tableNotes.dedupRemoved > 0 && (
+            <span className="notes-table-count">已按笔记去重，合并 {tableNotes.dedupRemoved} 条跨关键词重复</span>
+          )}
         </div>
-        <TableShell minWidth={1650}>
+        <div className="notes-table-toolbar">
+          <span className="text-[12px] text-[var(--muted)]">舆论倾向：</span>
+          {(["negative", "neutral", "positive", "all"] as const).map((f) => (
+            <button
+              key={f}
+              type="button"
+              className={clsx("related-kw-chip", sentimentFilter === f && "selected")}
+              onClick={() => setSentimentFilter(f)}
+            >
+              <span className="related-kw-name">
+                {f === "all" ? "全部" : sentimentLabelMap[f]} {tableNotes.counts[f]}
+              </span>
+            </button>
+          ))}
+          {sentimentFilter !== "all" && !sortKey && (
+            <span className="notes-table-count">默认按总互动量降序，发酵中的排最前</span>
+          )}
+        </div>
+        <TableShell minWidth={1740}>
           <thead>
             <tr>
               <th style={{ width: 44 }}>#</th>
@@ -826,6 +809,7 @@ export function SentimentPage({ canManage, onAction }: SentimentPageProps) {
               <th style={{ width: 120 }}>{renderSortTh("keyword", "关键词")}</th>
               <th style={{ width: 140 }}>{renderSortTh("author", "作者")}</th>
               <th style={{ width: 110 }}>小红书号</th>
+              <th style={{ width: 90 }}>{renderSortTh("fans", "粉丝")}</th>
               <th style={{ width: 130 }}>{renderSortTh("publishTime", "发布时间")}</th>
               <th style={{ width: 70 }}>{renderSortTh("liked", "赞")}</th>
               <th style={{ width: 70 }}>{renderSortTh("comment", "评论")}</th>
@@ -839,14 +823,14 @@ export function SentimentPage({ canManage, onAction }: SentimentPageProps) {
           <tbody>
             {tableNotes.rows.length === 0 && noteQuery.trim() ? (
               <tr>
-                <td colSpan={14} className="py-6 text-center text-[13px] text-[var(--muted)]">
+                <td colSpan={15} className="py-6 text-center text-[13px] text-[var(--muted)]">
                   没有匹配「{noteQuery.trim()}」的笔记，换个关键词试试
                 </td>
               </tr>
             ) : tableNotes.rows.length === 0 ? (
               <tr>
-                <td colSpan={14} className="py-6 text-center text-[13px] text-[var(--muted)]">
-                  笔记库为空；在上方搜索栏输入关键词抓取第一批笔记
+                <td colSpan={15} className="py-6 text-center text-[13px] text-[var(--muted)]">
+                  {sentimentFilter !== "all" ? `没有判为「${sentimentLabelMap[sentimentFilter]}」的笔记，切换到「全部」查看完整笔记库` : "笔记库为空；在上方搜索栏输入关键词抓取第一批笔记"}
                 </td>
               </tr>
             ) : pageRows.map((note, i) => {
@@ -880,13 +864,14 @@ export function SentimentPage({ canManage, onAction }: SentimentPageProps) {
                 <td className="text-[var(--muted)]">{note.keyword ?? "—"}</td>
                 <td className="text-[var(--muted)]">{note.author}</td>
                 <td className="text-[var(--muted)] text-[12px]">{note.redId ?? "—"}</td>
+                <td>{note.fans != null ? fmt(note.fans) : "—"}</td>
                 <td className="text-[var(--muted)] text-[12px]" title={note.publishTime ?? ""}>{fmtPublishTime(note.publishTime)}</td>
                 <td>{fmt(note.liked)}</td>
                 <td>{fmt(note.comment)}</td>
                 <td>{fmt(note.collected)}</td>
                 <td>{fmt(note.shared)}</td>
                 <td>
-                  <span title={s ? `负面词 ${s.neg} 次 · 正面词 ${s.pos} 次（词典算法）` : "无正文，按中性处理"}>
+                  <span title={s ? `负面词 ${fmtScore(s.neg)} · 正面词 ${fmtScore(s.pos)}（词典算法,标签半权）` : "无正文,按中性处理"}>
                     <StatusTag label={sentimentLabelMap[s?.label ?? "neutral"]} tone={sentimentToneMap[s?.label ?? "neutral"]} />
                   </span>
                 </td>
@@ -896,6 +881,8 @@ export function SentimentPage({ canManage, onAction }: SentimentPageProps) {
                 <td>
                   {note.detailState === "ok" ? (
                     <StatusTag label={`成功 ${note.bodyLength} 字`} tone="green" />
+                  ) : note.detailState === "unrelated" ? (
+                    <StatusTag label="无关筛除" tone="muted" />
                   ) : note.detailState === "failed" ? (
                     <StatusTag label="失败" tone="red" />
                   ) : (
@@ -1048,7 +1035,7 @@ export function SentimentPage({ canManage, onAction }: SentimentPageProps) {
                   <button className="analyze-modal-clear" onClick={() => { setDateFrom(""); setDateTo(""); }} type="button">清除时间</button>
                 )}
               </div>
-              <p className="analyze-modal-hint">分析对象：笔记库中该关键词下正文抓取成功的笔记，按发布时间筛选</p>
+              <p className="analyze-modal-hint">分析对象：该关键词下「舆论倾向判为负面」且正文抓取成功的笔记（中性/正面不参与 LLM 综合），按发布时间筛选</p>
             </div>
             <div className="analyze-modal-footer">
               <button className="btn" onClick={() => setShowAnalyzeModal(false)} type="button">取消</button>
@@ -1120,8 +1107,8 @@ export function SentimentPage({ canManage, onAction }: SentimentPageProps) {
               {crawl.phase === "filling" && (
                 <div className="mt-3">
                   <ProgressBar
-                    value={crawl.total ? Math.round(((crawl.ok + crawl.failed) / crawl.total) * 100) : 0}
-                    label={`正文抓取 ${crawl.ok + crawl.failed}/${crawl.total}（成功 ${crawl.ok} · 失败 ${crawl.failed}），服务端并发 2、批次间隔 3s`}
+                    value={crawl.total ? Math.round(((crawl.ok + crawl.excluded + crawl.failed) / crawl.total) * 100) : 0}
+                    label={`正文抓取 ${crawl.ok + crawl.excluded + crawl.failed}/${crawl.total}（成功 ${crawl.ok} · 筛除无关 ${crawl.excluded} · 失败 ${crawl.failed}），服务端并发 2、批次间隔 3s`}
                     striped
                   />
                   <p className="mt-2 text-[12.5px] leading-relaxed text-[var(--muted)]">
@@ -1133,7 +1120,7 @@ export function SentimentPage({ canManage, onAction }: SentimentPageProps) {
                 <div className="mt-3">
                   {crawl.total > 0 ? (
                     <p className="text-[13px] leading-relaxed">
-                      抓取完成：{crawl.keywords.length} 个关键词共 {crawl.total} 条笔记，正文成功 {crawl.ok} 条、失败 {crawl.failed} 条，结果已写入笔记库。
+                      抓取完成：{crawl.keywords.length} 个关键词共 {crawl.total} 条笔记，正文成功 {crawl.ok} 条、筛除无关 {crawl.excluded} 条、失败 {crawl.failed} 条，结果已写入笔记库。
                     </p>
                   ) : (
                     <p className="text-[13px] leading-relaxed">搜索完成，但没有解析出新笔记（已抓取过的关键词不会重复抓正文）。</p>

@@ -24,7 +24,7 @@ function requiredConfig() {
 }
 
 function scheduleTimes() {
-  return readLocalEnv("DINGTALK_SYNC_TIMES", "10:30,13:00,17:30")
+  return readLocalEnv("DINGTALK_SYNC_TIMES", "11:00,13:00,17:30")
     .split(",")
     .map((value) => value.trim())
     .filter((value) => /^\d{2}:\d{2}$/.test(value));

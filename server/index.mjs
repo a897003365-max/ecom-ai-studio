@@ -1,4 +1,4 @@
-import { createReadStream, existsSync, mkdirSync, readFileSync } from "node:fs";
+import { createReadStream, existsSync, mkdirSync, readFileSync, readdirSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { createHash } from "node:crypto";
@@ -17,7 +17,8 @@ import { buildDashboardDataStatus } from "./dashboard-status.mjs";
 import { checkWarehouse, queryProductsOnDemand, readWarehouseSnapshot, syncWarehouse, warehouseSnapshotMtime } from "./warehouse.mjs";
 import { searchSite } from "./search-service.mjs";
 import { fetchCompetitorPrices, fetchProducts } from "./yudao-client.mjs";
-import { getPipelineState, hasSourceXlsx, sourceXlsxInfo, startAnalysisPipeline } from "./intelligence-pipeline.mjs";
+import { getPipelineState, hasSourceXlsx, saveSourceFile, sourceXlsxInfo, startAnalysisPipeline, requestCancel, visionProviderInfo } from "./intelligence-pipeline.mjs";
+import { generateIntelligenceReport, reportArtifactPath } from "./intelligence-report.mjs";
 import { hasVisionKey } from "./vision-client.mjs";
 import {
   beginSync,
@@ -874,14 +875,63 @@ async function handleApi(request, response, url) {
   if (request.method === "GET" && path === "/api/history") {
     return sendJson(response, 200, { syncRuns: listSyncRuns(), uploads: listUploads(), tasks: listTasks(30) });
   }
+  if (request.method === "GET" && path === "/api/intelligence/periods") {
+    return sendJson(response, 200, { periods: listIntelligencePeriods() });
+  }
+  // 竞品价格趋势：聚合 price-snapshots/<period>.json 中同一商品的多期快照。
+  // 快照文件由抓取流程按周期落盘（scripts/export-price-snapshots.mjs 负责首期导出）。
+  if (request.method === "GET" && path === "/api/intelligence/price-trend") {
+    const id = String(url.searchParams.get("id") || "").trim();
+    if (!id) return sendJson(response, 400, { error: "缺少 id 参数" });
+    const snapshotsDir = join(intelligenceDir, "price-snapshots");
+    let files = [];
+    try {
+      files = readdirSync(snapshotsDir).filter((f) => f.endsWith(".json")).sort();
+    } catch {
+      files = [];
+    }
+    const parsePriceNum = (text) => {
+      const m = String(text ?? "").replace(/,/g, "").match(/[\d.]+/);
+      return m ? parseFloat(m[0]) : null;
+    };
+    const points = [];
+    let productName = null;
+    for (const f of files) {
+      try {
+        const snap = JSON.parse(readFileSync(join(snapshotsDir, f), "utf8"));
+        const period = snap.period || f.replace(/\.json$/, "");
+        const item = (Array.isArray(snap.items) ? snap.items : []).find((it) => it && it.id === id);
+        if (!item) continue;
+        if (!productName) productName = item.productName || null;
+        // 优先返回当期留档图（/competitor-images/ 子路径），否则回退快照里的 alicdn 白名单链接
+        let imageUrl = null;
+        if (typeof item.imageFile === "string" && /^[A-Za-z0-9/_-]+$/.test(item.imageFile)) {
+          imageUrl = `/competitor-images/${item.imageFile}`;
+        } else if (typeof item.mainImage === "string" && item.mainImage.startsWith("http")) {
+          imageUrl = item.mainImage;
+        }
+        points.push({
+          period,
+          price: parsePriceNum(item.couponPrice),
+          rawPrice: item.couponPrice ?? null,
+          originalPrice: parsePriceNum(item.originalPrice),
+          low30d: parsePriceNum(item.low30d),
+          imageUrl,
+        });
+      } catch {
+        // 单个坏快照跳过，不影响整体趋势
+      }
+    }
+    return sendJson(response, 200, { id, productName, points, snapshots: files.length });
+  }
   if (request.method === "GET" && path === "/api/intelligence/top100") {
-    return serveIntelligenceJson(response, "top100.json");
+    return serveIntelligenceJson(response, "top100.json", url.searchParams.get("period"));
   }
   if (request.method === "GET" && path === "/api/intelligence/brand-ranking") {
-    return serveIntelligenceJson(response, "brand-ranking.json");
+    return serveIntelligenceJson(response, "brand-ranking.json", url.searchParams.get("period"));
   }
   if (request.method === "GET" && path === "/api/intelligence/insights") {
-    return serveIntelligenceJson(response, "insights.json");
+    return serveIntelligenceJson(response, "insights.json", url.searchParams.get("period"));
   }
   if (request.method === "GET" && path === "/api/intelligence/analyze-status") {
     return sendJson(response, 200, {
@@ -889,13 +939,108 @@ async function handleApi(request, response, url) {
       hasSourceXlsx: hasSourceXlsx(),
       hasVisionKey: hasVisionKey(),
       sourceInfo: sourceXlsxInfo(),
+      visionProviders: visionProviderInfo(),
     });
+  }
+  // 解析失败清单（含 LLM 原始返回片段），诊断哪些图片的输出无法解析为结构化字段
+  if (request.method === "GET" && path === "/api/intelligence/parse-failures") {
+    const safePeriod = String(url.searchParams.get("period") || "").replace(/[^0-9A-Za-z~_|-]/g, "");
+    if (!safePeriod) return sendJson(response, 400, { error: "缺少 period 参数" });
+    const fp = join(intelligenceDir, "analysis-cache", safePeriod, "pipeline-parse-failures.json");
+    if (!existsSync(fp)) return sendJson(response, 200, { period: safePeriod, failures: [] });
+    try {
+      return sendJson(response, 200, { period: safePeriod, failures: JSON.parse(readFileSync(fp, "utf8")) });
+    } catch (error) {
+      return sendJson(response, 500, { error: errorMessage(error) });
+    }
+  }
+  // 竞品原始表上传：接收 application/octet-stream 原始二进制，
+  // 立即校验格式（缺列会明确报出缺哪列），通过后按周期存到 sources/<period>.xlsx
+  if (request.method === "POST" && path === "/api/intelligence/upload-source") {
+    const MAX_SOURCE_BYTES = 60 * 1024 * 1024;
+    try {
+      const chunks = [];
+      let size = 0;
+      for await (const chunk of request) {
+        size += chunk.length;
+        if (size > MAX_SOURCE_BYTES) throw new Error("源表超过 60 MB 限制");
+        chunks.push(chunk);
+      }
+      if (!size) return sendJson(response, 400, { error: "文件内容为空" });
+      const buffer = Buffer.concat(chunks);
+      // xlsx = zip，校验 PK 头防止误传别的格式
+      if (buffer[0] !== 0x50 || buffer[1] !== 0x4b) {
+        return sendJson(response, 400, { error: "不是有效的 xlsx 文件（缺少 PK 头）" });
+      }
+      const result = await saveSourceFile(buffer);
+      if (!result.ok) {
+        // 格式校验失败：明确告诉前端缺哪列
+        return sendJson(response, 422, {
+          error: `文件格式不符合要求：${result.error}`,
+          missing: result.missing || [],
+          headers: result.headers || [],
+        });
+      }
+      return sendJson(response, 201, {
+        ok: true,
+        period: result.period,
+        slug: result.slug,
+        rowCount: result.rowCount,
+      });
+    } catch (error) {
+      return sendJson(response, 400, { error: errorMessage(error) });
+    }
+  }
+  // 取消正在进行的分析（已完成部分保留，可断点续跑）
+  if (request.method === "POST" && path === "/api/intelligence/analyze-cancel") {
+    const ok = requestCancel();
+    return sendJson(response, ok ? 202 : 409, {
+      cancelled: ok,
+      message: ok ? "已请求取消，当前图片处理完后停止" : "当前没有正在运行的分析任务",
+    });
+  }
+  // 同源只读报告产物：HTML 预览内联，PDF/Markdown 作为附件下载。
+  if (request.method === "GET" && path.startsWith("/api/intelligence/reports/")) {
+    const artifact = path.slice("/api/intelligence/reports/".length);
+    const match = artifact.match(/^([0-9A-Za-z_~-]+)(?:\.(html|pdf|md))?$/);
+    if (!match) return sendJson(response, 400, { error: "报告地址不合法" });
+    const format = match[2] || "html";
+    const filePath = reportArtifactPath(match[1], format);
+    if (!existsSync(filePath)) return sendJson(response, 404, { error: "报告产物不存在或尚未生成" });
+    const contentTypes = {
+      html: "text/html; charset=utf-8",
+      pdf: "application/pdf",
+      md: "text/markdown; charset=utf-8",
+    };
+    const headers = {
+      "Content-Type": contentTypes[format],
+      "Cache-Control": "no-store",
+      "Content-Security-Policy": "default-src 'none'; img-src data:; style-src 'unsafe-inline'; frame-ancestors 'self'",
+      "X-Frame-Options": "SAMEORIGIN",
+    };
+    if (format !== "html") {
+      const fileName = `竞品情报_TOP100_${match[1]}.${format}`;
+      headers["Content-Disposition"] = `attachment; filename*=UTF-8''${encodeURIComponent(fileName)}`;
+    }
+    response.writeHead(200, headers);
+    createReadStream(filePath).pipe(response);
+    return;
+  }
+  // 生成分析报告：完整 TOP100 + 同周期价格快照，输出 HTML/PDF/Markdown 元数据。
+  if (request.method === "POST" && path === "/api/intelligence/report") {
+    try {
+      const body = await readJson(request).catch(() => ({}));
+      const report = await generateIntelligenceReport({ period: body?.period, priceSnapshot: body?.priceSnapshot });
+      return sendJson(response, 200, report);
+    } catch (error) {
+      return sendJson(response, 400, { error: errorMessage(error) });
+    }
   }
   if (request.method === "POST" && path === "/api/intelligence/analyze-source") {
     try {
       const body = await readJson(request).catch(() => ({}));
       const useMock = body?.mock === true;
-      await startAnalysisPipeline({ mock: useMock });
+      await startAnalysisPipeline({ mock: useMock, force: body?.force === true, period: body?.period });
       return sendJson(response, 202, {
         state: getPipelineState(),
         message: "分析任务已启动",
@@ -1017,8 +1162,10 @@ const intelligenceDir = join(dataDir, "intelligence");
 const intelligenceImagesDir = join(intelligenceDir, "images");
 
 function serveCompetitorImage(response, fileName) {
-  const safe = safeFileName(fileName);
-  const filePath = normalize(join(intelligenceImagesDir, safe));
+  // 支持周期子路径：<slug>/<filename>（周期隔离的图片目录 images/<slug>/）
+  const decoded = String(fileName);
+  const parts = decoded.split("/").filter(Boolean).map((p) => safeFileName(p));
+  const filePath = normalize(join(intelligenceImagesDir, ...parts));
   if (!filePath.startsWith(intelligenceImagesDir) || !existsSync(filePath)) {
     return sendJson(response, 404, { error: "图片不存在" });
   }
@@ -1029,8 +1176,18 @@ function serveCompetitorImage(response, fileName) {
   createReadStream(filePath).pipe(response);
 }
 
-function serveIntelligenceJson(response, name) {
-  const filePath = join(intelligenceDir, name);
+function serveIntelligenceJson(response, name, period) {
+  // 周期快照：?period=2026-08-25 读 top100-<period>.json；不带 period 读最新
+  let filePath = join(intelligenceDir, name);
+  if (period) {
+    const safePeriod = String(period).replace(/[^0-9A-Za-z~_|-]/g, "");
+    const snapshotPath = join(intelligenceDir, name.replace(/\.json$/, `-${safePeriod}.json`));
+    if (existsSync(snapshotPath)) {
+      filePath = snapshotPath;
+    } else {
+      return sendJson(response, 404, { error: `周期 ${safePeriod} 的 ${name} 不存在`, availablePeriods: listIntelligencePeriods() });
+    }
+  }
   if (!existsSync(filePath)) {
     return sendJson(response, 404, { error: `${name} 尚未生成，请先运行 node scripts/build-intelligence-dataset.mjs` });
   }
@@ -1039,6 +1196,21 @@ function serveIntelligenceJson(response, name) {
     return sendJson(response, 200, payload);
   } catch (error) {
     return sendJson(response, 500, { error: errorMessage(error) });
+  }
+}
+
+// 扫描 intelligence 目录里的周期快照文件（top100-<period>.json），返回可用周期列表
+function listIntelligencePeriods() {
+  try {
+    const files = readdirSync(intelligenceDir);
+    const periods = new Set();
+    for (const f of files) {
+      const m = f.match(/^top100-(.+)\.json$/);
+      if (m) periods.add(m[1]);
+    }
+    return [...periods].sort().reverse();
+  } catch {
+    return [];
   }
 }
 
@@ -1123,3 +1295,7 @@ console.log(`Mode: ${production ? "production" : "development"}; API and UI shar
 // 启动后后台异步预热 analytics 缓存，不阻塞端口监听；首请求若未就绪则等待 single-flight
 prewarmAnalyticsCache();
 console.log("Analytics cache prewarm started in background.");
+
+// restart-trigger: 1787733992
+// Wed Aug 26 21:34:07     2026 touch
+// touch 1787751473

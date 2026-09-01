@@ -17,7 +17,7 @@ if (-not $Times) {
   if ($envValue) {
     $Times = $envValue -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ }
   } else {
-    $Times = @("10:30", "13:00", "17:30")
+    $Times = @("11:00", "13:00", "17:30")
   }
 }
 

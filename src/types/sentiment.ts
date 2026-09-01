@@ -1,5 +1,5 @@
 // 小红书舆情分析类型（对应 server/sentiment.mjs 的响应结构）
-export type SentimentNoteState = "pending" | "ok" | "failed";
+export type SentimentNoteState = "pending" | "ok" | "failed" | "unrelated";
 
 export interface SentimentNoteMeta {
   noteId: string;
@@ -86,6 +86,7 @@ export interface SentimentCrawlStatus {
   phase: "idle" | "searching" | "filling";
   total: number;
   ok: number;
+  excluded: number;
   failed: number;
   errors: string[];
   startedAt: string | null;

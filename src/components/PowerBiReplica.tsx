@@ -1216,7 +1216,7 @@ function CompetitorPage({ pages, refreshedAt }: { pages: PowerBiPages; refreshed
 type ServiceMetricRow = Record<string, number | string | null | undefined>;
 
 type AggregateConfig =
-  | { key: string; aggregate: "sum" | "avg" }
+  | { key: string; aggregate: "sum" | "avg" | "avgOrNull" }
   | { key: string; aggregate: "weightedAverage"; weightKey: string };
 
 function sumRows(rows: ServiceMetricRow[], key: string): number {
@@ -1237,6 +1237,22 @@ function avgRows(rows: ServiceMetricRow[], key: string): number {
     count += 1;
   }
   return count ? sum / count : 0;
+}
+
+/** 与 avgRows 同口径忽略 null/NaN，但整列无数据时返回 null（渲染「—」）而非 0，
+ *  避免把「该店铺无此指标」（如京东POP无首次响应）显示成虚假的 0.0s。 */
+function avgRowsOrNull(rows: ServiceMetricRow[], key: string): number | null {
+  let sum = 0;
+  let count = 0;
+  for (const row of rows) {
+    const value = row[key];
+    if (value == null) continue;
+    const num = Number(value);
+    if (!Number.isFinite(num)) continue;
+    sum += num;
+    count += 1;
+  }
+  return count ? sum / count : null;
 }
 
 /** 加权平均：分子 = Σ(指标 × 权重)、分母 = Σ(权重)。
@@ -1272,6 +1288,8 @@ function aggregateAgentRows(rows: PowerBiCustomerServiceAgent[], config: Aggrega
         (base as unknown as Record<string, number>)[key] = sumRows(metricList, key);
       } else if (configItem.aggregate === "avg") {
         (base as unknown as Record<string, number>)[key] = avgRows(metricList, key);
+      } else if (configItem.aggregate === "avgOrNull") {
+        (base as unknown as Record<string, number | null>)[key] = avgRowsOrNull(metricList, key);
       } else if (configItem.aggregate === "weightedAverage") {
         (base as unknown as Record<string, number | null>)[key] = weightedAverageRows(metricList, key, configItem.weightKey);
       }
@@ -1410,7 +1428,7 @@ function CustomerServiceTrendChart({ rows, leftSeries, rightSeries }: {
 interface ServiceKpiTile {
   label: string;
   key: string;
-  aggregate: "sum" | "avg";
+  aggregate: "sum" | "avg" | "avgOrNull";
   format: (value: number) => string;
   note?: string;
   /** 客服维度无此指标时显示「—」（如整体口径的当日询单/销售人数） */
@@ -1425,21 +1443,24 @@ function ServiceKpiGrid({ rows, previousRows, tiles }: {
 }) {
   const metricRows = rows as unknown as ServiceMetricRow[];
   const metricPrevRows = previousRows as unknown as ServiceMetricRow[];
-  const aggregate = (list: ServiceMetricRow[], tile: ServiceKpiTile) => (tile.aggregate === "sum" ? sumRows(list, tile.key) : avgRows(list, tile.key));
+  const aggregate = (list: ServiceMetricRow[], tile: ServiceKpiTile) =>
+    tile.aggregate === "sum" ? sumRows(list, tile.key)
+    : tile.aggregate === "avgOrNull" ? avgRowsOrNull(list, tile.key)
+    : avgRows(list, tile.key);
   return (
     <div className="pb-kpi-grid">
       {tiles.map((tile, index) => {
-        const current = tile.unavailable ? 0 : aggregate(metricRows, tile);
+        const current = tile.unavailable ? null : aggregate(metricRows, tile);
         const previous = tile.unavailable || !metricPrevRows.length ? null : aggregate(metricPrevRows, tile);
         return (
           <KpiTile
-            current={current}
+            current={current ?? 0}
             index={index}
             key={tile.key}
             label={tile.label}
             note={tile.note ?? ""}
             previous={previous}
-            value={tile.unavailable ? "—" : tile.format(current)}
+            value={current == null ? "—" : tile.format(current)}
           />
         );
       })}
@@ -1567,35 +1588,43 @@ function TmallServicePage({ cs, range }: { cs: PowerBiCustomerService; range: { 
 function JdServicePage({ cs, range }: { cs: PowerBiCustomerService; range: { start: string; end: string } | null }) {
   const jd = cs.jd ?? { daily: [], serviceDaily: [], byAgent: [], groups: [] };
   const inRange = (value: string) => !range || (value >= range.start && value <= range.end);
+  const [store, setStore] = useState("全部");
+  // 新快照 daily 每店一行 + '全部' rollup 行；旧快照无 store 字段时按原口径整体渲染（hasStoreDimension=false）
+  const hasStoreDimension = jd.daily.some((row) => row.store) || jd.byAgent.some((row) => row.store);
+  const storeOptions = ["全部", ...new Set(jd.daily.map((row) => row.store).filter((value): value is string => Boolean(value) && value !== "全部"))].sort();
+  const dailyStoreMatch = (row: { store?: string }) =>
+    !hasStoreDimension ? true : store === "全部" ? row.store === "全部" : row.store === store;
+  const agentStoreMatch = (row: { store?: string }) =>
+    !hasStoreDimension || store === "全部" ? true : row.store === store;
   const allDaily = [...jd.daily].sort((a, b) => a.date.localeCompare(b.date));
-  const daily = allDaily.filter((row) => inRange(row.date));
+  const daily = allDaily.filter((row) => inRange(row.date) && dailyStoreMatch(row));
   const allServiceDaily = [...jd.serviceDaily].sort((a, b) => a.date.localeCompare(b.date));
-  const serviceDaily = allServiceDaily.filter((row) => inRange(row.date));
+  const serviceDaily = allServiceDaily.filter((row) => inRange(row.date) && dailyStoreMatch(row));
   const prevRange = previousRangeFor(range);
-  const prevDaily = range && prevRange ? allDaily.filter((row) => row.date >= prevRange.start && row.date <= prevRange.end) : [];
-  const prevServiceDaily = range && prevRange ? allServiceDaily.filter((row) => row.date >= prevRange.start && row.date <= prevRange.end) : [];
+  const prevDaily = range && prevRange ? allDaily.filter((row) => row.date >= prevRange.start && row.date <= prevRange.end && dailyStoreMatch(row)) : [];
+  const prevServiceDaily = range && prevRange ? allServiceDaily.filter((row) => row.date >= prevRange.start && row.date <= prevRange.end && dailyStoreMatch(row)) : [];
   const [group, setGroup] = useState("全部");
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
-  const detailRows = jd.byAgent.filter((row) => inRange(row.date) && (group === "全部" || row.skillGroup === group));
+  const detailRows = jd.byAgent.filter((row) => inRange(row.date) && agentStoreMatch(row) && (group === "全部" || row.skillGroup === group));
   const selectedRows = selectedAgent ? detailRows.filter((row) => row.agent === selectedAgent) : [];
   // 表格恒为「范围内按客服聚合」（每客服一行，无日期列），点击行联动卡片与趋势
   const tableRows = aggregateAgentRows(detailRows, [
     { key: "received", aggregate: "sum" },
     { key: "orderAmount", aggregate: "sum" },
-    { key: "firstResponse", aggregate: "avg" },
-    { key: "avgResponse", aggregate: "avg" },
-    { key: "answerRatio", aggregate: "avg" },
+    { key: "firstResponse", aggregate: "avgOrNull" },
+    { key: "avgResponse", aggregate: "avgOrNull" },
+    { key: "answerRatio", aggregate: "avgOrNull" },
     { key: "conversionRate", aggregate: "avg" },
     { key: "goodReviews", aggregate: "sum" },
     { key: "badReviews", aggregate: "sum" },
   ]).sort((a, b) => (b.received ?? 0) - (a.received ?? 0));
-  const agentPagination = usePagination(tableRows, `${selectedAgent ?? "all"}-${group}-${range?.start}-${range?.end}`, 10);
+  const agentPagination = usePagination(tableRows, `${selectedAgent ?? "all"}-${store}-${group}-${range?.start}-${range?.end}`, 10);
   // 选中客服失效时自动清除（改分组/全局日期后该客服可能不在当前明细集内）
   useEffect(() => {
     if (selectedAgent && !detailRows.some((row) => row.agent === selectedAgent)) setSelectedAgent(null);
   }, [selectedAgent, detailRows]);
   const prevAgentRows = selectedAgent
-    ? jd.byAgent.filter((row) => row.agent === selectedAgent && prevRange && row.date >= prevRange.start && row.date <= prevRange.end)
+    ? jd.byAgent.filter((row) => row.agent === selectedAgent && agentStoreMatch(row) && prevRange && row.date >= prevRange.start && row.date <= prevRange.end)
     : [];
   if (!cs.jd) return null;
   if (!daily.length) return <div className="pb-empty">当前日期范围内无京东客服数据，请调整日期筛选。</div>;
@@ -1606,8 +1635,8 @@ function JdServicePage({ cs, range }: { cs: PowerBiCustomerService; range: { sta
   const servicePrevRows = selectedAgent ? prevAgentRows : prevServiceDaily;
   const overallTiles: ServiceKpiTile[] = [
     { label: "接待量", key: "received", aggregate: "sum", format: (value) => countFormat.format(value), note: "范围内合计" },
-    { label: "首次平均响应", key: "firstResponse", aggregate: "avg", format: (value) => `${value.toFixed(1)}s`, note: "每日平均" },
-    { label: "30s应答率", key: "response30s", aggregate: "avg", format: (value) => percent(value), note: "每日平均" },
+    { label: "首次平均响应", key: "firstResponse", aggregate: "avgOrNull", format: (value) => `${value.toFixed(1)}s`, note: "每日平均" },
+    { label: "30s应答率", key: "response30s", aggregate: "avgOrNull", format: (value) => percent(value), note: "每日平均" },
     { label: "促成下单金额", key: "orderAmount", aggregate: "sum", format: (value) => `${moneyPreciseFormat.format(value / 10000)} 万`, note: "万元" },
     { label: "客单价(客服)", key: "unitPrice", aggregate: "avg", format: (value) => `¥${moneyFormat.format(value)}`, note: "促成金额 / 促成人数" },
     { label: "转化率", key: "conversionRate", aggregate: "avg", format: (value) => percent(value), note: "促成下单 / 售前接待 · 每日平均" },
@@ -1623,13 +1652,18 @@ function JdServicePage({ cs, range }: { cs: PowerBiCustomerService; range: { sta
   const serviceTiles: ServiceKpiTile[] = [
     { label: "好评量", key: "goodReviews", aggregate: "sum", format: (value) => countFormat.format(value) },
     { label: "差评量", key: "badReviews", aggregate: "sum", format: (value) => countFormat.format(value) },
-    { label: "京东答问比", key: "answerRatio", aggregate: "avg", format: (value) => value.toFixed(2), note: "客服消息 / 客户消息 · 每日平均" },
+    { label: "京东答问比", key: "answerRatio", aggregate: "avgOrNull", format: (value) => value.toFixed(2), note: "客服消息 / 客户消息 · 每日平均" },
   ];
   const selectedName = selectedAgent ?? "";
   return (
     <div className="pb-detail-layout" data-search-anchor="analytics-jd-service">
       <main>
         <div className="pb-service-controls">
+          {hasStoreDimension && (
+            <label><span>店铺</span><select aria-label="筛选店铺" onChange={(event) => { setStore(event.target.value); setSelectedAgent(null); }} value={store}>
+              {storeOptions.map((value) => <option key={value} value={value}>{value}</option>)}
+            </select></label>
+          )}
           <label><span>技能组</span><select aria-label="筛选技能组" onChange={(event) => setGroup(event.target.value)} value={group}>
             <option value="全部">全部</option>
             {jd.groups.map((value) => <option key={value} value={value}>{value}</option>)}
@@ -1652,9 +1686,9 @@ function JdServicePage({ cs, range }: { cs: PowerBiCustomerService; range: { sta
                   <td>{row.skillGroup || "—"}</td>
                   <td>{countFormat.format(row.received ?? 0)}</td>
                   <td>{moneyPreciseFormat.format((row.orderAmount ?? 0) / 10000)}</td>
-                  <td>{(row.firstResponse ?? 0).toFixed(1)}s</td>
-                  <td>{(row.avgResponse ?? 0).toFixed(1)}s</td>
-                  <td>{(row.answerRatio ?? 0).toFixed(2)}</td>
+                  <td>{row.firstResponse == null ? "—" : `${row.firstResponse.toFixed(1)}s`}</td>
+                  <td>{row.avgResponse == null ? "—" : `${row.avgResponse.toFixed(1)}s`}</td>
+                  <td>{row.answerRatio == null ? "—" : row.answerRatio.toFixed(2)}</td>
                   <td>{percent(row.conversionRate ?? 0)}</td>
                   <td>{countFormat.format(row.goodReviews ?? 0)}</td>
                   <td>{countFormat.format(row.badReviews ?? 0)}</td>

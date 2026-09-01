@@ -8,12 +8,12 @@
  *
  * 两种模式：
  *   1. 默认（Stage A）：读取 E:/Github/竞品主图分析/analysis/ 下的离线人工分析
- *   2. --pipeline（Stage B）：读取 local-data/intelligence/analysis-cache/pipeline-results.json
- *      （由 server pipeline 自动生成）
+ *   2. --pipeline（Stage B）：读取 local-data/intelligence/analysis-cache/<period>/pipeline-results.json
+ *      （由 server pipeline 自动生成；--period <slug> 指定周期目录）
  *
  * 用法：
  *   node scripts/build-intelligence-dataset.mjs
- *   node scripts/build-intelligence-dataset.mjs --pipeline
+ *   node scripts/build-intelligence-dataset.mjs --pipeline --period 2026-08-25
  */
 import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync } from "node:fs";
 import { join, basename } from "node:path";
@@ -25,11 +25,17 @@ const OUTPUT_DIR = join(projectRoot, "local-data", "intelligence");
 const IMAGES_DIR = join(OUTPUT_DIR, "images");
 
 const usePipeline = process.argv.includes("--pipeline");
+// --period <slug>：周期隔离目录（analysis-cache/<slug>/、images/<slug>/）
+const periodArgIdx = process.argv.indexOf("--period");
+const periodSlug = periodArgIdx !== -1 ? String(process.argv[periodArgIdx + 1] || "").trim() : "";
 
 // 数据源根据模式切换
 const STAGE_A_ANALYSIS_ROOT = "E:/Github/竞品主图分析/analysis";
 const STAGE_A_IMAGE_ROOT = "E:/Github/竞品主图分析/images/raw";
-const PIPELINE_CACHE = join(OUTPUT_DIR, "analysis-cache", "pipeline-results.json");
+const PIPELINE_CACHE = periodSlug
+  ? join(OUTPUT_DIR, "analysis-cache", periodSlug, "pipeline-results.json")
+  : join(OUTPUT_DIR, "analysis-cache", "pipeline-results.json");
+const PIPELINE_IMAGES_DIR = periodSlug ? join(IMAGES_DIR, periodSlug) : IMAGES_DIR;
 
 mkdirSync(OUTPUT_DIR, { recursive: true });
 mkdirSync(IMAGES_DIR, { recursive: true });
@@ -43,7 +49,8 @@ let batches = [];
 let context = {};
 let rowImageMap = {};
 let madashiByRow = {};
-let samplePeriod = "2026-07-02 ~ 2026-07-08";
+// 空串起步：优先 row.date，兜底 periodSlug，最后才是 Stage A 历史默认
+let samplePeriod = "";
 let imageBaseDir = IMAGES_DIR;  // pipeline 模式下图片已在 IMAGES_DIR
 
 if (usePipeline) {
@@ -67,8 +74,8 @@ if (usePipeline) {
       sales: row.sales || "",
       keywords: row.keywords || "",
     };
-    rowImageMap[String(r)] = join(IMAGES_DIR, row.imageFile);
-    if (row.date) samplePeriod = row.date;
+    rowImageMap[String(r)] = join(PIPELINE_IMAGES_DIR, row.imageFile);
+    if (!samplePeriod && row.date) samplePeriod = row.date;
   }
   console.log(`[build] pipeline 模式：读取 ${pipelineRows.length} 行分析结果`);
 } else {
@@ -90,6 +97,9 @@ if (usePipeline) {
     if (!rowImageMap[row]) rowImageMap[row] = join(STAGE_A_IMAGE_ROOT, f);
   }
 }
+
+// 兜底：行内无 date（历史缓存）时用 --period slug；Stage A 无 slug 时保留历史默认
+if (!samplePeriod) samplePeriod = periodSlug || "2026-07-02 ~ 2026-07-08";
 
 // ---------- 2. 归一化字段 ----------
 // 分数字段可能是字符串数字，也可能是"高/中/低"，统一转成 1~5 数字
@@ -124,7 +134,8 @@ function buildTop100() {
     const analysis = madashiByRow[row] ?? batch;
     const ctx = context[String(row)] ?? {};
     const imgPath = rowImageMap[String(row)];
-    const imgFile = imgPath ? basename(imgPath) : null;
+    // 周期隔离时 imageFile 带周期前缀（<slug>/<filename>），供 /competitor-images/ 路由按周期目录找图
+    const imgFile = imgPath ? (periodSlug ? `${periodSlug}/${basename(imgPath)}` : basename(imgPath)) : null;
 
     return {
       row,
@@ -133,8 +144,9 @@ function buildTop100() {
       brand: extractBrand(imgFile, ctx.shop),
       shop: ctx.shop ?? "",
       platform: ctx.platform ?? "天猫",
-      priceRange: ctx.price ?? "",
-      salesRange: ctx.sales ?? "",
+      // 价格带只接受「数字 ~ 数字」区间格式；脏值（如单元格串行解析出的散字）一律置空
+      priceRange: /^\s*[\d.,]+\s*[~～\-—]\s*[\d.,]+\s*$/.test(String(ctx.price ?? "")) ? ctx.price : "",
+      salesRange: ctx.sales || (ctx.price ? String(ctx.price) : "") || "",
       keywords: ctx.keywords ?? "",
       imageFile: imgFile,
       // 9 项评分（1~5）
@@ -333,14 +345,28 @@ writeFileSync(join(OUTPUT_DIR, "top100.json"), JSON.stringify(top100, null, 2), 
 writeFileSync(join(OUTPUT_DIR, "brand-ranking.json"), JSON.stringify(brandRanking, null, 2), "utf8");
 writeFileSync(join(OUTPUT_DIR, "insights.json"), JSON.stringify(insights, null, 2), "utf8");
 
+// 周期快照：每次构建同时写 <name>-<period>.json，供前端按采样周期回看历史
+// 优先用 --period 传入的 slug；否则从 samplePeriod 生成（与 server 的 periodSlug 口径一致）
+const snapshotSlug = (periodSlug || top100.samplePeriod || top100.generatedAt.slice(0, 10))
+  .replace(/[\\/:*?"<>|\s]+/g, "_");
+for (const [name, data] of [["top100", top100], ["brand-ranking", brandRanking], ["insights", insights]]) {
+  writeFileSync(join(OUTPUT_DIR, `${name}-${snapshotSlug}.json`), JSON.stringify(data, null, 2), "utf8");
+}
+console.log(`  周期快照：*-${snapshotSlug}.json`);
+
 console.log(`[build-intelligence-dataset] 写入完成：`);
 console.log(`  ${OUTPUT_DIR}/top100.json         (${top100.items.length} 行)`);
 console.log(`  ${OUTPUT_DIR}/brand-ranking.json  (${brandRanking.ranking.length} 品牌)`);
 console.log(`  ${OUTPUT_DIR}/insights.json       (4 流派 + P0/P1 行动)`);
 
 // 图片存在性 sanity check（根据模式检查不同目录）
-const imgCheckDir = usePipeline ? IMAGES_DIR : STAGE_A_IMAGE_ROOT;
-const missing = top100.items.filter((i) => i.imageFile && !existsSync(join(imgCheckDir, i.imageFile)));
+const imgCheckDir = usePipeline ? PIPELINE_IMAGES_DIR : STAGE_A_IMAGE_ROOT;
+const missing = top100.items.filter((i) => {
+  if (!i.imageFile) return false;
+  // imageFile 可能带周期前缀（<slug>/<filename>）
+  const rel = i.imageFile.includes("/") ? i.imageFile.split("/").pop() : i.imageFile;
+  return !existsSync(join(imgCheckDir, rel));
+});
 if (missing.length) {
   console.warn(`[WARN] ${missing.length} 张图片在 ${imgCheckDir} 中未找到，前端会显示占位：`);
   missing.slice(0, 5).forEach((i) => console.warn(`  row ${i.row}: ${i.imageFile}`));

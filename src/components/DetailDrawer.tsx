@@ -12,7 +12,7 @@ interface DetailDrawerProps {
 // 点击 TOP100 行 → 全屏右侧抽屉展开 85 字段全景，按维度分组
 export function DetailDrawer({ item, onClose }: DetailDrawerProps) {
   if (!item) return null;
-  const imgUrl = competitorImageUrl(item.imageFile);
+  const imgUrl = competitorImageUrl(item.imageFile) || item.imageUrl || null;
 
   return (
     <div className="fixed inset-0 z-50 flex" role="dialog" aria-modal="true">

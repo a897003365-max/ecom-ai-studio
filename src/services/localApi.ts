@@ -1,4 +1,5 @@
 import type { CompetitorPriceItem, QueueTask } from "../types";
+import { tmallCompetitorPrices } from "../data/tmallCompetitorData";
 import type { AnalyticsIntegrationPayload, DataSourcesPayload, ProductsPayload, UploadRecord } from "../types/integration";
 import type { SearchRequest, SearchResponse } from "../types/search";
 import { startProgress, stopProgress } from "../utils/progress";
@@ -134,7 +135,7 @@ function toCompetitorPriceItem(vo: YudaoCompetitorPriceVO, index: number): Compe
   };
 }
 
-// 竞品价格监控：服务端代理 yudao 只读接口；degraded=true 表示 yudao 未配置或不可用
+// 竞品价格监控：服务端代理 yudao 只读接口；degraded=true 时回退到 tmall-sku-price 实时抓取数据
 export async function getCompetitorPrices(): Promise<CompetitorPricesPayload> {
   const payload = await request<{
     items?: YudaoCompetitorPriceVO[];
@@ -142,10 +143,20 @@ export async function getCompetitorPrices(): Promise<CompetitorPricesPayload> {
     degraded?: boolean;
     reason?: string;
   }>("/api/masterdata/competitor-prices");
+  const mapped = (payload.items ?? []).map(toCompetitorPriceItem);
+  if (payload.degraded === true || mapped.length === 0) {
+    // yudao 不可用 → 用天猫实时抓取数据兜底（tmall-sku-price 项目产出）
+    return {
+      items: tmallCompetitorPrices,
+      total: tmallCompetitorPrices.length,
+      degraded: false,
+      reason: `yudao 不可用，展示天猫实时抓取数据（${payload.reason ?? "未配置"}）`,
+    };
+  }
   return {
-    items: (payload.items ?? []).map(toCompetitorPriceItem),
+    items: mapped,
     total: payload.total ?? 0,
-    degraded: payload.degraded === true,
+    degraded: false,
     reason: payload.reason,
   };
 }

@@ -1,7 +1,10 @@
 """
 extract-images-from-xlsx.py
 
-从 xlsx 文件抽取所有 DISPIMG 图片，输出到指定目录。
+从 xlsx 文件抽取所有图片，输出到指定目录。
+支持两种嵌入格式：
+  1. WPS DISPIMG（xl/cellimages.xml + 单元格公式 _xlfn.DISPIMG）
+  2. 标准 OOXML drawing（xl/drawings/drawingN.xml 锚点 + xl/media/*）—— 生意参谋导出格式
 弹性设计：图片数量、行数、列数都不写死，实际有多少处理多少。
 
 用法：
@@ -53,6 +56,49 @@ def find_column(headers, name_candidates):
             if name in h_str:
                 return i + 1  # openpyxl 列从 1 开始
     return None
+
+
+def parse_drawing_anchors(z):
+    """解析标准 OOXML drawing 锚点（非 DISPIMG 的常规嵌入图片）。
+
+    结构：xl/drawings/drawingN.xml 里每个 oneCellAnchor/twoCellAnchor 带
+    <from><col>..</col><row>0基行号</row></from> 和 r:embed="rIdX"，
+    对应的 rels 文件把 rIdX 映射到 ../media/imageN.jpeg。
+    返回 {1基行号: media_target}，每行只保留第一张图。
+    """
+    names = set(z.namelist())
+    row_to_target = {}
+    drawing_files = sorted(
+        n for n in names if re.fullmatch(r"xl/drawings/drawing\d+\.xml", n)
+    )
+    for df in drawing_files:
+        rels_name = f"xl/drawings/_rels/{os.path.basename(df)}.rels"
+        rid_to_target = {}
+        if rels_name in names:
+            rels_xml = z.read(rels_name).decode("utf-8", errors="ignore")
+            # 属性顺序不固定（有的文件 Target 在前 Id 在后），逐个 Relationship 解析
+            for m in re.finditer(r"<Relationship\b[^>]*/?>", rels_xml):
+                tag = m.group(0)
+                id_m = re.search(r'Id="(rId\d+)"', tag)
+                target_m = re.search(r'Target="([^"]+)"', tag)
+                if id_m and target_m:
+                    rid_to_target[id_m.group(1)] = target_m.group(1)
+        drawing_xml = z.read(df).decode("utf-8", errors="ignore")
+        for m in re.finditer(
+            r"<(?:oneCellAnchor|twoCellAnchor)\b.*?</(?:oneCellAnchor|twoCellAnchor)>",
+            drawing_xml,
+            re.DOTALL,
+        ):
+            block = m.group(0)
+            row_m = re.search(r"<from>.*?<row>(\d+)</row>", block, re.DOTALL)
+            embed_m = re.search(r'r:embed="(rId\d+)"', block)
+            if not row_m or not embed_m:
+                continue
+            row_num = int(row_m.group(1)) + 1  # drawing XML 行号是 0 基
+            target = rid_to_target.get(embed_m.group(1))
+            if target and row_num not in row_to_target:
+                row_to_target[row_num] = target
+    return row_to_target
 
 
 def main():
@@ -119,21 +165,28 @@ def main():
     col_ranking = find_column(headers, ["行业排名", "排名", "ranking"])
     col_date = find_column(headers, ["日期", "date"])
 
-    # 4. 抽图
+    # 4. 建立 行号 → media 目标 的统一映射（DISPIMG 优先，标准 drawing 兜底）
+    row_to_target = {}
+    for (row_num, col_letter), disp_id in sorted(row_col_to_id.items()):
+        if row_num < 2:  # 跳过表头
+            continue
+        if row_num in row_to_target:
+            continue  # 每行只取第一张主图
+        rid = id_to_embed.get(disp_id)
+        target = rid_to_target.get(rid) if rid else None
+        if target:
+            row_to_target[row_num] = target
+
+    if not row_to_target:
+        # 标准 OOXML drawing（生意参谋等导出的常规嵌入图）
+        with zipfile.ZipFile(xlsx_path) as z:
+            row_to_target = parse_drawing_anchors(z)
+
+    # 5. 抽图
     images = []
     with zipfile.ZipFile(xlsx_path) as z:
-        # 遍历所有含 DISPIMG 的单元格，按 row 分组，每 row 取第一张图片作为主图
-        rows_seen = {}
-        for (row_num, col_letter), disp_id in sorted(row_col_to_id.items()):
-            if row_num < 2:  # 跳过表头
-                continue
-            if row_num in rows_seen:
-                continue  # 每行只取第一张主图
-            rows_seen[row_num] = True
-
-            rid = id_to_embed.get(disp_id)
-            target = rid_to_target.get(rid) if rid else None
-            if not target:
+        for row_num, target in sorted(row_to_target.items()):
+            if row_num < 2:
                 continue
 
             product_name = sanitize(ws.cell(row=row_num, column=col_name).value) if col_name else "unknown"

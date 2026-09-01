@@ -359,6 +359,7 @@ export interface Top100ItemV2 {
   salesRange: string;
   keywords: string;
   imageFile: string | null;
+  imageUrl?: string;  // CDN 直链（兜底数据用，替代本地 imageFile）
   scores: Top100ItemScores;
   // 精选字段
   headline: string;

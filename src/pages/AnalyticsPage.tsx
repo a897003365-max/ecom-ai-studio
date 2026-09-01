@@ -191,7 +191,7 @@ export function AnalyticsPage({ onAction, canManage, searchTarget, onSearchConsu
     <div>
       <PageHeader
         title="全渠道经营总览"
-        subtitle={`成交、回款、投放与渠道质量一屏决策 · 最近同步 ${dateTime(latestSync)} · 每日同步计划 ${dingtalk?.schedule?.join(" / ") || "10:30 / 13:00 / 17:30"}`}
+        subtitle={`成交、回款、投放与渠道质量一屏决策 · 最近同步 ${dateTime(latestSync)} · 每日同步计划 ${dingtalk?.schedule?.join(" / ") || "11:00 / 13:00 / 17:30"}`}
         actions={
           <>
             <ViewModeToggle mode={viewMode} onChange={setViewMode} />

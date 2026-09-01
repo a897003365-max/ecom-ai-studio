@@ -20,6 +20,11 @@ $env:HOST = $TailnetIP
 $env:PORT = $Port
 $env:AUTH_ENFORCEMENT_ENABLED = "0"
 
+# 钉钉同步计划：从此脚本启动时从 HKCU\Environment 读取最新值，覆盖进程级缓存，
+# 避免长驻 watcher 的 process.env 残留旧值（readLocalEnv 优先 process.env，其次注册表）。
+$syncTimes = (Get-ItemProperty -Path 'HKCU:\Environment' -Name DINGTALK_SYNC_TIMES -ErrorAction SilentlyContinue).DINGTALK_SYNC_TIMES
+if ($syncTimes) { $env:DINGTALK_SYNC_TIMES = $syncTimes } else { Remove-Item Env:DINGTALK_SYNC_TIMES -ErrorAction SilentlyContinue }
+
 Set-Location $ProjectDir
 
 function Write-Log($msg) {

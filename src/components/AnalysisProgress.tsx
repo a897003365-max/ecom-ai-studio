@@ -4,7 +4,7 @@ import { clsx } from "../utils/format";
 
 export interface PipelineState {
   running: boolean;
-  phase: "idle" | "extract" | "analyze" | "merge" | "done" | "error";
+  phase: "idle" | "read" | "download" | "extract" | "analyze" | "merge" | "done" | "error" | "cancelled";
   processed: number;
   total: number;
   message: string;
@@ -12,13 +12,17 @@ export interface PipelineState {
   finishedAt: string | null;
   error: string | null;
   useMock: boolean;
+  period?: string | null;
+  failedDownloads?: Array<{ row: number; name: string; url: string; reason: string }>;
+  cancelRequested?: boolean;
 }
 
 export interface AnalyzeStatus {
   state: PipelineState;
   hasSourceXlsx: boolean;
   hasVisionKey: boolean;
-  sourceInfo: { path: string; size: number; mtime: string } | null;
+  sourceInfo: { path: string; size: number; mtime: string; period?: string } | null;
+  visionProviders?: Array<{ id: string; model: string }>;
 }
 
 interface AnalysisProgressProps {
@@ -28,20 +32,26 @@ interface AnalysisProgressProps {
 
 const PHASE_LABELS: Record<PipelineState["phase"], string> = {
   idle: "待启动",
+  read: "读取源表",
+  download: "下载原图",
   extract: "抽图中",
   analyze: "视觉分析中",
   merge: "合并结果",
   done: "完成",
   error: "失败",
+  cancelled: "已取消",
 };
 
 const PHASE_TONE: Record<PipelineState["phase"], string> = {
   idle: "muted",
+  read: "blue",
+  download: "blue",
   extract: "blue",
   analyze: "blue",
   merge: "blue",
   done: "green",
   error: "red",
+  cancelled: "orange",
 };
 
 // 前端进度条组件：所有分母来自 API state.total，不写死
@@ -91,6 +101,25 @@ export function AnalysisProgress({ status, onComplete }: AnalysisProgressProps) 
           )}
           {state.error && (
             <div className="mt-2 text-xs text-[var(--red)]">错误详情：{state.error}</div>
+          )}
+          {state.failedDownloads && state.failedDownloads.length > 0 && (
+            <details className="mt-2 text-xs text-[var(--orange)]">
+              <summary className="cursor-pointer">
+                {state.failedDownloads.length} 张原图下载失败（点击展开明细）
+              </summary>
+              <ul className="mt-1 grid gap-1 pl-4">
+                {state.failedDownloads.map((f) => (
+                  <li key={`${f.row}-${f.name}`} className="truncate" title={f.url}>
+                    第{f.row}行 {f.name || "-"}：{f.reason}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+          {status.visionProviders && status.visionProviders.length > 0 && (
+            <div className="mt-2 text-xs text-[var(--muted)]">
+              视觉渠道：{status.visionProviders.map((p) => `${p.id}(${p.model})`).join(" → ")}
+            </div>
           )}
         </div>
       </div>

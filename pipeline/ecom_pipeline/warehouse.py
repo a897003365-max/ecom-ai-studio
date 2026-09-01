@@ -22,7 +22,7 @@ from .product_structure_builders import (
     empty_size_structure,
     empty_spu_sales_trend,
 )
-from .readers import discover_files, read_source_file
+from .readers import QuarantinedSourceError, discover_files, read_source_file
 from .source_policy import (
     DINGTALK_COVERED_QUERIES,
     PARTIAL_OVERLAP_QUERIES,
@@ -112,6 +112,7 @@ def _sync_query(
     reused = 0
     failed = 0
     errors = []
+    quarantined: list[dict[str, str]] = []
 
     _emit(progress, {"event": "query_started", "query": spec.name, "files": len(selected), "totalFiles": len(all_files)})
     for index, source in enumerate(selected, start=1):
@@ -119,15 +120,14 @@ def _sync_query(
         signature = _file_signature(source)
         destination = _partition_path(paths.staging_root, spec, source)
         previous = state["files"].get(key)
-        if (
-            not options.force
-            and previous
-            and previous.get("query") == spec.name
-            and previous.get("signature") == signature
-            and destination.exists()
-        ):
-            reused += 1
-            continue
+        if not options.force and previous and previous.get("query") == spec.name and previous.get("signature") == signature:
+            if previous.get("quarantined"):
+                # 置信度隔离结论随文件签名缓存：文件不变则不重复判定，仍计入本次报告
+                quarantined.append({"file": source.name, "reason": previous["quarantined"]})
+                continue
+            if destination.exists():
+                reused += 1
+                continue
         try:
             frame = read_source_file(source, spec)
             frame = transform_source_file(frame, spec, source)
@@ -145,6 +145,20 @@ def _sync_query(
                 "error": None,
             }
             processed += 1
+        except QuarantinedSourceError as error:
+            # 置信度不足：不写分区、不算失败，记入 quarantined 待人工确认
+            quarantined.append({"file": source.name, "reason": error.reason})
+            state["files"][key] = {
+                "query": spec.name,
+                "signature": signature,
+                "source": str(source),
+                "parquet": None,
+                "rows": 0,
+                "columns": 0,
+                "updatedAt": datetime.now().astimezone().isoformat(),
+                "error": None,
+                "quarantined": error.reason,
+            }
         except Exception as error:  # Keep the last valid partition when one file is malformed.
             failed += 1
             message = str(error).replace("\r", " ").replace("\n", " ")[:500]
@@ -188,6 +202,7 @@ def _sync_query(
         "processed": processed,
         "reused": reused,
         "failed": failed,
+        "quarantined": quarantined,
         "rows": sum(int(item.get("rows", 0)) for item in active),
         "columns": max((int(item.get("columns", 0)) for item in active), default=0),
         "errors": errors[:20],
@@ -338,7 +353,9 @@ def _create_composite_views(connection: duckdb.DuckDBPyConnection, specs: list[Q
     combinations = {
         "08-旗舰店推广花费": ["08-旗舰店推广花费", "11-旗舰店UD推广计划"],
         "10-2京东客服营销明细": ["10-2京东客服营销明细", "接待数据"],
-        "10-3京东客服绩效数据": ["10-3京东客服绩效数据", "营销数据", "营销数据改版"],
+        # 接待数据同时并入 10-3：京东pop 日报单文件自带营销列（售前接待/促成下单人数/金额），
+        # 其店铺=京东POP 标签随行进视图，与自营绩效数据按店铺区分，不会混口径。
+        "10-3京东客服绩效数据": ["10-3京东客服绩效数据", "营销数据", "营销数据改版", "接待数据"],
         "10-4客服员工日报统计": ["10-4客服员工日报统计", "考勤数据"],
     }
     for destination_name, source_names in combinations.items():
@@ -1166,6 +1183,9 @@ def _build_customer_service(
     - 客单价（客服）= SUM(促成下单商品金额) / SUM(促成下单人数)；
     - 转化率京东客服 = SUM(促成下单人数) / SUM(售前接待人数)；
     - 京东答问比 = SUM(客服总消息数) / SUM(客户总消息数)。
+    京东侧带 store 维度：京东自营（工作量/绩效/日报文件夹）与 京东POP（接待数据
+    文件夹的 京东pop 高置信日报）分行输出，另用 GROUPING SETS 产出 store=全部
+    的合计行，比率类指标在合计行按 SUM/SUM 重算而非简单平均。
     环比由前端对排序后的 daily 数组相邻天相减得到：PBIX 用 DATEADD(-1 day)
     （前一天无数据时返回 0），这里取「上一个有数据的日期」——日期缺口时两者
     口径不同，属于有意取舍，前端以此为准。
@@ -1274,6 +1294,28 @@ def _build_jd_customer_service(
         staff_view = _model_view(connection, "10-4客服员工日报统计")
     except ValueError:
         return {"daily": [], "serviceDaily": [], "byAgent": [], "groups": []}
+    # 京东pop 日报（接待数据文件夹新高置信格式）写入时带 店铺=京东POP，其余来源兜底京东自营。
+    # 店铺列只在存在高置信 POP 分区后才出现在复合视图中，故按列存在性兜底，避免旧分区报错。
+    # 注：_model_view 返回已引用的标识符，_view_columns 需要原始表名。
+    workload_name = workload_view.strip('"').replace('""', '"')
+    sales_name = sales_view.strip('"').replace('""', '"')
+    workload_columns = _view_columns(connection, workload_name)
+    workload_store = (
+        "coalesce(nullif(trim(cast(\"店铺\" AS VARCHAR)), ''), '京东自营')"
+        if "店铺" in workload_columns
+        else "'京东自营'"
+    )
+    sales_store = (
+        "coalesce(nullif(trim(cast(\"店铺\" AS VARCHAR)), ''), '京东自营')"
+        if "店铺" in _view_columns(connection, sales_name)
+        else "'京东自营'"
+    )
+    # POP 日报只有改名后的「新平均响应时间」，自营旧表只有「平均响应时间」；列存在性兜底避免旧分区报错。
+    avg_response_expr = (
+        'avg(coalesce(try_cast("平均响应时间" AS DOUBLE), try_cast("新平均响应时间" AS DOUBLE)))'
+        if "新平均响应时间" in workload_columns
+        else 'avg(try_cast("平均响应时间" AS DOUBLE))'
+    )
     workload_dedup = _customer_dedup_sql(workload_view, start, end, ("客服",))
     sales_dedup = _customer_dedup_sql(sales_view, start, end, ("客服",))
     # 10-4 真实粒度是 (日期, UID, 技能组)：同一 UID 同日有售前/售后多行，各带独立消息与评价。
@@ -1285,15 +1327,17 @@ def _build_jd_customer_service(
         WITH workload AS (
           SELECT
             try_cast("日期" AS DATE) AS date,
+            coalesce({workload_store}, '全部') AS store,
             count(DISTINCT cast("客服" AS VARCHAR)) AS agentCount,
             sum(coalesce(try_cast("接待量" AS DOUBLE), 0)) AS received,
             avg(try_cast("首次平均响应时间" AS DOUBLE)) AS firstResponse,
             avg(try_cast("30s应答率" AS DOUBLE)) AS response30s
           FROM {workload_dedup}
-          GROUP BY 1
+          GROUP BY GROUPING SETS ((try_cast("日期" AS DATE), {workload_store}), (try_cast("日期" AS DATE)))
         ), sales AS (
           SELECT
             try_cast("日期" AS DATE) AS date,
+            coalesce({sales_store}, '全部') AS store,
             sum(coalesce(try_cast("促成下单商品金额" AS DOUBLE), 0)) AS orderAmount,
             sum(coalesce(try_cast("促成下单人数" AS DOUBLE), 0))
               / nullif(sum(coalesce(try_cast("售前接待人数" AS DOUBLE), 0)), 0)
@@ -1302,10 +1346,57 @@ def _build_jd_customer_service(
               / nullif(sum(coalesce(try_cast("促成下单人数" AS DOUBLE), 0)), 0)
             AS unitPrice
           FROM {sales_dedup}
-          GROUP BY 1
+          GROUP BY GROUPING SETS ((try_cast("日期" AS DATE), {sales_store}), (try_cast("日期" AS DATE)))
         ), staff AS (
+          SELECT date, coalesce(store, '全部') AS store, goodReviews, badReviews, answerRatio, satisfactionRate
+          FROM (
+            SELECT
+              try_cast("日期" AS DATE) AS date,
+              '京东自营' AS store,
+              sum(coalesce(try_cast("好评量" AS DOUBLE), 0)) AS goodReviews,
+              sum(coalesce(try_cast("差评量" AS DOUBLE), 0)) AS badReviews,
+              sum(coalesce(try_cast("客服总消息数" AS DOUBLE), 0))
+                / nullif(sum(coalesce(try_cast("客户总消息数" AS DOUBLE), 0)), 0)
+              AS answerRatio,
+              sum(coalesce(try_cast("好评量" AS DOUBLE), 0))
+                / nullif(
+                    sum(coalesce(try_cast("好评量" AS DOUBLE), 0))
+                    + sum(coalesce(try_cast("差评量" AS DOUBLE), 0)),
+                    0
+                  )
+              AS satisfactionRate
+            FROM {staff_dedup}
+            GROUP BY GROUPING SETS ((try_cast("日期" AS DATE), '京东自营'), (try_cast("日期" AS DATE)))
+          )
+        )
+        SELECT
+          coalesce(w.date, s.date, st.date) AS date,
+          coalesce(w.store, s.store, st.store) AS store,
+          coalesce(w.agentCount, 0) AS agentCount,
+          coalesce(w.received, 0) AS received,
+          w.firstResponse,
+          w.response30s,
+          coalesce(s.orderAmount, 0) AS orderAmount,
+          s.conversionRate, s.unitPrice,
+          coalesce(st.goodReviews, 0) AS goodReviews,
+          coalesce(st.badReviews, 0) AS badReviews,
+          st.answerRatio,
+          st.satisfactionRate
+        FROM workload w
+        FULL OUTER JOIN sales s ON w.date = s.date AND w.store = s.store
+        FULL OUTER JOIN staff st ON coalesce(w.date, s.date) = st.date
+            AND coalesce(w.store, s.store) = st.store
+        ORDER BY 1, 2
+        """,
+    )
+    service_daily = _records(
+        connection,
+        f"""
+        SELECT date, coalesce(store, '全部') AS store, goodReviews, badReviews, answerRatio, satisfactionRate
+        FROM (
           SELECT
             try_cast("日期" AS DATE) AS date,
+            '京东自营' AS store,
             sum(coalesce(try_cast("好评量" AS DOUBLE), 0)) AS goodReviews,
             sum(coalesce(try_cast("差评量" AS DOUBLE), 0)) AS badReviews,
             sum(coalesce(try_cast("客服总消息数" AS DOUBLE), 0))
@@ -1319,45 +1410,9 @@ def _build_jd_customer_service(
                 )
             AS satisfactionRate
           FROM {staff_dedup}
-          GROUP BY 1
+          GROUP BY GROUPING SETS ((try_cast("日期" AS DATE), '京东自营'), (try_cast("日期" AS DATE)))
         )
-        SELECT
-          coalesce(w.date, s.date, st.date) AS date,
-          coalesce(w.agentCount, 0) AS agentCount,
-          coalesce(w.received, 0) AS received,
-          coalesce(w.firstResponse, 0) AS firstResponse,
-          coalesce(w.response30s, 0) AS response30s,
-          coalesce(s.orderAmount, 0) AS orderAmount,
-          s.conversionRate, s.unitPrice,
-          coalesce(st.goodReviews, 0) AS goodReviews,
-          coalesce(st.badReviews, 0) AS badReviews,
-          st.answerRatio,
-          st.satisfactionRate
-        FROM workload w
-        FULL OUTER JOIN sales s ON w.date = s.date
-        FULL OUTER JOIN staff st ON coalesce(w.date, s.date) = st.date
-        ORDER BY 1
-        """,
-    )
-    service_daily = _records(
-        connection,
-        f"""
-        SELECT
-          try_cast("日期" AS DATE) AS date,
-          sum(coalesce(try_cast("好评量" AS DOUBLE), 0)) AS goodReviews,
-          sum(coalesce(try_cast("差评量" AS DOUBLE), 0)) AS badReviews,
-          sum(coalesce(try_cast("客服总消息数" AS DOUBLE), 0))
-            / nullif(sum(coalesce(try_cast("客户总消息数" AS DOUBLE), 0)), 0)
-          AS answerRatio,
-          sum(coalesce(try_cast("好评量" AS DOUBLE), 0))
-            / nullif(
-                sum(coalesce(try_cast("好评量" AS DOUBLE), 0))
-                + sum(coalesce(try_cast("差评量" AS DOUBLE), 0)),
-                0
-              )
-          AS satisfactionRate
-        FROM {staff_dedup}
-        GROUP BY 1 ORDER BY 1
+        ORDER BY 1, 2
         """,
     )
     by_agent = _records(
@@ -1366,25 +1421,28 @@ def _build_jd_customer_service(
         WITH workload AS (
           SELECT
             try_cast("日期" AS DATE) AS date,
+            {workload_store} AS store,
             replace(cast("客服" AS VARCHAR), '-', '') AS agent,
             sum(coalesce(try_cast("接待量" AS DOUBLE), 0)) AS received,
-            sum(coalesce(try_cast("首次平均响应时间" AS DOUBLE), 0)) AS firstResponse,
-            sum(coalesce(try_cast("平均响应时间" AS DOUBLE), 0)) AS avgResponse
+            max(try_cast("首次平均响应时间" AS DOUBLE)) AS firstResponse,
+            {avg_response_expr} AS avgResponse
           FROM {workload_dedup}
-          GROUP BY 1, 2
+          GROUP BY 1, 2, 3
         ), sales AS (
           SELECT
             try_cast("日期" AS DATE) AS date,
+            {sales_store} AS store,
             replace(cast("客服" AS VARCHAR), '-', '') AS agent,
             sum(coalesce(try_cast("促成下单商品金额" AS DOUBLE), 0)) AS orderAmount,
             sum(coalesce(try_cast("促成下单人数" AS DOUBLE), 0))
               / nullif(sum(coalesce(try_cast("售前接待人数" AS DOUBLE), 0)), 0)
             AS conversionRate
           FROM {sales_dedup}
-          GROUP BY 1, 2
+          GROUP BY 1, 2, 3
         ), staff AS (
           SELECT
             try_cast("日期" AS DATE) AS date,
+            '京东自营' AS store,
             replace(cast("UID" AS VARCHAR), '-', '') AS agent,
             max(cast("技能组" AS VARCHAR)) AS skillGroup,
             sum(coalesce(try_cast("好评量" AS DOUBLE), 0)) AS goodReviews,
@@ -1400,10 +1458,11 @@ def _build_jd_customer_service(
                 )
             AS satisfactionRate
           FROM {staff_dedup}
-          GROUP BY 1, 2
+          GROUP BY 1, 2, 3
         )
         SELECT
           coalesce(w.date, s.date, st.date) AS date,
+          coalesce(w.store, s.store, st.store) AS store,
           coalesce(w.agent, s.agent, st.agent) AS agent,
           coalesce(st.skillGroup, '') AS skillGroup,
           coalesce(w.received, 0) AS received,
@@ -1414,10 +1473,11 @@ def _build_jd_customer_service(
           coalesce(st.badReviews, 0) AS badReviews,
           coalesce(st.satisfactionRate, 0) AS satisfactionRate
         FROM workload w
-        FULL OUTER JOIN sales s ON w.date = s.date AND w.agent = s.agent
+        FULL OUTER JOIN sales s ON w.date = s.date AND w.agent = s.agent AND w.store = s.store
         FULL OUTER JOIN staff st ON coalesce(w.date, s.date) = st.date
             AND coalesce(w.agent, s.agent) = st.agent
-        ORDER BY 1, 2
+            AND coalesce(w.store, s.store) = st.store
+        ORDER BY 1, 2, 3
         """,
     )
     groups = _records(
@@ -3087,6 +3147,7 @@ def sync_warehouse(
         "processedFiles": sum(item["processed"] for item in results),
         "reusedFiles": sum(item["reused"] for item in results),
         "failedFiles": sum(item["failed"] for item in results),
+        "quarantinedFiles": sum(len(item.get("quarantined", [])) for item in results),
         "factRows": snapshot.get("recordCount", 0),
         "period": snapshot.get("period"),
         "database": str(paths.database),

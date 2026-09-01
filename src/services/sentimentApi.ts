@@ -45,10 +45,10 @@ export function getCrawlStatus() {
   return fetchJson<SentimentCrawlStatus>("/api/sentiment/crawl/status");
 }
 
-export function startAnalysis(keyword: string, dateFrom: string, dateTo: string) {
+export function startAnalysis(keyword: string, dateFrom: string, dateTo: string, noteIds?: string[]) {
   return fetchJson<{ status: string; keyword: string; noteCount: number }>("/api/sentiment/analyze", {
     method: "POST",
-    body: JSON.stringify({ keyword, dateFrom, dateTo }),
+    body: JSON.stringify({ keyword, dateFrom, dateTo, ...(noteIds ? { noteIds } : {}) }),
   });
 }
 

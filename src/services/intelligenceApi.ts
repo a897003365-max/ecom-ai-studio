@@ -11,16 +11,44 @@ async function fetchJson<T>(path: string): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-export function getTop100Dataset() {
-  return fetchJson<Top100Dataset>("/api/intelligence/top100");
+export function getTop100Dataset(period?: string) {
+  const q = period ? `?period=${encodeURIComponent(period)}` : "";
+  return fetchJson<Top100Dataset>(`/api/intelligence/top100${q}`);
 }
 
-export function getBrandRanking() {
-  return fetchJson<BrandRankingDataset>("/api/intelligence/brand-ranking");
+export function getBrandRanking(period?: string) {
+  const q = period ? `?period=${encodeURIComponent(period)}` : "";
+  return fetchJson<BrandRankingDataset>(`/api/intelligence/brand-ranking${q}`);
 }
 
-export function getInsights() {
-  return fetchJson<InsightsDataset>("/api/intelligence/insights");
+export function getInsights(period?: string) {
+  const q = period ? `?period=${encodeURIComponent(period)}` : "";
+  return fetchJson<InsightsDataset>(`/api/intelligence/insights${q}`);
+}
+
+export function getIntelligencePeriods() {
+  return fetchJson<{ periods: string[] }>("/api/intelligence/periods");
+}
+
+export interface PriceTrendPoint {
+  period: string;
+  price: number | null;
+  rawPrice: string | null;
+  originalPrice: number | null;
+  low30d: number | null;
+  imageUrl: string | null;
+}
+
+export interface PriceTrendPayload {
+  id: string;
+  productName: string | null;
+  points: PriceTrendPoint[];
+  snapshots: number;
+}
+
+// 价格趋势：聚合服务端 price-snapshots 多期快照（快照不足时前端用静态周期兜底）
+export function getPriceTrend(id: string) {
+  return fetchJson<PriceTrendPayload>(`/api/intelligence/price-trend?id=${encodeURIComponent(id)}`);
 }
 
 // 图片走静态路由 /competitor-images/<encoded-filename>

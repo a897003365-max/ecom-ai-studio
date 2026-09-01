@@ -42,13 +42,21 @@ function crawledNoteKey(note) {
   return `${note.noteId}|${note.keyword ?? ""}`;
 }
 
-export function listCrawledNotes() {
+// 品牌名：抓取正文环节据此筛选笔记是否与品牌相关，无关笔记标记 excluded 不展示/不分析/不重复抓
+const BRAND_NAME = "麻大师";
+
+function readLibraryRaw() {
   try {
     const arr = JSON.parse(readFileSync(CRAWLED_FILE, "utf8"));
     return Array.isArray(arr) ? arr.filter((n) => n && typeof n.noteId === "string" && n.noteId) : [];
   } catch {
     return [];
   }
+}
+
+// 对外暴露（API / LLM 分析）：过滤掉已判定为品牌无关的 excluded 笔记
+export function listCrawledNotes() {
+  return readLibraryRaw().filter((n) => !n.excluded);
 }
 
 function writeLibrary(notes) {
@@ -65,6 +73,10 @@ function upsertNotes(library, incoming) {
   for (const note of incoming) {
     const key = crawledNoteKey(note);
     const existing = merged.get(key);
+    // 已判定为品牌无关：保留 excluded 标记，不重新进队列补抓正文
+    if (existing?.excluded) {
+      continue;
+    }
     // 重抓同一关键词：已有正文的保留（含 redId/fans，正文 ok 的笔记不会重新进队列补抓）
     if (existing?.detailState === "ok" && existing.noteBody) {
       merged.set(key, { ...note, detailState: "ok", noteBody: existing.noteBody, bodyLength: existing.bodyLength, publishTime: existing.publishTime ?? note.publishTime ?? null, redId: existing.redId ?? null, fans: existing.fans ?? null });
@@ -194,20 +206,53 @@ export function getAnalysis(id) {
   }
 }
 
+// 任务冲突（已有任务在跑）与参数错误分开：路由层据此返回 409 / 400
+function conflictError(message) {
+  const error = new Error(message);
+  error.status = 409;
+  return error;
+}
+
 // ---------- 抓取引擎（多关键词串行：搜索全部入库，再统一补抓正文） ----------
 
-let crawlJob = { running: false, keywords: [], keywordIndex: 0, phase: "idle", total: 0, ok: 0, failed: 0, errors: [], startedAt: null, finishedAt: null };
+// 正文全库复用：同一 noteId 在任一关键词下已有正文的，直接复制到该笔记的其他条目，
+// 不再重复调用详情工作流（同一笔记在 N 个关键词下命中时，正文只抓一次）
+function propagateBodies(library) {
+  const donorByNoteId = new Map();
+  for (const n of library) {
+    if (n.detailState === "ok" && n.noteBody && !donorByNoteId.has(n.noteId)) donorByNoteId.set(n.noteId, n);
+  }
+  let changed = false;
+  const next = library.map((n) => {
+    if (n.detailState === "ok" || n.excluded) return n;
+    const donor = donorByNoteId.get(n.noteId);
+    if (!donor) return n;
+    changed = true;
+    return {
+      ...n,
+      detailState: "ok",
+      noteBody: donor.noteBody,
+      bodyLength: donor.bodyLength,
+      publishTime: donor.publishTime ?? n.publishTime ?? null,
+      redId: donor.redId ?? n.redId ?? null,
+      fans: donor.fans ?? n.fans ?? null,
+    };
+  });
+  return changed ? next : library;
+}
+
+let crawlJob = { running: false, keywords: [], keywordIndex: 0, phase: "idle", total: 0, ok: 0, excluded: 0, failed: 0, errors: [], startedAt: null, finishedAt: null };
 
 export function getCrawlStatus() {
   return { ...crawlJob };
 }
 
 export function startCrawl(keywords) {
-  if (crawlJob.running) throw new Error("抓取任务正在进行中，请等待完成");
+  if (crawlJob.running) throw conflictError("抓取任务正在进行中，请等待完成");
   const list = [...new Set((Array.isArray(keywords) ? keywords : [keywords]).map((k) => String(k ?? "").trim()).filter(Boolean))];
   if (!list.length) throw new Error("至少提供一个关键词");
   if (list.length > 10) throw new Error("一次最多抓取 10 个关键词");
-  crawlJob = { running: true, keywords: list, keywordIndex: 0, phase: "searching", total: 0, ok: 0, failed: 0, errors: [], startedAt: new Date().toISOString(), finishedAt: null };
+  crawlJob = { running: true, keywords: list, keywordIndex: 0, phase: "searching", total: 0, ok: 0, excluded: 0, failed: 0, errors: [], startedAt: new Date().toISOString(), finishedAt: null };
   void runCrawlJob(list);
   return { keywords: list.length };
 }
@@ -248,9 +293,13 @@ async function runCrawlJob(keywords) {
           bodyLength: 0,
           publishTime: null,
         })).filter((n) => n.noteId);
-        const library = upsertNotes(listCrawledNotes(), incoming);
+        const library = propagateBodies(upsertNotes(readLibraryRaw(), incoming));
         writeLibrary(library);
-        for (const note of library.filter((n) => n.keyword === keyword && n.detailState !== "ok" && n.url)) {
+        // 队列按 noteId 去重：同一笔记多关键词命中时只抓一次正文，结果回写所有条目
+        const queuedNoteIds = new Set(queue.map((q) => q.noteId));
+        for (const note of library.filter((n) => n.keyword === keyword && n.detailState !== "ok" && !n.excluded && n.url)) {
+          if (queuedNoteIds.has(note.noteId)) continue;
+          queuedNoteIds.add(note.noteId);
           queue.push(note);
         }
         crawlJob.total = queue.length;
@@ -276,6 +325,16 @@ async function fillNoteBodies(queue) {
       batch.map(async (note) => {
         try {
           const detail = await fetchNoteDetail(note.url);
+          // 品牌相关性筛选：标题+正文均不含品牌名即判为无关噪音，标记 excluded 不保留正文
+          const combined = `${note.title ?? ""}\n${detail.body ?? ""}`;
+          if (!combined.includes(BRAND_NAME)) {
+            note.detailState = "unrelated";
+            note.excluded = true;
+            note.noteBody = "";
+            note.bodyLength = 0;
+            crawlJob.excluded += 1;
+            return;
+          }
           note.noteBody = detail.body;
           note.bodyLength = detail.body.length;
           note.publishTime = detail.publishTime ?? extractPublishTimeFromBody(detail.body);
@@ -289,8 +348,22 @@ async function fillNoteBodies(queue) {
         }
       }),
     );
-    // 每批落盘一次：中途重启也能保留已抓到的正文
-    const library = upsertNotes(listCrawledNotes(), batch);
+    // 每批落盘一次：抓取结果回写该 noteId 的所有关键词条目（相关笔记保留正文，无关笔记统一标记 excluded）
+    const fetchedByNoteId = new Map(batch.map((n) => [n.noteId, n]));
+    const library = readLibraryRaw().map((entry) => {
+      const fetched = fetchedByNoteId.get(entry.noteId);
+      if (!fetched) return entry;
+      return {
+        ...entry,
+        detailState: fetched.detailState,
+        excluded: fetched.excluded ?? entry.excluded,
+        noteBody: fetched.noteBody ?? "",
+        bodyLength: fetched.bodyLength ?? 0,
+        publishTime: fetched.publishTime ?? entry.publishTime ?? null,
+        redId: fetched.redId ?? entry.redId ?? null,
+        fans: fetched.fans ?? entry.fans ?? null,
+      };
+    });
     writeLibrary(library);
     if (bi + CRAWL_CONCURRENCY < queue.length) {
       await new Promise((resolve) => setTimeout(resolve, CRAWL_GAP_MS));
@@ -475,8 +548,8 @@ export function getAnalysisStatus() {
   return { ...analysisJob };
 }
 
-export function startAnalysis({ keyword, dateFrom, dateTo }) {
-  if (analysisJob.status === "running") throw new Error("舆情分析正在运行中，请等待完成");
+export function startAnalysis({ keyword, dateFrom, dateTo, noteIds }) {
+  if (analysisJob.status === "running") throw conflictError("舆情分析正在运行中，请等待完成");
   if (!keyword || !keyword.trim()) throw new Error("必须选择分析关键词");
 
   const kw = keyword.trim();
@@ -486,6 +559,14 @@ export function startAnalysis({ keyword, dateFrom, dateTo }) {
   if (!selected.length) {
     const period = dateFrom || dateTo ? `，发布时间 ${dateFrom || "…"} ~ ${dateTo || "…"}` : "";
     throw new Error(`笔记库中没有符合条件的笔记（关键词「${kw}」${period}，且正文已抓取成功）`);
+  }
+  // 前端按词典算法判负后传入 noteIds：分析对象收敛为负面笔记子集（服务端按 noteId 白名单取交集）
+  if (Array.isArray(noteIds)) {
+    const allowed = new Set(noteIds.map((id) => String(id)));
+    selected = selected.filter((n) => allowed.has(n.noteId));
+    if (!selected.length) {
+      throw new Error(`该条件下没有判为负面的笔记（关键词「${kw}」），可放宽时间范围或先抓取更多笔记`);
+    }
   }
 
   analysisJob = { status: "running", keyword: kw, reportId: null, error: null, startedAt: new Date().toISOString(), finishedAt: null };

@@ -2,6 +2,20 @@
 
 本文件只记录可复核的运行事件、数据口径修复和验证结果；日期使用 YYYY-MM-DD。
 
+## 2026-08-25
+
+### 钉钉同步早间计划时间由 10:30 调整为 11:00
+
+- 背景：运营要求看板早间更新从 10:30 推迟到 11:00（当日 10:30 已按旧计划正常执行一次，LastResult=0）。
+- 改动（唯一口径来源为注册表 `HKCU:\Environment\DINGTALK_SYNC_TIMES`）：
+  - 注册表值 `10:30,13:00,17:30` → `11:00,13:00,17:30`；
+  - 重新运行 `scripts/register-dingtalk-schedule.ps1` 重建 `EcomAIStudio-DingTalk-Sync`（S4U/Limited/网络可用/失败重试属性保持不变），触发器验证为 11:00、13:00、17:30，State=Ready；
+  - 代码回退默认值同步更新：`server/dingtalk-api.mjs`（scheduleTimes 默认串）、`scripts/register-dingtalk-schedule.ps1`（$Times 回退）、`src/pages/AnalyticsPage.tsx`（页头"每日同步计划"回退文案）；
+  - `scripts/test-dingtalk-api.mjs` 两处断言改为 11:00；
+  - 文档口径同步：AGENTS.md、docs/HANDOFF.md（§2 与 §8）、docs/OPERATIONS_DATA_INTEGRATION_PLAN.md、README.md（架构图与环境变量示例）。
+- 验证：`npm run test:dingtalk-api`、`npm run test:dingtalk-unattended` 通过；计划任务 NextRun 指向当日 11:00（改动时点在 10:30 旧计划跑完之后、11:00 之前，新计划当日即生效）。
+- 注意：`readLocalEnv` 优先读进程环境变量、其次注册表；改动前启动的旧 shell 会话与 dev server 进程会残留 10:30 展示值，新起进程一律从注册表读 11:00。改动时点 5180/5173 无运行中服务，下次启动自然生效，无需重启操作。
+
 ## 2026-08-07
 
 ### yudao 业务管理后台集成（方案 A：服务端只读代理）

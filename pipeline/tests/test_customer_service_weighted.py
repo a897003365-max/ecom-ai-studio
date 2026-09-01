@@ -167,20 +167,24 @@ class CustomerServiceWeightedSatisfactionTests(unittest.TestCase):
         """京东 daily = Σ(好评) / (Σ(好评) + Σ(差评))。
 
         构造：同一天两个 UID，1+1=2 好评、1 差评 → 2/3 ≈ 0.6667。
+        店铺维度（2026-08-26）后每日返回 自营 + 全部 两行，断言取自营行。
         """
         self._insert_jd_staff("jd_001", good=1, bad=1)
         self._insert_jd_staff("jd_002", good=1, bad=0)
         result = _build_jd_customer_service(self.connection, self.START, self.END)
-        self.assertEqual(len(result["daily"]), 1)
-        satisfaction = result["daily"][0]["satisfactionRate"]
-        self.assertAlmostEqual(satisfaction, 2 / 3, places=4)
+        self.assertEqual(len(result["daily"]), 2)
+        daily = {row["store"]: row for row in result["daily"]}
+        self.assertAlmostEqual(daily["京东自营"]["satisfactionRate"], 2 / 3, places=4)
+        # 全部 = 仅有自营时的 rollup，与自营口径一致
+        self.assertAlmostEqual(daily["全部"]["satisfactionRate"], 2 / 3, places=4)
 
     def test_jd_daily_returns_null_when_no_reviews(self) -> None:
         """京东 daily 当好评+差评=0 时（10-4 周末缺数），nullif 防空 → satisfactionRate 为 None。"""
         self._insert_jd_staff("jd_003", good=0, bad=0)
         result = _build_jd_customer_service(self.connection, self.START, self.END)
-        self.assertEqual(len(result["daily"]), 1)
-        self.assertIsNone(result["daily"][0]["satisfactionRate"])
+        daily = {row["store"]: row for row in result["daily"]}
+        self.assertIsNone(daily["京东自营"]["satisfactionRate"])
+        self.assertIsNone(daily["全部"]["satisfactionRate"])
 
     def test_jd_by_agent_satisfaction_matches_per_agent_rate(self) -> None:
         """京东 byAgent 把"好评率"按 (日期, 客服) 透传；前端客服折叠时与 daily 一致。"""
