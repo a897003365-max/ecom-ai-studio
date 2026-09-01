@@ -1,0 +1,5082 @@
+{
+  "generatedAt": "2026-07-11T10:59:51.549Z",
+  "sourcePbix": "D:/麻大师/BI文件/麻大师店铺推广数据报表.pbix",
+  "tmdlRoot": "migration/powerbi-tmdl",
+  "queryCount": 27,
+  "queries": [
+    {
+      "name": "00-月表汇总",
+      "tmdlFile": "tables/00-月表汇总.tmdl",
+      "mFile": "original/00-月表汇总.pq",
+      "sourceKind": "excel_file",
+      "sourcePaths": [
+        "D:\\麻大师\\日更数据\\天猫旗舰店\\00-各渠道销售数据\\淘系.xlsx"
+      ],
+      "operations": [
+        "Excel.Workbook",
+        "File.Contents",
+        "Table.PromoteHeaders",
+        "Table.TransformColumnTypes"
+      ],
+      "references": [],
+      "sheetName": "Sheet4",
+      "promoteHeaders": true,
+      "typedColumnCount": 24,
+      "typedColumns": [
+        "日期",
+        "浏览量",
+        "店铺客户数",
+        "GMV",
+        "成功退款金额",
+        "当日净成交金额",
+        "回款#(lf)（减退款）",
+        "总推广费#(lf)(含品销宝，小红书）",
+        "加购人数",
+        "站内总推广费#(lf)(含品销宝）",
+        "站内推广费%#(lf)(含品销宝）",
+        "关键词推广",
+        "精准人群推广",
+        "万相台（不包含目标直投）",
+        "多目标直投",
+        "全站推广",
+        "品销宝",
+        "内容场景",
+        "店铺运营",
+        "小红书推广费",
+        "搜索排名数",
+        "渠道",
+        "店铺",
+        "淘客"
+      ],
+      "schema": [
+        {
+          "column": "日期",
+          "mType": "type date"
+        },
+        {
+          "column": "浏览量",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "店铺客户数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "GMV",
+          "mType": "type number"
+        },
+        {
+          "column": "成功退款金额",
+          "mType": "type number"
+        },
+        {
+          "column": "当日净成交金额",
+          "mType": "type number"
+        },
+        {
+          "column": "回款#(lf)（减退款）",
+          "mType": "type number"
+        },
+        {
+          "column": "总推广费#(lf)(含品销宝，小红书）",
+          "mType": "type number"
+        },
+        {
+          "column": "加购人数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "站内总推广费#(lf)(含品销宝）",
+          "mType": "type number"
+        },
+        {
+          "column": "站内推广费%#(lf)(含品销宝）",
+          "mType": "Percentage.Type"
+        },
+        {
+          "column": "关键词推广",
+          "mType": "type number"
+        },
+        {
+          "column": "精准人群推广",
+          "mType": "type number"
+        },
+        {
+          "column": "万相台（不包含目标直投）",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "多目标直投",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "全站推广",
+          "mType": "type number"
+        },
+        {
+          "column": "品销宝",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "内容场景",
+          "mType": "type number"
+        },
+        {
+          "column": "店铺运营",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "小红书推广费",
+          "mType": "type number"
+        },
+        {
+          "column": "搜索排名数",
+          "mType": "type any"
+        },
+        {
+          "column": "渠道",
+          "mType": "type text"
+        },
+        {
+          "column": "店铺",
+          "mType": "type text"
+        },
+        {
+          "column": "淘客",
+          "mType": "type number"
+        }
+      ],
+      "migrationStatus": "catalogued"
+    },
+    {
+      "name": "01-店铺数据辅助表",
+      "tmdlFile": "tables/01-店铺数据辅助表.tmdl",
+      "mFile": "original/01-店铺数据辅助表.pq",
+      "sourceKind": "folder",
+      "sourcePaths": [
+        "D:\\麻大师\\日更数据\\天猫旗舰店\\01-店铺数据辅助表"
+      ],
+      "operations": [
+        "Folder.Files",
+        "Table.SelectColumns",
+        "Table.SelectRows",
+        "Table.AddColumn",
+        "Table.ExpandTableColumn",
+        "Table.ColumnNames",
+        "Table.TransformColumnTypes"
+      ],
+      "references": [
+        "转换文件 (3)",
+        "示例文件 (3)"
+      ],
+      "sheetName": null,
+      "promoteHeaders": false,
+      "typedColumnCount": 4,
+      "typedColumns": [
+        "日期",
+        "年度",
+        "月份",
+        "日"
+      ],
+      "schema": [
+        {
+          "column": "日期",
+          "mType": "type date"
+        },
+        {
+          "column": "年度",
+          "mType": "type text"
+        },
+        {
+          "column": "月份",
+          "mType": "type text"
+        },
+        {
+          "column": "日",
+          "mType": "type text"
+        }
+      ],
+      "migrationStatus": "catalogued"
+    },
+    {
+      "name": "03-1-各渠道目标金额",
+      "tmdlFile": "tables/03-1-各渠道目标金额.tmdl",
+      "mFile": "original/03-1-各渠道目标金额.pq",
+      "sourceKind": "excel_file",
+      "sourcePaths": [
+        "D:\\麻大师\\日更数据\\天猫旗舰店\\00-各渠道销售数据\\25年各渠道目标.xlsx"
+      ],
+      "operations": [
+        "Excel.Workbook",
+        "File.Contents",
+        "List.Select",
+        "Text.Trim",
+        "Table.RemoveLastN",
+        "List.IsEmpty",
+        "List.Skip",
+        "Record.FieldValues",
+        "Table.TransformColumnTypes",
+        "Table.PromoteHeaders",
+        "Table.UnpivotOtherColumns",
+        "Table.RenameColumns"
+      ],
+      "references": [],
+      "sheetName": "Sheet1",
+      "promoteHeaders": true,
+      "typedColumnCount": 29,
+      "typedColumns": [
+        "Column1",
+        "Column2",
+        "Column3",
+        "Column4",
+        "Column5",
+        "Column6",
+        "Column7",
+        "Column8",
+        "Column9",
+        "Column10",
+        "Column11",
+        "Column12",
+        "Column13",
+        "Column14",
+        "渠道",
+        "店铺",
+        "1月",
+        "2月",
+        "3月",
+        "4月",
+        "5月",
+        "6月",
+        "7月",
+        "8月",
+        "9月",
+        "10月",
+        "11月",
+        "12月",
+        "属性"
+      ],
+      "schema": [
+        {
+          "column": "Column1",
+          "mType": "type text"
+        },
+        {
+          "column": "Column2",
+          "mType": "type text"
+        },
+        {
+          "column": "Column3",
+          "mType": "type any"
+        },
+        {
+          "column": "Column4",
+          "mType": "type any"
+        },
+        {
+          "column": "Column5",
+          "mType": "type any"
+        },
+        {
+          "column": "Column6",
+          "mType": "type any"
+        },
+        {
+          "column": "Column7",
+          "mType": "type any"
+        },
+        {
+          "column": "Column8",
+          "mType": "type any"
+        },
+        {
+          "column": "Column9",
+          "mType": "type any"
+        },
+        {
+          "column": "Column10",
+          "mType": "type any"
+        },
+        {
+          "column": "Column11",
+          "mType": "type any"
+        },
+        {
+          "column": "Column12",
+          "mType": "type any"
+        },
+        {
+          "column": "Column13",
+          "mType": "type any"
+        },
+        {
+          "column": "Column14",
+          "mType": "type any"
+        },
+        {
+          "column": "渠道",
+          "mType": "type text"
+        },
+        {
+          "column": "店铺",
+          "mType": "type text"
+        },
+        {
+          "column": "1月",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "2月",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "3月",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "4月",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "5月",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "6月",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "7月",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "8月",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "9月",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "10月",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "11月",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "12月",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "属性",
+          "mType": "type date"
+        }
+      ],
+      "migrationStatus": "catalogued"
+    },
+    {
+      "name": "03-2店铺每天销售目标",
+      "tmdlFile": "tables/03-2店铺每天销售目标.tmdl",
+      "mFile": "original/03-2店铺每天销售目标.pq",
+      "sourceKind": "folder",
+      "sourcePaths": [
+        "D:\\麻大师\\日更数据\\天猫旗舰店\\03-各店铺销售目标"
+      ],
+      "operations": [
+        "Folder.Files",
+        "Table.SelectRows",
+        "Table.AddColumn",
+        "Table.RenameColumns",
+        "Table.SelectColumns",
+        "Table.ExpandTableColumn",
+        "Table.ColumnNames",
+        "Table.TransformColumnTypes",
+        "Table.RemoveColumns"
+      ],
+      "references": [
+        "转换文件 (16)",
+        "示例文件 (16)"
+      ],
+      "sheetName": null,
+      "promoteHeaders": false,
+      "typedColumnCount": 5,
+      "typedColumns": [
+        "Source.Name",
+        "日期",
+        "销售目标",
+        "旗舰店毛利",
+        "Column4"
+      ],
+      "schema": [
+        {
+          "column": "Source.Name",
+          "mType": "type text"
+        },
+        {
+          "column": "日期",
+          "mType": "type date"
+        },
+        {
+          "column": "销售目标",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "旗舰店毛利",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "Column4",
+          "mType": "type any"
+        }
+      ],
+      "migrationStatus": "catalogued"
+    },
+    {
+      "name": "04-旗舰店基础数据",
+      "tmdlFile": "tables/04-旗舰店基础数据.tmdl",
+      "mFile": "original/04-旗舰店基础数据.pq",
+      "sourceKind": "folder",
+      "sourcePaths": [
+        "D:\\麻大师\\日更数据\\天猫旗舰店\\04-旗舰店基础数据"
+      ],
+      "operations": [
+        "Folder.Files",
+        "Table.SelectRows",
+        "Table.AddColumn",
+        "Table.RenameColumns",
+        "Table.SelectColumns",
+        "Table.ExpandTableColumn",
+        "Table.ColumnNames",
+        "Table.TransformColumnTypes",
+        "Table.Distinct"
+      ],
+      "references": [
+        "转换文件 (15)",
+        "示例文件 (15)"
+      ],
+      "sheetName": null,
+      "promoteHeaders": false,
+      "typedColumnCount": 120,
+      "typedColumns": [
+        "Source.Name",
+        "统计日期",
+        "店铺名称",
+        "访客数",
+        "直播间访客数",
+        "短视频访客数",
+        "图文访客数",
+        "店铺页访客数",
+        "3D应用访客数",
+        "无线端访客数",
+        "PC端访客数",
+        "浏览量",
+        "无线端浏览量",
+        "PC端浏览量",
+        "商品访客数",
+        "无线端商品访客数",
+        "PC端商品访客数",
+        "商品浏览量",
+        "无线端商品浏览量",
+        "PC端商品浏览量",
+        "平均停留时长",
+        "无线端平均停留时长",
+        "PC端平均停留时长",
+        "跳失率",
+        "无线端跳失率",
+        "PC端跳失率",
+        "商品收藏买家数",
+        "无线端商品收藏买家数",
+        "PC端商品收藏买家数",
+        "商品收藏次数",
+        "无线端商品收藏次数",
+        "PC端商品收藏次数",
+        "加购人数",
+        "无线端加购人数",
+        "PC端加购人数",
+        "支付金额",
+        "无线端支付金额",
+        "PC端支付金额",
+        "支付买家数",
+        "无线端支付买家数",
+        "PC端支付买家数",
+        "支付子订单数",
+        "无线端支付子订单数",
+        "PC端支付子订单数",
+        "支付件数",
+        "无线端支付件数",
+        "PC端支付件数",
+        "下单金额",
+        "无线端下单金额",
+        "PC端下单金额",
+        "下单买家数",
+        "无线端下单买家数",
+        "PC端下单买家数",
+        "下单件数",
+        "无线端下单件数",
+        "PC端下单件数",
+        "人均浏览量",
+        "无线端人均浏览量",
+        "PC端人均浏览量",
+        "下单转化率",
+        "无线端下单转化率",
+        "PC端下单转化率",
+        "支付转化率",
+        "无线端支付转化率",
+        "PC端支付转化率",
+        "客单价",
+        "无线端客单价",
+        "PC端客单价",
+        "UV价值",
+        "无线端UV价值",
+        "PC端UV价值",
+        "老访客数",
+        "无线端老访客数",
+        "PC端老访客数",
+        "新访客数",
+        "无线端新访客数",
+        "PC端新访客数",
+        "加购件数",
+        "无线端加购件数",
+        "PC端加购件数",
+        "支付新买家数",
+        "支付老买家数",
+        "无线端支付老买家数",
+        "PC端支付老买家数",
+        "老买家支付金额",
+        "全站推广花费",
+        "关键词推广花费",
+        "精准人群推广花费",
+        "智能场景花费",
+        "淘宝客佣金",
+        "成功退款金额",
+        "评价数",
+        "有图评价数",
+        "正面评价数",
+        "负面评价数",
+        "老买家正面评价数",
+        "老买家负面评价数",
+        "支付父订单数",
+        "揽收包裹数",
+        "发货包裹数",
+        "派送包裹数",
+        "签收成功包裹数",
+        "平均支付_签收时长(秒)",
+        "描述相符评分",
+        "物流服务评分",
+        "服务态度评分",
+        "下单-支付转化率",
+        "无线端下单-支付转化率",
+        "PC端下单-支付转化率",
+        "支付商品数",
+        "无线端支付商品数",
+        "PC端支付商品数",
+        "关注店铺人数",
+        "无线端关注店铺人数",
+        "PC端关注店铺人数",
+        "会员总数",
+        "新增会员数",
+        "活跃会员数",
+        "会员成交金额",
+        "会员成交人数"
+      ],
+      "schema": [
+        {
+          "column": "Source.Name",
+          "mType": "type text"
+        },
+        {
+          "column": "统计日期",
+          "mType": "type date"
+        },
+        {
+          "column": "店铺名称",
+          "mType": "type text"
+        },
+        {
+          "column": "访客数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "直播间访客数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "短视频访客数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "图文访客数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "店铺页访客数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "3D应用访客数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "无线端访客数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "PC端访客数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "浏览量",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "无线端浏览量",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "PC端浏览量",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "商品访客数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "无线端商品访客数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "PC端商品访客数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "商品浏览量",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "无线端商品浏览量",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "PC端商品浏览量",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "平均停留时长",
+          "mType": "type number"
+        },
+        {
+          "column": "无线端平均停留时长",
+          "mType": "type number"
+        },
+        {
+          "column": "PC端平均停留时长",
+          "mType": "type number"
+        },
+        {
+          "column": "跳失率",
+          "mType": "type number"
+        },
+        {
+          "column": "无线端跳失率",
+          "mType": "type number"
+        },
+        {
+          "column": "PC端跳失率",
+          "mType": "type number"
+        },
+        {
+          "column": "商品收藏买家数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "无线端商品收藏买家数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "PC端商品收藏买家数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "商品收藏次数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "无线端商品收藏次数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "PC端商品收藏次数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "加购人数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "无线端加购人数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "PC端加购人数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "支付金额",
+          "mType": "type number"
+        },
+        {
+          "column": "无线端支付金额",
+          "mType": "type number"
+        },
+        {
+          "column": "PC端支付金额",
+          "mType": "type number"
+        },
+        {
+          "column": "支付买家数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "无线端支付买家数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "PC端支付买家数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "支付子订单数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "无线端支付子订单数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "PC端支付子订单数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "支付件数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "无线端支付件数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "PC端支付件数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "下单金额",
+          "mType": "type number"
+        },
+        {
+          "column": "无线端下单金额",
+          "mType": "type number"
+        },
+        {
+          "column": "PC端下单金额",
+          "mType": "type number"
+        },
+        {
+          "column": "下单买家数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "无线端下单买家数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "PC端下单买家数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "下单件数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "无线端下单件数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "PC端下单件数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "人均浏览量",
+          "mType": "type number"
+        },
+        {
+          "column": "无线端人均浏览量",
+          "mType": "type number"
+        },
+        {
+          "column": "PC端人均浏览量",
+          "mType": "type number"
+        },
+        {
+          "column": "下单转化率",
+          "mType": "type number"
+        },
+        {
+          "column": "无线端下单转化率",
+          "mType": "type number"
+        },
+        {
+          "column": "PC端下单转化率",
+          "mType": "type number"
+        },
+        {
+          "column": "支付转化率",
+          "mType": "type number"
+        },
+        {
+          "column": "无线端支付转化率",
+          "mType": "type number"
+        },
+        {
+          "column": "PC端支付转化率",
+          "mType": "type number"
+        },
+        {
+          "column": "客单价",
+          "mType": "type number"
+        },
+        {
+          "column": "无线端客单价",
+          "mType": "type number"
+        },
+        {
+          "column": "PC端客单价",
+          "mType": "type number"
+        },
+        {
+          "column": "UV价值",
+          "mType": "type number"
+        },
+        {
+          "column": "无线端UV价值",
+          "mType": "type number"
+        },
+        {
+          "column": "PC端UV价值",
+          "mType": "type any"
+        },
+        {
+          "column": "老访客数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "无线端老访客数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "PC端老访客数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "新访客数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "无线端新访客数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "PC端新访客数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "加购件数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "无线端加购件数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "PC端加购件数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "支付新买家数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "支付老买家数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "无线端支付老买家数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "PC端支付老买家数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "老买家支付金额",
+          "mType": "type number"
+        },
+        {
+          "column": "全站推广花费",
+          "mType": "type number"
+        },
+        {
+          "column": "关键词推广花费",
+          "mType": "type number"
+        },
+        {
+          "column": "精准人群推广花费",
+          "mType": "type number"
+        },
+        {
+          "column": "智能场景花费",
+          "mType": "type number"
+        },
+        {
+          "column": "淘宝客佣金",
+          "mType": "type number"
+        },
+        {
+          "column": "成功退款金额",
+          "mType": "type number"
+        },
+        {
+          "column": "评价数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "有图评价数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "正面评价数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "负面评价数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "老买家正面评价数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "老买家负面评价数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "支付父订单数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "揽收包裹数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "发货包裹数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "派送包裹数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "签收成功包裹数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "平均支付_签收时长(秒)",
+          "mType": "type number"
+        },
+        {
+          "column": "描述相符评分",
+          "mType": "type number"
+        },
+        {
+          "column": "物流服务评分",
+          "mType": "type number"
+        },
+        {
+          "column": "服务态度评分",
+          "mType": "type number"
+        },
+        {
+          "column": "下单-支付转化率",
+          "mType": "type number"
+        },
+        {
+          "column": "无线端下单-支付转化率",
+          "mType": "type number"
+        },
+        {
+          "column": "PC端下单-支付转化率",
+          "mType": "type number"
+        },
+        {
+          "column": "支付商品数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "无线端支付商品数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "PC端支付商品数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "关注店铺人数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "无线端关注店铺人数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "PC端关注店铺人数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "会员总数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "新增会员数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "活跃会员数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "会员成交金额",
+          "mType": "type number"
+        },
+        {
+          "column": "会员成交人数",
+          "mType": "Int64.Type"
+        }
+      ],
+      "migrationStatus": "catalogued"
+    },
+    {
+      "name": "05-旗舰店ID对照表",
+      "tmdlFile": "tables/05-旗舰店ID对照表.tmdl",
+      "mFile": "original/05-旗舰店ID对照表.pq",
+      "sourceKind": "folder",
+      "sourcePaths": [
+        "D:\\麻大师\\日更数据\\天猫旗舰店\\05-旗舰店ID对照表"
+      ],
+      "operations": [
+        "Folder.Files",
+        "Table.SelectRows",
+        "Table.AddColumn",
+        "Table.RenameColumns",
+        "Table.SelectColumns",
+        "Table.ExpandTableColumn",
+        "Table.ColumnNames",
+        "Table.TransformColumnTypes",
+        "Table.Distinct"
+      ],
+      "references": [
+        "转换文件 (44)",
+        "示例文件 (44)"
+      ],
+      "sheetName": null,
+      "promoteHeaders": false,
+      "typedColumnCount": 14,
+      "typedColumns": [
+        "Source.Name",
+        "商品名称",
+        "商品ID",
+        "商品图片",
+        "商家编码",
+        "类目名称",
+        "商品价格",
+        "库存",
+        "累计销量",
+        "30日销量",
+        "基础分",
+        "扶优分",
+        "创建时间",
+        "商品状态"
+      ],
+      "schema": [
+        {
+          "column": "Source.Name",
+          "mType": "type text"
+        },
+        {
+          "column": "商品名称",
+          "mType": "type text"
+        },
+        {
+          "column": "商品ID",
+          "mType": "type text"
+        },
+        {
+          "column": "商品图片",
+          "mType": "type text"
+        },
+        {
+          "column": "商家编码",
+          "mType": "type text"
+        },
+        {
+          "column": "类目名称",
+          "mType": "type text"
+        },
+        {
+          "column": "商品价格",
+          "mType": "type number"
+        },
+        {
+          "column": "库存",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "累计销量",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "30日销量",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "基础分",
+          "mType": "type any"
+        },
+        {
+          "column": "扶优分",
+          "mType": "type any"
+        },
+        {
+          "column": "创建时间",
+          "mType": "type datetime"
+        },
+        {
+          "column": "商品状态",
+          "mType": "type text"
+        }
+      ],
+      "migrationStatus": "catalogued"
+    },
+    {
+      "name": "06-旗舰店流量数据",
+      "tmdlFile": "tables/06-旗舰店流量数据.tmdl",
+      "mFile": "original/06-旗舰店流量数据.pq",
+      "sourceKind": "folder",
+      "sourcePaths": [
+        "D:\\麻大师\\日更数据\\天猫旗舰店\\06-旗舰店流量数据"
+      ],
+      "operations": [
+        "Folder.Files",
+        "Table.SelectRows",
+        "Table.AddColumn",
+        "Table.RenameColumns",
+        "Table.SelectColumns",
+        "Table.ExpandTableColumn",
+        "Table.ColumnNames",
+        "Table.TransformColumnTypes",
+        "Table.ReplaceErrorValues"
+      ],
+      "references": [
+        "转换文件 (21)",
+        "示例文件 (21)"
+      ],
+      "sheetName": null,
+      "promoteHeaders": false,
+      "typedColumnCount": 34,
+      "typedColumns": [
+        "Source.Name",
+        "流量载体",
+        "一级来源",
+        "二级来源",
+        "三级来源",
+        "访客数",
+        "访客数环比",
+        "新访客",
+        "新访客环比",
+        "平均停留时长",
+        "平均停留时长环比",
+        "3s查看人数",
+        "3s查看人数环比",
+        "商品点击人数",
+        "商品点击人数环比",
+        "加购人数",
+        "加购人数环比",
+        "商品收藏人数",
+        "商品收藏人数环比",
+        "加购件数",
+        "加购件数环比",
+        "关注店铺人数",
+        "关注店铺人数环比",
+        "支付买家数",
+        "支付买家数环比",
+        "支付转化率",
+        "支付转化率环比",
+        "支付金额",
+        "支付金额环比",
+        "客单价",
+        "客单价环比",
+        "UV价值",
+        "uv价值环比",
+        "数据日期"
+      ],
+      "schema": [
+        {
+          "column": "Source.Name",
+          "mType": "type text"
+        },
+        {
+          "column": "流量载体",
+          "mType": "type text"
+        },
+        {
+          "column": "一级来源",
+          "mType": "type text"
+        },
+        {
+          "column": "二级来源",
+          "mType": "type text"
+        },
+        {
+          "column": "三级来源",
+          "mType": "type text"
+        },
+        {
+          "column": "访客数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "访客数环比",
+          "mType": "Percentage.Type"
+        },
+        {
+          "column": "新访客",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "新访客环比",
+          "mType": "Percentage.Type"
+        },
+        {
+          "column": "平均停留时长",
+          "mType": "type number"
+        },
+        {
+          "column": "平均停留时长环比",
+          "mType": "type text"
+        },
+        {
+          "column": "3s查看人数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "3s查看人数环比",
+          "mType": "type text"
+        },
+        {
+          "column": "商品点击人数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "商品点击人数环比",
+          "mType": "type text"
+        },
+        {
+          "column": "加购人数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "加购人数环比",
+          "mType": "Percentage.Type"
+        },
+        {
+          "column": "商品收藏人数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "商品收藏人数环比",
+          "mType": "Percentage.Type"
+        },
+        {
+          "column": "加购件数",
+          "mType": "type text"
+        },
+        {
+          "column": "加购件数环比",
+          "mType": "Percentage.Type"
+        },
+        {
+          "column": "关注店铺人数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "关注店铺人数环比",
+          "mType": "type text"
+        },
+        {
+          "column": "支付买家数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "支付买家数环比",
+          "mType": "Percentage.Type"
+        },
+        {
+          "column": "支付转化率",
+          "mType": "Percentage.Type"
+        },
+        {
+          "column": "支付转化率环比",
+          "mType": "Percentage.Type"
+        },
+        {
+          "column": "支付金额",
+          "mType": "type number"
+        },
+        {
+          "column": "支付金额环比",
+          "mType": "Percentage.Type"
+        },
+        {
+          "column": "客单价",
+          "mType": "type number"
+        },
+        {
+          "column": "客单价环比",
+          "mType": "Percentage.Type"
+        },
+        {
+          "column": "UV价值",
+          "mType": "type number"
+        },
+        {
+          "column": "uv价值环比",
+          "mType": "Percentage.Type"
+        },
+        {
+          "column": "数据日期",
+          "mType": "type date"
+        }
+      ],
+      "migrationStatus": "catalogued"
+    },
+    {
+      "name": "07-旗舰店商品销售数据",
+      "tmdlFile": "tables/07-旗舰店商品销售数据.tmdl",
+      "mFile": "original/07-旗舰店商品销售数据.pq",
+      "sourceKind": "folder",
+      "sourcePaths": [
+        "D:\\麻大师\\日更数据\\天猫旗舰店\\07-旗舰店商品销售数据"
+      ],
+      "operations": [
+        "Folder.Files",
+        "Table.AddColumn",
+        "Excel.Workbook",
+        "Table.Sort",
+        "Table.ExpandTableColumn",
+        "Table.RemoveColumns",
+        "Table.Distinct",
+        "Table.PromoteHeaders",
+        "Table.TransformColumnTypes",
+        "Table.SelectRows",
+        "List.IsEmpty",
+        "List.RemoveMatchingItems",
+        "Record.FieldValues",
+        "Table.RenameColumns"
+      ],
+      "references": [
+        "展开的“自定义”",
+        "展开的“Data”"
+      ],
+      "sheetName": null,
+      "promoteHeaders": true,
+      "typedColumnCount": 12,
+      "typedColumns": [
+        "退款金额",
+        "支付金额",
+        "商品访客数",
+        "日期",
+        "支付买家数",
+        "支付件数",
+        "商品ID",
+        "加购人数",
+        "支付新买家数",
+        "UV价值",
+        "客单价",
+        "加购件数"
+      ],
+      "schema": [
+        {
+          "column": "退款金额",
+          "mType": "Currency.Type"
+        },
+        {
+          "column": "支付金额",
+          "mType": "Currency.Type"
+        },
+        {
+          "column": "商品访客数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "日期",
+          "mType": "type date"
+        },
+        {
+          "column": "支付买家数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "支付件数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "商品ID",
+          "mType": "type text"
+        },
+        {
+          "column": "加购人数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "支付新买家数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "UV价值",
+          "mType": "type number"
+        },
+        {
+          "column": "客单价",
+          "mType": "type number"
+        },
+        {
+          "column": "加购件数",
+          "mType": "type number"
+        }
+      ],
+      "migrationStatus": "catalogued"
+    },
+    {
+      "name": "08-1关键词报表数据",
+      "tmdlFile": "tables/08-1关键词报表数据.tmdl",
+      "mFile": "original/08-1关键词报表数据.pq",
+      "sourceKind": "folder",
+      "sourcePaths": [
+        "D:\\麻大师\\日更数据\\天猫旗舰店\\08-1关键词报表数据"
+      ],
+      "operations": [
+        "Folder.Files",
+        "Table.SelectRows",
+        "Table.AddColumn",
+        "Table.RenameColumns",
+        "Table.Sort",
+        "Table.SelectColumns",
+        "Table.ExpandTableColumn",
+        "Table.ColumnNames",
+        "Table.TransformColumnTypes",
+        "Table.Distinct"
+      ],
+      "references": [
+        "转换文件 (23)",
+        "示例文件 (23)"
+      ],
+      "sheetName": null,
+      "promoteHeaders": false,
+      "typedColumnCount": 78,
+      "typedColumns": [
+        "Source.Name",
+        "日期",
+        "场景ID",
+        "场景名字",
+        "原二级场景ID",
+        "原二级场景名字",
+        "计划ID",
+        "计划名字",
+        "单元ID",
+        "单元名字",
+        "宝贝ID",
+        "宝贝名称",
+        "词类型",
+        "词ID/词包ID",
+        "词名字/词包名字",
+        "展现量",
+        "点击量",
+        "花费",
+        "点击率",
+        "平均点击花费",
+        "千次展现花费",
+        "总预售成交金额",
+        "总预售成交笔数",
+        "直接预售成交金额",
+        "直接预售成交笔数",
+        "间接预售成交金额",
+        "间接预售成交笔数",
+        "直接成交金额",
+        "间接成交金额",
+        "总成交金额",
+        "总成交笔数",
+        "直接成交笔数",
+        "间接成交笔数",
+        "点击转化率",
+        "投入产出比",
+        "含预售投产比",
+        "总成交成本",
+        "总购物车数",
+        "直接购物车数",
+        "间接购物车数",
+        "加购率",
+        "收藏宝贝数",
+        "收藏店铺数",
+        "店铺收藏成本",
+        "总收藏加购数",
+        "总收藏加购成本",
+        "宝贝收藏加购数",
+        "宝贝收藏加购成本",
+        "总收藏数",
+        "宝贝收藏成本",
+        "宝贝收藏率",
+        "加购成本",
+        "拍下订单笔数",
+        "拍下订单金额",
+        "直接收藏宝贝数",
+        "间接收藏宝贝数",
+        "优惠券领取量",
+        "购物金充值笔数",
+        "购物金充值金额",
+        "旺旺咨询量",
+        "引导访问量",
+        "引导访问人数",
+        "引导访问潜客数",
+        "引导访问潜客占比",
+        "入会率",
+        "入会量",
+        "引导访问率",
+        "深度访问量",
+        "平均访问页面数",
+        "成交新客数",
+        "成交新客占比",
+        "会员首购人数",
+        "会员成交金额",
+        "会员成交笔数",
+        "成交人数",
+        "人均成交笔数",
+        "人均成交金额",
+        "平均展现排名"
+      ],
+      "schema": [
+        {
+          "column": "Source.Name",
+          "mType": "type text"
+        },
+        {
+          "column": "日期",
+          "mType": "type date"
+        },
+        {
+          "column": "场景ID",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "场景名字",
+          "mType": "type text"
+        },
+        {
+          "column": "原二级场景ID",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "原二级场景名字",
+          "mType": "type text"
+        },
+        {
+          "column": "计划ID",
+          "mType": "type text"
+        },
+        {
+          "column": "计划名字",
+          "mType": "type text"
+        },
+        {
+          "column": "单元ID",
+          "mType": "type text"
+        },
+        {
+          "column": "单元名字",
+          "mType": "type text"
+        },
+        {
+          "column": "宝贝ID",
+          "mType": "type text"
+        },
+        {
+          "column": "宝贝名称",
+          "mType": "type text"
+        },
+        {
+          "column": "词类型",
+          "mType": "type text"
+        },
+        {
+          "column": "词ID/词包ID",
+          "mType": "type text"
+        },
+        {
+          "column": "词名字/词包名字",
+          "mType": "type text"
+        },
+        {
+          "column": "展现量",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "点击量",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "花费",
+          "mType": "type number"
+        },
+        {
+          "column": "点击率",
+          "mType": "type number"
+        },
+        {
+          "column": "平均点击花费",
+          "mType": "type number"
+        },
+        {
+          "column": "千次展现花费",
+          "mType": "type number"
+        },
+        {
+          "column": "总预售成交金额",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "总预售成交笔数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "直接预售成交金额",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "直接预售成交笔数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "间接预售成交金额",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "间接预售成交笔数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "直接成交金额",
+          "mType": "type number"
+        },
+        {
+          "column": "间接成交金额",
+          "mType": "type number"
+        },
+        {
+          "column": "总成交金额",
+          "mType": "type number"
+        },
+        {
+          "column": "总成交笔数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "直接成交笔数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "间接成交笔数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "点击转化率",
+          "mType": "type number"
+        },
+        {
+          "column": "投入产出比",
+          "mType": "type number"
+        },
+        {
+          "column": "含预售投产比",
+          "mType": "type number"
+        },
+        {
+          "column": "总成交成本",
+          "mType": "type number"
+        },
+        {
+          "column": "总购物车数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "直接购物车数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "间接购物车数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "加购率",
+          "mType": "type number"
+        },
+        {
+          "column": "收藏宝贝数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "收藏店铺数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "店铺收藏成本",
+          "mType": "type number"
+        },
+        {
+          "column": "总收藏加购数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "总收藏加购成本",
+          "mType": "type number"
+        },
+        {
+          "column": "宝贝收藏加购数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "宝贝收藏加购成本",
+          "mType": "type number"
+        },
+        {
+          "column": "总收藏数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "宝贝收藏成本",
+          "mType": "type number"
+        },
+        {
+          "column": "宝贝收藏率",
+          "mType": "type number"
+        },
+        {
+          "column": "加购成本",
+          "mType": "type number"
+        },
+        {
+          "column": "拍下订单笔数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "拍下订单金额",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "直接收藏宝贝数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "间接收藏宝贝数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "优惠券领取量",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "购物金充值笔数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "购物金充值金额",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "旺旺咨询量",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "引导访问量",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "引导访问人数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "引导访问潜客数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "引导访问潜客占比",
+          "mType": "type number"
+        },
+        {
+          "column": "入会率",
+          "mType": "type number"
+        },
+        {
+          "column": "入会量",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "引导访问率",
+          "mType": "type number"
+        },
+        {
+          "column": "深度访问量",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "平均访问页面数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "成交新客数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "成交新客占比",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "会员首购人数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "会员成交金额",
+          "mType": "type number"
+        },
+        {
+          "column": "会员成交笔数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "成交人数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "人均成交笔数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "人均成交金额",
+          "mType": "type number"
+        },
+        {
+          "column": "平均展现排名",
+          "mType": "type number"
+        }
+      ],
+      "migrationStatus": "catalogued"
+    },
+    {
+      "name": "08-2人群报表数据",
+      "tmdlFile": "tables/08-2人群报表数据.tmdl",
+      "mFile": "original/08-2人群报表数据.pq",
+      "sourceKind": "folder",
+      "sourcePaths": [
+        "D:\\麻大师\\日更数据\\天猫旗舰店\\08-2人群报表数据"
+      ],
+      "operations": [
+        "Folder.Files",
+        "Table.SelectRows",
+        "Table.Sort",
+        "Table.AddColumn",
+        "Table.RenameColumns",
+        "Table.SelectColumns",
+        "Table.ExpandTableColumn",
+        "Table.ColumnNames",
+        "Table.TransformColumnTypes",
+        "Table.Distinct"
+      ],
+      "references": [
+        "转换文件 (24)",
+        "示例文件 (24)"
+      ],
+      "sheetName": null,
+      "promoteHeaders": false,
+      "typedColumnCount": 76,
+      "typedColumns": [
+        "Source.Name",
+        "日期",
+        "场景ID",
+        "场景名字",
+        "原二级场景ID",
+        "原二级场景名字",
+        "计划ID",
+        "计划名字",
+        "单元ID",
+        "单元名字",
+        "人群名字",
+        "主体ID",
+        "主体类型",
+        "主体名称",
+        "展现量",
+        "点击量",
+        "花费",
+        "点击率",
+        "平均点击花费",
+        "千次展现花费",
+        "总预售成交金额",
+        "总预售成交笔数",
+        "直接预售成交金额",
+        "直接预售成交笔数",
+        "间接预售成交金额",
+        "间接预售成交笔数",
+        "直接成交金额",
+        "间接成交金额",
+        "总成交金额",
+        "总成交笔数",
+        "直接成交笔数",
+        "间接成交笔数",
+        "点击转化率",
+        "投入产出比",
+        "含预售投产比",
+        "总成交成本",
+        "总购物车数",
+        "直接购物车数",
+        "间接购物车数",
+        "加购率",
+        "收藏宝贝数",
+        "收藏店铺数",
+        "店铺收藏成本",
+        "总收藏加购数",
+        "总收藏加购成本",
+        "宝贝收藏加购数",
+        "宝贝收藏加购成本",
+        "总收藏数",
+        "宝贝收藏成本",
+        "宝贝收藏率",
+        "加购成本",
+        "拍下订单笔数",
+        "拍下订单金额",
+        "直接收藏宝贝数",
+        "间接收藏宝贝数",
+        "优惠券领取量",
+        "购物金充值笔数",
+        "购物金充值金额",
+        "旺旺咨询量",
+        "引导访问量",
+        "引导访问人数",
+        "引导访问潜客数",
+        "引导访问潜客占比",
+        "入会率",
+        "入会量",
+        "引导访问率",
+        "深度访问量",
+        "平均访问页面数",
+        "成交新客数",
+        "成交新客占比",
+        "会员首购人数",
+        "会员成交金额",
+        "会员成交笔数",
+        "成交人数",
+        "人均成交笔数",
+        "人均成交金额"
+      ],
+      "schema": [
+        {
+          "column": "Source.Name",
+          "mType": "type text"
+        },
+        {
+          "column": "日期",
+          "mType": "type date"
+        },
+        {
+          "column": "场景ID",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "场景名字",
+          "mType": "type text"
+        },
+        {
+          "column": "原二级场景ID",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "原二级场景名字",
+          "mType": "type text"
+        },
+        {
+          "column": "计划ID",
+          "mType": "type text"
+        },
+        {
+          "column": "计划名字",
+          "mType": "type text"
+        },
+        {
+          "column": "单元ID",
+          "mType": "type text"
+        },
+        {
+          "column": "单元名字",
+          "mType": "type text"
+        },
+        {
+          "column": "人群名字",
+          "mType": "type text"
+        },
+        {
+          "column": "主体ID",
+          "mType": "type text"
+        },
+        {
+          "column": "主体类型",
+          "mType": "type text"
+        },
+        {
+          "column": "主体名称",
+          "mType": "type text"
+        },
+        {
+          "column": "展现量",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "点击量",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "花费",
+          "mType": "type number"
+        },
+        {
+          "column": "点击率",
+          "mType": "type number"
+        },
+        {
+          "column": "平均点击花费",
+          "mType": "type number"
+        },
+        {
+          "column": "千次展现花费",
+          "mType": "type number"
+        },
+        {
+          "column": "总预售成交金额",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "总预售成交笔数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "直接预售成交金额",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "直接预售成交笔数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "间接预售成交金额",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "间接预售成交笔数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "直接成交金额",
+          "mType": "type number"
+        },
+        {
+          "column": "间接成交金额",
+          "mType": "type number"
+        },
+        {
+          "column": "总成交金额",
+          "mType": "type number"
+        },
+        {
+          "column": "总成交笔数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "直接成交笔数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "间接成交笔数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "点击转化率",
+          "mType": "type number"
+        },
+        {
+          "column": "投入产出比",
+          "mType": "type number"
+        },
+        {
+          "column": "含预售投产比",
+          "mType": "type number"
+        },
+        {
+          "column": "总成交成本",
+          "mType": "type number"
+        },
+        {
+          "column": "总购物车数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "直接购物车数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "间接购物车数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "加购率",
+          "mType": "type number"
+        },
+        {
+          "column": "收藏宝贝数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "收藏店铺数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "店铺收藏成本",
+          "mType": "type number"
+        },
+        {
+          "column": "总收藏加购数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "总收藏加购成本",
+          "mType": "type number"
+        },
+        {
+          "column": "宝贝收藏加购数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "宝贝收藏加购成本",
+          "mType": "type number"
+        },
+        {
+          "column": "总收藏数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "宝贝收藏成本",
+          "mType": "type number"
+        },
+        {
+          "column": "宝贝收藏率",
+          "mType": "type number"
+        },
+        {
+          "column": "加购成本",
+          "mType": "type number"
+        },
+        {
+          "column": "拍下订单笔数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "拍下订单金额",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "直接收藏宝贝数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "间接收藏宝贝数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "优惠券领取量",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "购物金充值笔数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "购物金充值金额",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "旺旺咨询量",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "引导访问量",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "引导访问人数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "引导访问潜客数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "引导访问潜客占比",
+          "mType": "type number"
+        },
+        {
+          "column": "入会率",
+          "mType": "type number"
+        },
+        {
+          "column": "入会量",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "引导访问率",
+          "mType": "type number"
+        },
+        {
+          "column": "深度访问量",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "平均访问页面数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "成交新客数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "成交新客占比",
+          "mType": "type number"
+        },
+        {
+          "column": "会员首购人数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "会员成交金额",
+          "mType": "type number"
+        },
+        {
+          "column": "会员成交笔数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "成交人数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "人均成交笔数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "人均成交金额",
+          "mType": "type number"
+        }
+      ],
+      "migrationStatus": "catalogued"
+    },
+    {
+      "name": "08-旗舰店推广花费",
+      "tmdlFile": "tables/08-旗舰店推广花费.tmdl",
+      "mFile": "original/08-旗舰店推广花费.pq",
+      "sourceKind": "folder",
+      "sourcePaths": [
+        "D:\\麻大师\\日更数据\\天猫旗舰店\\08-旗舰店推广花费"
+      ],
+      "operations": [
+        "Folder.Files",
+        "Table.Sort",
+        "Table.SelectRows",
+        "Table.AddColumn",
+        "Table.RenameColumns",
+        "Table.SelectColumns",
+        "Table.ExpandTableColumn",
+        "Table.ColumnNames",
+        "Table.TransformColumnTypes",
+        "Table.Combine",
+        "Table.ReplaceValue",
+        "Table.Distinct",
+        "Text.Contains",
+        "List.Contains",
+        "Table.RemoveColumns"
+      ],
+      "references": [
+        "转换文件 (14)",
+        "示例文件 (14)",
+        "11-旗舰店UD推广计划"
+      ],
+      "sheetName": null,
+      "promoteHeaders": false,
+      "typedColumnCount": 78,
+      "typedColumns": [
+        "Source.Name",
+        "日期",
+        "场景ID",
+        "场景名字",
+        "原二级场景ID",
+        "原二级场景名字",
+        "计划ID",
+        "计划名字",
+        "主体ID",
+        "主体类型",
+        "主体名称",
+        "展现量",
+        "点击量",
+        "花费",
+        "点击率",
+        "平均点击花费",
+        "千次展现花费",
+        "总预售成交金额",
+        "总预售成交笔数",
+        "直接预售成交金额",
+        "直接预售成交笔数",
+        "间接预售成交金额",
+        "间接预售成交笔数",
+        "直接成交金额",
+        "间接成交金额",
+        "总成交金额",
+        "总成交笔数",
+        "直接成交笔数",
+        "间接成交笔数",
+        "点击转化率",
+        "投入产出比",
+        "总成交成本",
+        "总购物车数",
+        "直接购物车数",
+        "间接购物车数",
+        "加购率",
+        "收藏宝贝数",
+        "收藏店铺数",
+        "店铺收藏成本",
+        "总收藏加购数",
+        "总收藏加购成本",
+        "宝贝收藏加购数",
+        "宝贝收藏加购成本",
+        "总收藏数",
+        "宝贝收藏成本",
+        "宝贝收藏率",
+        "加购成本",
+        "拍下订单笔数",
+        "拍下订单金额",
+        "直接收藏宝贝数",
+        "间接收藏宝贝数",
+        "优惠券领取量",
+        "购物金充值笔数",
+        "购物金充值金额",
+        "旺旺咨询量",
+        "引导访问量",
+        "引导访问人数",
+        "引导访问潜客数",
+        "引导访问潜客占比",
+        "入会率",
+        "入会量",
+        "引导访问率",
+        "深度访问量",
+        "平均访问页面数",
+        "成交新客数",
+        "成交新客占比",
+        "会员首购人数",
+        "会员成交金额",
+        "会员成交笔数",
+        "成交人数",
+        "人均成交笔数",
+        "人均成交金额",
+        "自然流量转化金额",
+        "自然流量曝光量",
+        "平台助推总成交",
+        "平台助推直接成交",
+        "平台助推点击",
+        "商品ID"
+      ],
+      "schema": [
+        {
+          "column": "Source.Name",
+          "mType": "type text"
+        },
+        {
+          "column": "日期",
+          "mType": "type date"
+        },
+        {
+          "column": "场景ID",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "场景名字",
+          "mType": "type text"
+        },
+        {
+          "column": "原二级场景ID",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "原二级场景名字",
+          "mType": "type text"
+        },
+        {
+          "column": "计划ID",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "计划名字",
+          "mType": "type text"
+        },
+        {
+          "column": "主体ID",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "主体类型",
+          "mType": "type text"
+        },
+        {
+          "column": "主体名称",
+          "mType": "type text"
+        },
+        {
+          "column": "展现量",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "点击量",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "花费",
+          "mType": "type number"
+        },
+        {
+          "column": "点击率",
+          "mType": "type number"
+        },
+        {
+          "column": "平均点击花费",
+          "mType": "type number"
+        },
+        {
+          "column": "千次展现花费",
+          "mType": "type number"
+        },
+        {
+          "column": "总预售成交金额",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "总预售成交笔数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "直接预售成交金额",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "直接预售成交笔数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "间接预售成交金额",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "间接预售成交笔数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "直接成交金额",
+          "mType": "type number"
+        },
+        {
+          "column": "间接成交金额",
+          "mType": "type number"
+        },
+        {
+          "column": "总成交金额",
+          "mType": "type number"
+        },
+        {
+          "column": "总成交笔数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "直接成交笔数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "间接成交笔数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "点击转化率",
+          "mType": "type number"
+        },
+        {
+          "column": "投入产出比",
+          "mType": "type number"
+        },
+        {
+          "column": "总成交成本",
+          "mType": "type number"
+        },
+        {
+          "column": "总购物车数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "直接购物车数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "间接购物车数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "加购率",
+          "mType": "type number"
+        },
+        {
+          "column": "收藏宝贝数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "收藏店铺数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "店铺收藏成本",
+          "mType": "type number"
+        },
+        {
+          "column": "总收藏加购数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "总收藏加购成本",
+          "mType": "type number"
+        },
+        {
+          "column": "宝贝收藏加购数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "宝贝收藏加购成本",
+          "mType": "type number"
+        },
+        {
+          "column": "总收藏数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "宝贝收藏成本",
+          "mType": "type number"
+        },
+        {
+          "column": "宝贝收藏率",
+          "mType": "type number"
+        },
+        {
+          "column": "加购成本",
+          "mType": "type number"
+        },
+        {
+          "column": "拍下订单笔数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "拍下订单金额",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "直接收藏宝贝数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "间接收藏宝贝数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "优惠券领取量",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "购物金充值笔数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "购物金充值金额",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "旺旺咨询量",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "引导访问量",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "引导访问人数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "引导访问潜客数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "引导访问潜客占比",
+          "mType": "type number"
+        },
+        {
+          "column": "入会率",
+          "mType": "type number"
+        },
+        {
+          "column": "入会量",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "引导访问率",
+          "mType": "type number"
+        },
+        {
+          "column": "深度访问量",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "平均访问页面数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "成交新客数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "成交新客占比",
+          "mType": "type number"
+        },
+        {
+          "column": "会员首购人数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "会员成交金额",
+          "mType": "type number"
+        },
+        {
+          "column": "会员成交笔数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "成交人数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "人均成交笔数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "人均成交金额",
+          "mType": "type number"
+        },
+        {
+          "column": "自然流量转化金额",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "自然流量曝光量",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "平台助推总成交",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "平台助推直接成交",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "平台助推点击",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "商品ID",
+          "mType": "type text"
+        }
+      ],
+      "migrationStatus": "catalogued"
+    },
+    {
+      "name": "10-1淘宝客服绩效明细",
+      "tmdlFile": "tables/10-1淘宝客服绩效明细.tmdl",
+      "mFile": "original/10-1淘宝客服绩效明细.pq",
+      "sourceKind": "folder",
+      "sourcePaths": [
+        "D:\\麻大师\\日更数据\\天猫旗舰店\\10-1淘宝客服绩效明细\\自制报表"
+      ],
+      "operations": [
+        "Folder.Files",
+        "Table.SelectRows",
+        "Table.AddColumn",
+        "Table.RenameColumns",
+        "Table.SelectColumns",
+        "Table.ExpandTableColumn",
+        "Table.ColumnNames",
+        "Table.TransformColumnTypes",
+        "Table.SplitColumn",
+        "Table.Distinct",
+        "Table.ReplaceValue"
+      ],
+      "references": [
+        "转换文件 (37)",
+        "示例文件 (37)"
+      ],
+      "sheetName": null,
+      "promoteHeaders": false,
+      "typedColumnCount": 27,
+      "typedColumns": [
+        "Source.Name",
+        "旺旺昵称",
+        "客服主动跟进人数",
+        "有效接待人数",
+        "销售人数",
+        "询单最终付款转化率",
+        "客单价",
+        "净销售额",
+        "旺旺回复率",
+        "平均响应时长（秒)",
+        "答问比",
+        "平均接待时长",
+        "成功退款率",
+        "当日询单人数",
+        "下单最终付款人数",
+        "询单当日付款人数",
+        "客户满意率",
+        "平均上线时间",
+        "销售额",
+        "询单流失人数",
+        "下单当日付款转化率",
+        "首次响应时长（秒)",
+        "旺旺分组",
+        "Source.Name.1",
+        "Source.Name.2",
+        "Source.Name.3",
+        "Source.Name.4"
+      ],
+      "schema": [
+        {
+          "column": "Source.Name",
+          "mType": "type text"
+        },
+        {
+          "column": "旺旺昵称",
+          "mType": "type text"
+        },
+        {
+          "column": "客服主动跟进人数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "有效接待人数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "销售人数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "询单最终付款转化率",
+          "mType": "Percentage.Type"
+        },
+        {
+          "column": "客单价",
+          "mType": "type number"
+        },
+        {
+          "column": "净销售额",
+          "mType": "type number"
+        },
+        {
+          "column": "旺旺回复率",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "平均响应时长（秒)",
+          "mType": "type number"
+        },
+        {
+          "column": "答问比",
+          "mType": "type number"
+        },
+        {
+          "column": "平均接待时长",
+          "mType": "type time"
+        },
+        {
+          "column": "成功退款率",
+          "mType": "type number"
+        },
+        {
+          "column": "当日询单人数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "下单最终付款人数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "询单当日付款人数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "客户满意率",
+          "mType": "type number"
+        },
+        {
+          "column": "平均上线时间",
+          "mType": "type time"
+        },
+        {
+          "column": "销售额",
+          "mType": "type number"
+        },
+        {
+          "column": "询单流失人数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "下单当日付款转化率",
+          "mType": "type number"
+        },
+        {
+          "column": "首次响应时长（秒)",
+          "mType": "type number"
+        },
+        {
+          "column": "旺旺分组",
+          "mType": "type any"
+        },
+        {
+          "column": "Source.Name.1",
+          "mType": "type text"
+        },
+        {
+          "column": "Source.Name.2",
+          "mType": "type date"
+        },
+        {
+          "column": "Source.Name.3",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "Source.Name.4",
+          "mType": "type text"
+        }
+      ],
+      "migrationStatus": "catalogued"
+    },
+    {
+      "name": "10-2京东客服营销明细",
+      "tmdlFile": "tables/10-2京东客服营销明细.tmdl",
+      "mFile": "original/10-2京东客服营销明细.pq",
+      "sourceKind": "folder",
+      "sourcePaths": [
+        "D:\\麻大师\\日更数据\\天猫旗舰店\\10-2京东客服绩效明细\\工作量数据"
+      ],
+      "operations": [
+        "Folder.Files",
+        "Table.SelectRows",
+        "Table.AddColumn",
+        "Table.RenameColumns",
+        "Table.SelectColumns",
+        "Table.ExpandTableColumn",
+        "Table.ColumnNames",
+        "Table.Combine",
+        "Text.Select",
+        "Text.BetweenDelimiters",
+        "Number.FromText",
+        "List.First",
+        "List.RemoveNulls",
+        "List.Transform",
+        "Text.Contains",
+        "List.PositionOf",
+        "Text.PositionOf",
+        "Text.Middle",
+        "Text.Combine",
+        "Text.From",
+        "Text.Length",
+        "Table.TransformColumnTypes",
+        "Table.Distinct"
+      ],
+      "references": [
+        "转换文件 (43)",
+        "示例文件 (43)"
+      ],
+      "sheetName": null,
+      "promoteHeaders": false,
+      "typedColumnCount": 7,
+      "typedColumns": [
+        "日期",
+        "30s应答率",
+        "平均回复消息数",
+        "首次平均响应时间",
+        "新平均响应时间",
+        "接待量",
+        "接待时长"
+      ],
+      "schema": [
+        {
+          "column": "日期",
+          "mType": "type date"
+        },
+        {
+          "column": "30s应答率",
+          "mType": "Percentage.Type"
+        },
+        {
+          "column": "平均回复消息数",
+          "mType": "type number"
+        },
+        {
+          "column": "首次平均响应时间",
+          "mType": "type number"
+        },
+        {
+          "column": "新平均响应时间",
+          "mType": "type number"
+        },
+        {
+          "column": "接待量",
+          "mType": "type number"
+        },
+        {
+          "column": "接待时长",
+          "mType": "type number"
+        }
+      ],
+      "migrationStatus": "catalogued"
+    },
+    {
+      "name": "10-3京东客服绩效数据",
+      "tmdlFile": "tables/10-3京东客服绩效数据.tmdl",
+      "mFile": "original/10-3京东客服绩效数据.pq",
+      "sourceKind": "folder",
+      "sourcePaths": [
+        "D:\\麻大师\\日更数据\\天猫旗舰店\\10-2京东客服绩效明细\\绩效数据"
+      ],
+      "operations": [
+        "Folder.Files",
+        "Table.SelectRows",
+        "Table.AddColumn",
+        "Table.RenameColumns",
+        "Table.SelectColumns",
+        "Table.ExpandTableColumn",
+        "Table.ColumnNames",
+        "Table.TransformColumnTypes",
+        "Table.Combine",
+        "Text.Select",
+        "Text.BetweenDelimiters",
+        "Number.FromText",
+        "List.First",
+        "List.RemoveNulls",
+        "List.Transform",
+        "Text.Contains",
+        "List.PositionOf",
+        "Text.PositionOf",
+        "Text.Middle",
+        "Text.Combine",
+        "Text.From",
+        "Text.Length",
+        "Table.Distinct"
+      ],
+      "references": [
+        "转换文件 (42)",
+        "示例文件 (42)"
+      ],
+      "sheetName": null,
+      "promoteHeaders": false,
+      "typedColumnCount": 13,
+      "typedColumns": [
+        "Source.Name",
+        "客服",
+        "售前接待人数",
+        "促成下单人数",
+        "促成出库人数",
+        "促成下单订单数",
+        "促成出库订单数",
+        "促成下单商品数",
+        "促成出库商品数",
+        "促成下单商品金额",
+        "促成出库商品金额",
+        "日期",
+        "售前咨询-下单转化率"
+      ],
+      "schema": [
+        {
+          "column": "Source.Name",
+          "mType": "type text"
+        },
+        {
+          "column": "客服",
+          "mType": "type any"
+        },
+        {
+          "column": "售前接待人数",
+          "mType": "type number"
+        },
+        {
+          "column": "促成下单人数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "促成出库人数",
+          "mType": "type any"
+        },
+        {
+          "column": "促成下单订单数",
+          "mType": "type any"
+        },
+        {
+          "column": "促成出库订单数",
+          "mType": "type any"
+        },
+        {
+          "column": "促成下单商品数",
+          "mType": "type any"
+        },
+        {
+          "column": "促成出库商品数",
+          "mType": "type any"
+        },
+        {
+          "column": "促成下单商品金额",
+          "mType": "type number"
+        },
+        {
+          "column": "促成出库商品金额",
+          "mType": "type any"
+        },
+        {
+          "column": "日期",
+          "mType": "type date"
+        },
+        {
+          "column": "售前咨询-下单转化率",
+          "mType": "Percentage.Type"
+        }
+      ],
+      "migrationStatus": "catalogued"
+    },
+    {
+      "name": "10-4客服员工日报统计",
+      "tmdlFile": "tables/10-4客服员工日报统计.tmdl",
+      "mFile": "original/10-4客服员工日报统计.pq",
+      "sourceKind": "folder",
+      "sourcePaths": [
+        "D:\\麻大师\\日更数据\\天猫旗舰店\\10-2京东客服绩效明细\\客服员工日报统计"
+      ],
+      "operations": [
+        "Folder.Files",
+        "Table.SelectRows",
+        "Table.AddColumn",
+        "Table.RenameColumns",
+        "Table.SelectColumns",
+        "Table.ExpandTableColumn",
+        "Table.ColumnNames",
+        "Table.TransformColumnTypes",
+        "Table.Combine",
+        "Table.ReplaceValue",
+        "Table.Distinct"
+      ],
+      "references": [
+        "转换文件 (40)",
+        "示例文件 (40)"
+      ],
+      "sheetName": null,
+      "promoteHeaders": false,
+      "typedColumnCount": 39,
+      "typedColumns": [
+        "非常满意",
+        "满意",
+        "不满意",
+        "非常不满意",
+        "好评量",
+        "差评量",
+        "Source.Name",
+        "日期",
+        "UID",
+        "技能组",
+        "服务商",
+        "ERP",
+        "咨询量",
+        "接待量",
+        "转出量",
+        "转入量",
+        "评价总数",
+        "勋章评价",
+        "一般",
+        "评价率",
+        "满意率",
+        "不满意率",
+        "一次性解决量",
+        "一次性解决率",
+        "4次以下会话数",
+        "4- 10 次会话数",
+        "10次以上会话数",
+        "客户总消息数",
+        "客服总消息数",
+        "邀评数",
+        "邀评率",
+        "CPH时长",
+        "会话时长",
+        "首次应答时长",
+        "留言分配量",
+        "留言接待量",
+        "留言响应率",
+        "平均响应时间",
+        "30s应答率"
+      ],
+      "schema": [
+        {
+          "column": "非常满意",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "满意",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "不满意",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "非常不满意",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "好评量",
+          "mType": "type number"
+        },
+        {
+          "column": "差评量",
+          "mType": "type number"
+        },
+        {
+          "column": "Source.Name",
+          "mType": "type text"
+        },
+        {
+          "column": "日期",
+          "mType": "type date"
+        },
+        {
+          "column": "UID",
+          "mType": "type text"
+        },
+        {
+          "column": "技能组",
+          "mType": "type text"
+        },
+        {
+          "column": "服务商",
+          "mType": "type text"
+        },
+        {
+          "column": "ERP",
+          "mType": "type any"
+        },
+        {
+          "column": "咨询量",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "接待量",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "转出量",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "转入量",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "评价总数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "勋章评价",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "一般",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "评价率",
+          "mType": "type text"
+        },
+        {
+          "column": "满意率",
+          "mType": "type text"
+        },
+        {
+          "column": "不满意率",
+          "mType": "type text"
+        },
+        {
+          "column": "一次性解决量",
+          "mType": "type any"
+        },
+        {
+          "column": "一次性解决率",
+          "mType": "type any"
+        },
+        {
+          "column": "4次以下会话数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "4- 10 次会话数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "10次以上会话数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "客户总消息数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "客服总消息数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "邀评数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "邀评率",
+          "mType": "type text"
+        },
+        {
+          "column": "CPH时长",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "会话时长",
+          "mType": "type number"
+        },
+        {
+          "column": "首次应答时长",
+          "mType": "type number"
+        },
+        {
+          "column": "留言分配量",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "留言接待量",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "留言响应率",
+          "mType": "type text"
+        },
+        {
+          "column": "平均响应时间",
+          "mType": "type number"
+        },
+        {
+          "column": "30s应答率",
+          "mType": "Percentage.Type"
+        }
+      ],
+      "migrationStatus": "catalogued"
+    },
+    {
+      "name": "11-旗舰店UD推广计划",
+      "tmdlFile": "tables/11-旗舰店UD推广计划.tmdl",
+      "mFile": "original/11-旗舰店UD推广计划.pq",
+      "sourceKind": "folder",
+      "sourcePaths": [
+        "D:\\麻大师\\日更数据\\天猫旗舰店\\11-旗舰店UD推广计划"
+      ],
+      "operations": [
+        "Folder.Files",
+        "Table.SelectRows",
+        "Table.Sort",
+        "Table.AddColumn",
+        "Table.RenameColumns",
+        "Table.SelectColumns",
+        "Table.ExpandTableColumn",
+        "Table.ColumnNames",
+        "Table.TransformColumnTypes",
+        "Table.Distinct"
+      ],
+      "references": [
+        "转换文件 (19)",
+        "示例文件 (19)"
+      ],
+      "sheetName": null,
+      "promoteHeaders": false,
+      "typedColumnCount": 46,
+      "typedColumns": [
+        "Source.Name",
+        "日期",
+        "展现量",
+        "点击量",
+        "花费",
+        "点击率",
+        "平均点击花费",
+        "千次展现花费",
+        "总预售成交金额",
+        "总预售成交笔数",
+        "直接预售成交金额",
+        "直接预售成交笔数",
+        "间接预售成交金额",
+        "间接预售成交笔数",
+        "预售投入产出比",
+        "拍下订单金额",
+        "拍下订单笔数",
+        "总成交金额",
+        "总成交笔数",
+        " 订单成本",
+        "点击转化率",
+        "投入产出比",
+        "直接投入产出比",
+        "直接成交金额",
+        "直接成交笔数",
+        "间接成交金额",
+        "间接成交笔数",
+        "新客成交金额",
+        "新客成交笔数",
+        "新客订单成本",
+        "新客投入产出比",
+        "总购物车数",
+        "加购率",
+        "加购成本",
+        "直接加购成本",
+        "直接购物车数",
+        "间接购物车数",
+        "总收藏数",
+        "收藏成本",
+        "收藏宝贝数",
+        "收藏店铺数",
+        "引导访问",
+        "到达PV数",
+        "到达PV成本",
+        "到达UV数",
+        "到达UV成本"
+      ],
+      "schema": [
+        {
+          "column": "Source.Name",
+          "mType": "type text"
+        },
+        {
+          "column": "日期",
+          "mType": "type date"
+        },
+        {
+          "column": "展现量",
+          "mType": "type number"
+        },
+        {
+          "column": "点击量",
+          "mType": "type number"
+        },
+        {
+          "column": "花费",
+          "mType": "type number"
+        },
+        {
+          "column": "点击率",
+          "mType": "type number"
+        },
+        {
+          "column": "平均点击花费",
+          "mType": "type number"
+        },
+        {
+          "column": "千次展现花费",
+          "mType": "type number"
+        },
+        {
+          "column": "总预售成交金额",
+          "mType": "type number"
+        },
+        {
+          "column": "总预售成交笔数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "直接预售成交金额",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "直接预售成交笔数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "间接预售成交金额",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "间接预售成交笔数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "预售投入产出比",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "拍下订单金额",
+          "mType": "type number"
+        },
+        {
+          "column": "拍下订单笔数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "总成交金额",
+          "mType": "type number"
+        },
+        {
+          "column": "总成交笔数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": " 订单成本",
+          "mType": "type number"
+        },
+        {
+          "column": "点击转化率",
+          "mType": "type number"
+        },
+        {
+          "column": "投入产出比",
+          "mType": "type number"
+        },
+        {
+          "column": "直接投入产出比",
+          "mType": "type number"
+        },
+        {
+          "column": "直接成交金额",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "直接成交笔数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "间接成交金额",
+          "mType": "type number"
+        },
+        {
+          "column": "间接成交笔数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "新客成交金额",
+          "mType": "type number"
+        },
+        {
+          "column": "新客成交笔数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "新客订单成本",
+          "mType": "type number"
+        },
+        {
+          "column": "新客投入产出比",
+          "mType": "type number"
+        },
+        {
+          "column": "总购物车数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "加购率",
+          "mType": "type number"
+        },
+        {
+          "column": "加购成本",
+          "mType": "type number"
+        },
+        {
+          "column": "直接加购成本",
+          "mType": "type number"
+        },
+        {
+          "column": "直接购物车数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "间接购物车数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "总收藏数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "收藏成本",
+          "mType": "type number"
+        },
+        {
+          "column": "收藏宝贝数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "收藏店铺数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "引导访问",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "到达PV数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "到达PV成本",
+          "mType": "type number"
+        },
+        {
+          "column": "到达UV数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "到达UV成本",
+          "mType": "type number"
+        }
+      ],
+      "migrationStatus": "catalogued"
+    },
+    {
+      "name": "14-推广竞品数据",
+      "tmdlFile": "tables/14-推广竞品数据.tmdl",
+      "mFile": "original/14-推广竞品数据.pq",
+      "sourceKind": "folder",
+      "sourcePaths": [
+        "D:\\麻大师\\日更数据\\天猫旗舰店\\14-推广竞品数据"
+      ],
+      "operations": [
+        "Folder.Files",
+        "Table.SelectRows",
+        "Table.AddColumn",
+        "Table.RenameColumns",
+        "Table.SelectColumns",
+        "Table.ExpandTableColumn",
+        "Table.ColumnNames",
+        "Table.TransformColumnTypes",
+        "Table.Distinct"
+      ],
+      "references": [
+        "转换文件 (29)",
+        "示例文件 (29)"
+      ],
+      "sheetName": null,
+      "promoteHeaders": false,
+      "typedColumnCount": 19,
+      "typedColumns": [
+        "Source.Name",
+        "消耗",
+        "展现量",
+        "点击量",
+        "收藏加购量",
+        "成交量",
+        "成交金额",
+        "ROI",
+        "收藏加购率",
+        "成交转化率",
+        "单次收加成本",
+        "单次点击成本",
+        "新增单个访问人群成本",
+        "新增单个兴趣人群成本",
+        "新增单个首购人群成本",
+        "新增单个复购人群成本",
+        "渠道",
+        "品牌",
+        "时间"
+      ],
+      "schema": [
+        {
+          "column": "Source.Name",
+          "mType": "type text"
+        },
+        {
+          "column": "消耗",
+          "mType": "type number"
+        },
+        {
+          "column": "展现量",
+          "mType": "type number"
+        },
+        {
+          "column": "点击量",
+          "mType": "type number"
+        },
+        {
+          "column": "收藏加购量",
+          "mType": "type number"
+        },
+        {
+          "column": "成交量",
+          "mType": "type number"
+        },
+        {
+          "column": "成交金额",
+          "mType": "type number"
+        },
+        {
+          "column": "ROI",
+          "mType": "type number"
+        },
+        {
+          "column": "收藏加购率",
+          "mType": "Percentage.Type"
+        },
+        {
+          "column": "成交转化率",
+          "mType": "Percentage.Type"
+        },
+        {
+          "column": "单次收加成本",
+          "mType": "type number"
+        },
+        {
+          "column": "单次点击成本",
+          "mType": "type number"
+        },
+        {
+          "column": "新增单个访问人群成本",
+          "mType": "type number"
+        },
+        {
+          "column": "新增单个兴趣人群成本",
+          "mType": "type number"
+        },
+        {
+          "column": "新增单个首购人群成本",
+          "mType": "type number"
+        },
+        {
+          "column": "新增单个复购人群成本",
+          "mType": "type number"
+        },
+        {
+          "column": "渠道",
+          "mType": "type text"
+        },
+        {
+          "column": "品牌",
+          "mType": "type text"
+        },
+        {
+          "column": "时间",
+          "mType": "type date"
+        }
+      ],
+      "migrationStatus": "catalogued"
+    },
+    {
+      "name": "辅4-床垫编码",
+      "tmdlFile": "tables/辅4-床垫编码.tmdl",
+      "mFile": "original/辅4-床垫编码.pq",
+      "sourceKind": "excel_file",
+      "sourcePaths": [
+        "D:\\麻大师\\日更数据\\天猫旗舰店\\商品信息文件\\产品明细.xlsx"
+      ],
+      "operations": [
+        "Excel.Workbook",
+        "File.Contents",
+        "Table.PromoteHeaders"
+      ],
+      "references": [],
+      "sheetName": "Sheet1",
+      "promoteHeaders": true,
+      "typedColumnCount": 0,
+      "typedColumns": [],
+      "schema": [],
+      "migrationStatus": "catalogued"
+    },
+    {
+      "name": "辅5-床类编码",
+      "tmdlFile": "tables/辅5-床类编码.tmdl",
+      "mFile": "original/辅5-床类编码.pq",
+      "sourceKind": "excel_file",
+      "sourcePaths": [
+        "D:\\麻大师\\日更数据\\天猫旗舰店\\商品信息文件\\床类编码.xlsx"
+      ],
+      "operations": [
+        "Excel.Workbook",
+        "File.Contents",
+        "Table.PromoteHeaders",
+        "Table.RenameColumns"
+      ],
+      "references": [],
+      "sheetName": "Sheet1",
+      "promoteHeaders": true,
+      "typedColumnCount": 0,
+      "typedColumns": [],
+      "schema": [],
+      "migrationStatus": "catalogued"
+    },
+    {
+      "name": "接待数据",
+      "tmdlFile": "tables/接待数据.tmdl",
+      "mFile": "original/接待数据.pq",
+      "sourceKind": "folder",
+      "sourcePaths": [
+        "D:\\麻大师\\日更数据\\天猫旗舰店\\10-2京东客服绩效明细\\接待数据"
+      ],
+      "operations": [
+        "Folder.Files",
+        "Table.SelectRows",
+        "Table.AddColumn",
+        "Table.RenameColumns",
+        "Table.SelectColumns",
+        "Table.ExpandTableColumn",
+        "Table.ColumnNames",
+        "Table.TransformColumnTypes"
+      ],
+      "references": [
+        "转换文件 (45)",
+        "示例文件 (45)"
+      ],
+      "sheetName": null,
+      "promoteHeaders": false,
+      "typedColumnCount": 31,
+      "typedColumns": [
+        "Source.Name",
+        "客服",
+        "服务时长",
+        "咨询量",
+        "接待量",
+        "应答率",
+        "30s应答率",
+        "首次平均响应时间",
+        "平均响应时长",
+        "平均响应时长(新标)",
+        "平均会话时长",
+        "平均回复消息数",
+        "无响应量",
+        "3分钟回复率（客服维度-不含留言）",
+        "邀评数",
+        "邀评率",
+        "评价量",
+        "评价率",
+        "好评量",
+        "满意率",
+        "差评量",
+        "不满意率",
+        "一般评价量",
+        "咨询差评率",
+        "解决量",
+        "未解决量",
+        "解决率",
+        "留言回复量",
+        "留言分配量",
+        "留言接待量",
+        "留言响应率"
+      ],
+      "schema": [
+        {
+          "column": "Source.Name",
+          "mType": "type text"
+        },
+        {
+          "column": "客服",
+          "mType": "type text"
+        },
+        {
+          "column": "服务时长",
+          "mType": "type number"
+        },
+        {
+          "column": "咨询量",
+          "mType": "type number"
+        },
+        {
+          "column": "接待量",
+          "mType": "type number"
+        },
+        {
+          "column": "应答率",
+          "mType": "Percentage.Type"
+        },
+        {
+          "column": "30s应答率",
+          "mType": "Percentage.Type"
+        },
+        {
+          "column": "首次平均响应时间",
+          "mType": "type number"
+        },
+        {
+          "column": "平均响应时长",
+          "mType": "type number"
+        },
+        {
+          "column": "平均响应时长(新标)",
+          "mType": "type number"
+        },
+        {
+          "column": "平均会话时长",
+          "mType": "type number"
+        },
+        {
+          "column": "平均回复消息数",
+          "mType": "type number"
+        },
+        {
+          "column": "无响应量",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "3分钟回复率（客服维度-不含留言）",
+          "mType": "Percentage.Type"
+        },
+        {
+          "column": "邀评数",
+          "mType": "type number"
+        },
+        {
+          "column": "邀评率",
+          "mType": "Percentage.Type"
+        },
+        {
+          "column": "评价量",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "评价率",
+          "mType": "type text"
+        },
+        {
+          "column": "好评量",
+          "mType": "type number"
+        },
+        {
+          "column": "满意率",
+          "mType": "type text"
+        },
+        {
+          "column": "差评量",
+          "mType": "type number"
+        },
+        {
+          "column": "不满意率",
+          "mType": "type text"
+        },
+        {
+          "column": "一般评价量",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "咨询差评率",
+          "mType": "type number"
+        },
+        {
+          "column": "解决量",
+          "mType": "type number"
+        },
+        {
+          "column": "未解决量",
+          "mType": "type number"
+        },
+        {
+          "column": "解决率",
+          "mType": "type text"
+        },
+        {
+          "column": "留言回复量",
+          "mType": "type any"
+        },
+        {
+          "column": "留言分配量",
+          "mType": "type any"
+        },
+        {
+          "column": "留言接待量",
+          "mType": "type any"
+        },
+        {
+          "column": "留言响应率",
+          "mType": "type text"
+        }
+      ],
+      "migrationStatus": "catalogued"
+    },
+    {
+      "name": "京东客服分组表",
+      "tmdlFile": "tables/京东客服分组表.tmdl",
+      "mFile": "original/京东客服分组表.pq",
+      "sourceKind": "folder",
+      "sourcePaths": [
+        "D:\\麻大师\\日更数据\\天猫旗舰店\\京东客服分组表"
+      ],
+      "operations": [
+        "Folder.Files",
+        "Table.SelectRows",
+        "Table.AddColumn",
+        "Table.RenameColumns",
+        "Table.SelectColumns",
+        "Table.ExpandTableColumn",
+        "Table.ColumnNames",
+        "Table.TransformColumnTypes",
+        "Table.FuzzyNestedJoin"
+      ],
+      "references": [
+        "转换文件 (38)",
+        "示例文件 (38)",
+        "展开的“淘宝客服排班表”"
+      ],
+      "sheetName": null,
+      "promoteHeaders": false,
+      "typedColumnCount": 3,
+      "typedColumns": [
+        "Source.Name",
+        "客服账号",
+        "京东分组"
+      ],
+      "schema": [
+        {
+          "column": "Source.Name",
+          "mType": "type text"
+        },
+        {
+          "column": "客服账号",
+          "mType": "type text"
+        },
+        {
+          "column": "京东分组",
+          "mType": "type text"
+        }
+      ],
+      "migrationStatus": "catalogued"
+    },
+    {
+      "name": "考勤数据",
+      "tmdlFile": "tables/考勤数据.tmdl",
+      "mFile": "original/考勤数据.pq",
+      "sourceKind": "folder",
+      "sourcePaths": [
+        "D:\\麻大师\\日更数据\\天猫旗舰店\\10-2京东客服绩效明细\\考勤数据"
+      ],
+      "operations": [
+        "Folder.Files",
+        "Table.SelectRows",
+        "Table.AddColumn",
+        "Table.RenameColumns",
+        "Table.SelectColumns",
+        "Table.ExpandTableColumn",
+        "Table.ColumnNames",
+        "Table.TransformColumnTypes",
+        "Text.Select",
+        "Text.BetweenDelimiters",
+        "Number.FromText",
+        "List.First",
+        "List.RemoveNulls",
+        "List.Transform",
+        "Text.Contains",
+        "List.PositionOf",
+        "Text.PositionOf",
+        "Text.Middle",
+        "Text.Combine",
+        "Text.From",
+        "Text.Length"
+      ],
+      "references": [
+        "转换文件 (47)",
+        "示例文件 (47)"
+      ],
+      "sheetName": null,
+      "promoteHeaders": false,
+      "typedColumnCount": 16,
+      "typedColumns": [
+        "Source.Name",
+        "客服",
+        "工作时间段咨询量",
+        "全天咨询量",
+        "接待量",
+        "首次30s接待量",
+        "首次30s应答率",
+        "工作时间段无响应量",
+        "满意率",
+        "好评量",
+        "差评量",
+        "平均响应时间",
+        "平均响应时间（新标）",
+        "咨询差评率",
+        "3分钟人工回复量",
+        "3分钟回复率（客服维度-不含留言）"
+      ],
+      "schema": [
+        {
+          "column": "Source.Name",
+          "mType": "type text"
+        },
+        {
+          "column": "客服",
+          "mType": "type text"
+        },
+        {
+          "column": "工作时间段咨询量",
+          "mType": "type number"
+        },
+        {
+          "column": "全天咨询量",
+          "mType": "type number"
+        },
+        {
+          "column": "接待量",
+          "mType": "type number"
+        },
+        {
+          "column": "首次30s接待量",
+          "mType": "type number"
+        },
+        {
+          "column": "首次30s应答率",
+          "mType": "Percentage.Type"
+        },
+        {
+          "column": "工作时间段无响应量",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "满意率",
+          "mType": "type text"
+        },
+        {
+          "column": "好评量",
+          "mType": "type number"
+        },
+        {
+          "column": "差评量",
+          "mType": "type number"
+        },
+        {
+          "column": "平均响应时间",
+          "mType": "type number"
+        },
+        {
+          "column": "平均响应时间（新标）",
+          "mType": "type number"
+        },
+        {
+          "column": "咨询差评率",
+          "mType": "Percentage.Type"
+        },
+        {
+          "column": "3分钟人工回复量",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "3分钟回复率（客服维度-不含留言）",
+          "mType": "type text"
+        }
+      ],
+      "migrationStatus": "catalogued"
+    },
+    {
+      "name": "淘宝客服排班表",
+      "tmdlFile": "tables/淘宝客服排班表.tmdl",
+      "mFile": "original/淘宝客服排班表.pq",
+      "sourceKind": "folder",
+      "sourcePaths": [
+        "D:\\麻大师\\日更数据\\天猫旗舰店\\淘宝客服排班表"
+      ],
+      "operations": [
+        "Folder.Files",
+        "Table.SelectRows",
+        "Table.AddColumn",
+        "Table.RenameColumns",
+        "Table.SelectColumns",
+        "Table.ExpandTableColumn",
+        "Table.ColumnNames",
+        "Table.TransformColumnTypes",
+        "Table.PromoteHeaders"
+      ],
+      "references": [
+        "转换文件 (31)",
+        "示例文件 (31)"
+      ],
+      "sheetName": null,
+      "promoteHeaders": true,
+      "typedColumnCount": 9,
+      "typedColumns": [
+        "Source.Name",
+        "Column1",
+        "Column2",
+        "客服排班表.xlsx",
+        "旺旺昵称",
+        "班次",
+        "昵称",
+        "开始时间",
+        "结束时间"
+      ],
+      "schema": [
+        {
+          "column": "Source.Name",
+          "mType": "type text"
+        },
+        {
+          "column": "Column1",
+          "mType": "type text"
+        },
+        {
+          "column": "Column2",
+          "mType": "type text"
+        },
+        {
+          "column": "客服排班表.xlsx",
+          "mType": "type text"
+        },
+        {
+          "column": "旺旺昵称",
+          "mType": "type text"
+        },
+        {
+          "column": "班次",
+          "mType": "type text"
+        },
+        {
+          "column": "昵称",
+          "mType": "type text"
+        },
+        {
+          "column": "开始时间",
+          "mType": "type date"
+        },
+        {
+          "column": "结束时间",
+          "mType": "type date"
+        }
+      ],
+      "migrationStatus": "catalogued"
+    },
+    {
+      "name": "营销数据",
+      "tmdlFile": "tables/营销数据.tmdl",
+      "mFile": "original/营销数据.pq",
+      "sourceKind": "folder",
+      "sourcePaths": [
+        "D:\\麻大师\\日更数据\\天猫旗舰店\\10-2京东客服绩效明细\\营销数据"
+      ],
+      "operations": [
+        "Folder.Files",
+        "Table.SelectRows",
+        "Table.AddColumn",
+        "Table.RenameColumns",
+        "Table.SelectColumns",
+        "Table.ExpandTableColumn",
+        "Table.ColumnNames",
+        "Table.TransformColumnTypes"
+      ],
+      "references": [
+        "转换文件 (46)",
+        "示例文件 (46)"
+      ],
+      "sheetName": null,
+      "promoteHeaders": false,
+      "typedColumnCount": 12,
+      "typedColumns": [
+        "Source.Name",
+        "客服",
+        "售前接待人数",
+        "推荐人数",
+        "促成下单人数",
+        "促成下单订单数",
+        "促成下单商品数",
+        "促成下单商品金额",
+        "售前下单转化率",
+        "促成下单商品均价",
+        "促成下单客单价（元/人）",
+        "促成下单客件数（件/人）"
+      ],
+      "schema": [
+        {
+          "column": "Source.Name",
+          "mType": "type text"
+        },
+        {
+          "column": "客服",
+          "mType": "type text"
+        },
+        {
+          "column": "售前接待人数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "推荐人数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "促成下单人数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "促成下单订单数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "促成下单商品数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "促成下单商品金额",
+          "mType": "type number"
+        },
+        {
+          "column": "售前下单转化率",
+          "mType": "Percentage.Type"
+        },
+        {
+          "column": "促成下单商品均价",
+          "mType": "type number"
+        },
+        {
+          "column": "促成下单客单价（元/人）",
+          "mType": "type number"
+        },
+        {
+          "column": "促成下单客件数（件/人）",
+          "mType": "type number"
+        }
+      ],
+      "migrationStatus": "catalogued"
+    },
+    {
+      "name": "营销数据改版",
+      "tmdlFile": "tables/营销数据改版.tmdl",
+      "mFile": "original/营销数据改版.pq",
+      "sourceKind": "folder",
+      "sourcePaths": [
+        "D:\\麻大师\\日更数据\\天猫旗舰店\\10-2京东客服绩效明细\\营销数据改版"
+      ],
+      "operations": [
+        "Folder.Files",
+        "Table.SelectRows",
+        "Table.AddColumn",
+        "Table.RenameColumns",
+        "Table.SelectColumns",
+        "Table.ExpandTableColumn",
+        "Table.ColumnNames",
+        "Table.TransformColumnTypes",
+        "Table.Distinct",
+        "Table.PromoteHeaders",
+        "Table.DuplicateColumn",
+        "Table.RemoveColumns"
+      ],
+      "references": [
+        "转换文件 (10)",
+        "示例文件 (10)"
+      ],
+      "sheetName": null,
+      "promoteHeaders": true,
+      "typedColumnCount": 53,
+      "typedColumns": [
+        "Source.Name",
+        "Column1",
+        "Column2",
+        "Column3",
+        "Column4",
+        "Column5",
+        "Column6",
+        "Column7",
+        "Column8",
+        "Column9",
+        "Column10",
+        "Column11",
+        "Column12",
+        "Column13",
+        "Column14",
+        "Column15",
+        "Column16",
+        "Column17",
+        "Column18",
+        "Column19",
+        "Column20",
+        "Column21",
+        "Column22",
+        "Column23",
+        "Column24",
+        "Column25",
+        "Column26",
+        "客服",
+        "售前接待人数",
+        "推荐人数",
+        "24H下单人数",
+        "24H下单未取消人数",
+        "24H下单金额",
+        "24H下单未取消金额",
+        "24H下单转化率",
+        "24H未取消转化率",
+        "促成下单人数",
+        "促成下单订单数",
+        "促成下单商品数",
+        "促成下单商品金额",
+        "售前下单转化率",
+        "促成下单商品均价",
+        "促成下单客单价（元/人）",
+        "促成下单客件数（件/人）",
+        "促成出库人数",
+        "促成出库订单数",
+        "促成出库商品数",
+        "促成出库商品金额",
+        "售前出库转化率",
+        "下单出库转化率",
+        "促成出库商品均价",
+        "促成出库客单价（元/人）",
+        "促成出库客件数（件/人）"
+      ],
+      "schema": [
+        {
+          "column": "Source.Name",
+          "mType": "type text"
+        },
+        {
+          "column": "Column1",
+          "mType": "type text"
+        },
+        {
+          "column": "Column2",
+          "mType": "type text"
+        },
+        {
+          "column": "Column3",
+          "mType": "type text"
+        },
+        {
+          "column": "Column4",
+          "mType": "type text"
+        },
+        {
+          "column": "Column5",
+          "mType": "type text"
+        },
+        {
+          "column": "Column6",
+          "mType": "type text"
+        },
+        {
+          "column": "Column7",
+          "mType": "type text"
+        },
+        {
+          "column": "Column8",
+          "mType": "type text"
+        },
+        {
+          "column": "Column9",
+          "mType": "type text"
+        },
+        {
+          "column": "Column10",
+          "mType": "type text"
+        },
+        {
+          "column": "Column11",
+          "mType": "type text"
+        },
+        {
+          "column": "Column12",
+          "mType": "type text"
+        },
+        {
+          "column": "Column13",
+          "mType": "type text"
+        },
+        {
+          "column": "Column14",
+          "mType": "type text"
+        },
+        {
+          "column": "Column15",
+          "mType": "type text"
+        },
+        {
+          "column": "Column16",
+          "mType": "type text"
+        },
+        {
+          "column": "Column17",
+          "mType": "type text"
+        },
+        {
+          "column": "Column18",
+          "mType": "type text"
+        },
+        {
+          "column": "Column19",
+          "mType": "type text"
+        },
+        {
+          "column": "Column20",
+          "mType": "type text"
+        },
+        {
+          "column": "Column21",
+          "mType": "type text"
+        },
+        {
+          "column": "Column22",
+          "mType": "type text"
+        },
+        {
+          "column": "Column23",
+          "mType": "type text"
+        },
+        {
+          "column": "Column24",
+          "mType": "type text"
+        },
+        {
+          "column": "Column25",
+          "mType": "type text"
+        },
+        {
+          "column": "Column26",
+          "mType": "type text"
+        },
+        {
+          "column": "客服",
+          "mType": "type text"
+        },
+        {
+          "column": "售前接待人数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "推荐人数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "24H下单人数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "24H下单未取消人数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "24H下单金额",
+          "mType": "type number"
+        },
+        {
+          "column": "24H下单未取消金额",
+          "mType": "type number"
+        },
+        {
+          "column": "24H下单转化率",
+          "mType": "Percentage.Type"
+        },
+        {
+          "column": "24H未取消转化率",
+          "mType": "Percentage.Type"
+        },
+        {
+          "column": "促成下单人数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "促成下单订单数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "促成下单商品数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "促成下单商品金额",
+          "mType": "type number"
+        },
+        {
+          "column": "售前下单转化率",
+          "mType": "Percentage.Type"
+        },
+        {
+          "column": "促成下单商品均价",
+          "mType": "type number"
+        },
+        {
+          "column": "促成下单客单价（元/人）",
+          "mType": "type number"
+        },
+        {
+          "column": "促成下单客件数（件/人）",
+          "mType": "type number"
+        },
+        {
+          "column": "促成出库人数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "促成出库订单数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "促成出库商品数",
+          "mType": "Int64.Type"
+        },
+        {
+          "column": "促成出库商品金额",
+          "mType": "type number"
+        },
+        {
+          "column": "售前出库转化率",
+          "mType": "Percentage.Type"
+        },
+        {
+          "column": "下单出库转化率",
+          "mType": "Percentage.Type"
+        },
+        {
+          "column": "促成出库商品均价",
+          "mType": "type number"
+        },
+        {
+          "column": "促成出库客单价（元/人）",
+          "mType": "type number"
+        },
+        {
+          "column": "促成出库客件数（件/人）",
+          "mType": "type number"
+        }
+      ],
+      "migrationStatus": "catalogued"
+    },
+    {
+      "name": "15-聚水潭商品数据",
+      "tmdlFile": null,
+      "mFile": null,
+      "sourcePbix": "D:/麻大师/BI文件/麻大师商品数据报表.pbix",
+      "sourceKind": "folder",
+      "sourcePaths": [
+        "D:\\麻大师\\日更数据\\天猫旗舰店\\15-聚水潭商品数据"
+      ],
+      "operations": [
+        "Folder.Files",
+        "Excel.Workbook",
+        "Table.PromoteHeaders",
+        "Table.TransformColumnTypes",
+        "Table.SelectColumns"
+      ],
+      "references": [],
+      "sheetName": null,
+      "promoteHeaders": true,
+      "typedColumnCount": 34,
+      "typedColumns": [
+        "商品编码",
+        "商品简称",
+        "颜色规格",
+        "产品分类",
+        "品牌",
+        "供应商",
+        "店铺",
+        "订单来源",
+        "订单状态",
+        "订单状态明细",
+        "达人名称",
+        "业务员",
+        "省",
+        "发货仓",
+        "订单日期",
+        "发货日期",
+        "付款日期",
+        "销售数量",
+        "实发数量",
+        "实发金额",
+        "销售金额",
+        "成本价",
+        "基本售价",
+        "销售成本",
+        "销售毛利",
+        "退货数量",
+        "退货金额",
+        "实退金额",
+        "买家实付",
+        "商家实收",
+        "平台补贴金额",
+        "优惠金额",
+        "运费收入",
+        "运费支出"
+      ],
+      "schema": [
+        {
+          "column": "商品编码",
+          "mType": "type text"
+        },
+        {
+          "column": "商品简称",
+          "mType": "type text"
+        },
+        {
+          "column": "颜色规格",
+          "mType": "type text"
+        },
+        {
+          "column": "产品分类",
+          "mType": "type text"
+        },
+        {
+          "column": "品牌",
+          "mType": "type text"
+        },
+        {
+          "column": "供应商",
+          "mType": "type text"
+        },
+        {
+          "column": "店铺",
+          "mType": "type text"
+        },
+        {
+          "column": "订单来源",
+          "mType": "type text"
+        },
+        {
+          "column": "订单状态",
+          "mType": "type text"
+        },
+        {
+          "column": "订单状态明细",
+          "mType": "type text"
+        },
+        {
+          "column": "达人名称",
+          "mType": "type text"
+        },
+        {
+          "column": "业务员",
+          "mType": "type text"
+        },
+        {
+          "column": "省",
+          "mType": "type text"
+        },
+        {
+          "column": "发货仓",
+          "mType": "type text"
+        },
+        {
+          "column": "订单日期",
+          "mType": "type text"
+        },
+        {
+          "column": "发货日期",
+          "mType": "type text"
+        },
+        {
+          "column": "付款日期",
+          "mType": "type text"
+        },
+        {
+          "column": "销售数量",
+          "mType": "type number"
+        },
+        {
+          "column": "实发数量",
+          "mType": "type number"
+        },
+        {
+          "column": "实发金额",
+          "mType": "type number"
+        },
+        {
+          "column": "销售金额",
+          "mType": "type number"
+        },
+        {
+          "column": "成本价",
+          "mType": "type number"
+        },
+        {
+          "column": "基本售价",
+          "mType": "type number"
+        },
+        {
+          "column": "销售成本",
+          "mType": "type number"
+        },
+        {
+          "column": "销售毛利",
+          "mType": "type number"
+        },
+        {
+          "column": "退货数量",
+          "mType": "type number"
+        },
+        {
+          "column": "退货金额",
+          "mType": "type number"
+        },
+        {
+          "column": "实退金额",
+          "mType": "type number"
+        },
+        {
+          "column": "买家实付",
+          "mType": "type number"
+        },
+        {
+          "column": "商家实收",
+          "mType": "type number"
+        },
+        {
+          "column": "平台补贴金额",
+          "mType": "type number"
+        },
+        {
+          "column": "优惠金额",
+          "mType": "type number"
+        },
+        {
+          "column": "运费收入",
+          "mType": "type number"
+        },
+        {
+          "column": "运费支出",
+          "mType": "type number"
+        }
+      ],
+      "migrationStatus": "catalogued",
+      "note": "手写条目（无 TMDL）。源 pbix 为麻大师商品数据报表.pbix，与顶层 sourcePbix 不同。源文件 105 列，仅保留 32 个聚合所需列，丢弃 PII 与未用列。日期列由 transforms 查询规则用 %Y/%m/%d %H:%M:%S 解析。"
+    },
+    {
+      "name": "product-master",
+      "tmdlFile": null,
+      "mFile": null,
+      "sourcePbix": "D:/麻大师/BI文件/麻大师商品数据报表.pbix",
+      "sourceKind": "excel_file",
+      "sourcePaths": [
+        "D:\\麻大师\\日更数据\\天猫旗舰店\\商品信息文件\\产品明细.xlsx",
+        "D:\\麻大师\\日更数据\\天猫旗舰店\\商品信息文件\\拼多多店铺麻大师床垫产品信息表合集.xlsx",
+        "D:\\麻大师\\日更数据\\天猫旗舰店\\商品信息文件\\家纺商品表.xlsx",
+        "D:\\麻大师\\日更数据\\天猫旗舰店\\商品信息文件\\自营商品表.xlsx",
+        "D:\\麻大师\\日更数据\\天猫旗舰店\\商品信息文件\\pop商品表.xlsx"
+      ],
+      "operations": [
+        "Excel.Workbook",
+        "Table.PromoteHeaders",
+        "Table.Combine",
+        "Table.Distinct"
+      ],
+      "references": [
+        "辅4-床垫编码",
+        "拼多多商品",
+        "家纺商品表",
+        "京东自营商品表",
+        "京东POP商品表"
+      ],
+      "sheetName": null,
+      "promoteHeaders": true,
+      "typedColumnCount": 4,
+      "typedColumns": [
+        "商品编码",
+        "床垫类别",
+        "成本",
+        "尺寸"
+      ],
+      "schema": [
+        {
+          "column": "商品编码",
+          "mType": "type text"
+        },
+        {
+          "column": "床垫类别",
+          "mType": "type text"
+        },
+        {
+          "column": "成本",
+          "mType": "type number"
+        },
+        {
+          "column": "尺寸",
+          "mType": "type text"
+        }
+      ],
+      "migrationStatus": "catalogued",
+      "note": "手写条目。复刻 pbix 辅10-产品编码 的 union 逻辑：5 个产品主表按文件列映射到 商品编码/床垫类别/成本/尺寸，去重。提供床垫类别与成本给聚水潭 join 计算毛利率。床类编码.xlsx 跳过（其床垫类别/成本由 join 辅4 派生，原始文件不含）。"
+    }
+  ],
+  "sources": [
+    {
+      "path": "D:\\麻大师\\日更数据\\天猫旗舰店\\00-各渠道销售数据\\淘系.xlsx",
+      "exists": true,
+      "files": 1,
+      "extensions": [
+        ".xlsx"
+      ]
+    },
+    {
+      "path": "D:\\麻大师\\日更数据\\天猫旗舰店\\01-店铺数据辅助表",
+      "exists": true,
+      "files": 1,
+      "extensions": [
+        ".xlsx"
+      ]
+    },
+    {
+      "path": "D:\\麻大师\\日更数据\\天猫旗舰店\\00-各渠道销售数据\\25年各渠道目标.xlsx",
+      "exists": true,
+      "files": 1,
+      "extensions": [
+        ".xlsx"
+      ]
+    },
+    {
+      "path": "D:\\麻大师\\日更数据\\天猫旗舰店\\03-各店铺销售目标",
+      "exists": true,
+      "files": 1,
+      "extensions": [
+        ".xlsx"
+      ]
+    },
+    {
+      "path": "D:\\麻大师\\日更数据\\天猫旗舰店\\04-旗舰店基础数据",
+      "exists": true,
+      "files": 239,
+      "extensions": [
+        ".xlsx"
+      ]
+    },
+    {
+      "path": "D:\\麻大师\\日更数据\\天猫旗舰店\\05-旗舰店ID对照表",
+      "exists": true,
+      "files": 1,
+      "extensions": [
+        ".xlsx"
+      ]
+    },
+    {
+      "path": "D:\\麻大师\\日更数据\\天猫旗舰店\\06-旗舰店流量数据",
+      "exists": true,
+      "files": 120,
+      "extensions": [
+        ".xls"
+      ]
+    },
+    {
+      "path": "D:\\麻大师\\日更数据\\天猫旗舰店\\07-旗舰店商品销售数据",
+      "exists": true,
+      "files": 651,
+      "extensions": [
+        ".xlsx"
+      ]
+    },
+    {
+      "path": "D:\\麻大师\\日更数据\\天猫旗舰店\\08-1关键词报表数据",
+      "exists": true,
+      "files": 122,
+      "extensions": [
+        ".csv"
+      ]
+    },
+    {
+      "path": "D:\\麻大师\\日更数据\\天猫旗舰店\\08-2人群报表数据",
+      "exists": true,
+      "files": 124,
+      "extensions": [
+        ".csv"
+      ]
+    },
+    {
+      "path": "D:\\麻大师\\日更数据\\天猫旗舰店\\08-旗舰店推广花费",
+      "exists": true,
+      "files": 420,
+      "extensions": [
+        ".csv"
+      ]
+    },
+    {
+      "path": "D:\\麻大师\\日更数据\\天猫旗舰店\\10-1淘宝客服绩效明细\\自制报表",
+      "exists": true,
+      "files": 543,
+      "extensions": [
+        ".xlsx"
+      ]
+    },
+    {
+      "path": "D:\\麻大师\\日更数据\\天猫旗舰店\\10-2京东客服绩效明细\\工作量数据",
+      "exists": true,
+      "files": 249,
+      "extensions": [
+        ".xls"
+      ]
+    },
+    {
+      "path": "D:\\麻大师\\日更数据\\天猫旗舰店\\10-2京东客服绩效明细\\绩效数据",
+      "exists": true,
+      "files": 249,
+      "extensions": [
+        ".xls"
+      ]
+    },
+    {
+      "path": "D:\\麻大师\\日更数据\\天猫旗舰店\\10-2京东客服绩效明细\\客服员工日报统计",
+      "exists": true,
+      "files": 258,
+      "extensions": [
+        ".xls"
+      ]
+    },
+    {
+      "path": "D:\\麻大师\\日更数据\\天猫旗舰店\\11-旗舰店UD推广计划",
+      "exists": true,
+      "files": 102,
+      "extensions": [
+        ".csv"
+      ]
+    },
+    {
+      "path": "D:\\麻大师\\日更数据\\天猫旗舰店\\14-推广竞品数据",
+      "exists": true,
+      "files": 46,
+      "extensions": [
+        ".xlsx"
+      ]
+    },
+    {
+      "path": "D:\\麻大师\\日更数据\\天猫旗舰店\\商品信息文件\\产品明细.xlsx",
+      "exists": true,
+      "files": 1,
+      "extensions": [
+        ".xlsx"
+      ]
+    },
+    {
+      "path": "D:\\麻大师\\日更数据\\天猫旗舰店\\商品信息文件\\床类编码.xlsx",
+      "exists": true,
+      "files": 1,
+      "extensions": [
+        ".xlsx"
+      ]
+    },
+    {
+      "path": "D:\\麻大师\\日更数据\\天猫旗舰店\\10-2京东客服绩效明细\\接待数据",
+      "exists": true,
+      "files": 235,
+      "extensions": [
+        ".xls"
+      ]
+    },
+    {
+      "path": "D:\\麻大师\\日更数据\\天猫旗舰店\\京东客服分组表",
+      "exists": true,
+      "files": 1,
+      "extensions": [
+        ".xlsx"
+      ]
+    },
+    {
+      "path": "D:\\麻大师\\日更数据\\天猫旗舰店\\10-2京东客服绩效明细\\考勤数据",
+      "exists": true,
+      "files": 229,
+      "extensions": [
+        ".xls"
+      ]
+    },
+    {
+      "path": "D:\\麻大师\\日更数据\\天猫旗舰店\\淘宝客服排班表",
+      "exists": true,
+      "files": 1,
+      "extensions": [
+        ".xlsx"
+      ]
+    },
+    {
+      "path": "D:\\麻大师\\日更数据\\天猫旗舰店\\10-2京东客服绩效明细\\营销数据",
+      "exists": true,
+      "files": 27,
+      "extensions": [
+        ".xls"
+      ]
+    },
+    {
+      "path": "D:\\麻大师\\日更数据\\天猫旗舰店\\10-2京东客服绩效明细\\营销数据改版",
+      "exists": true,
+      "files": 205,
+      "extensions": [
+        ".xls"
+      ]
+    }
+  ],
+  "operationUsage": {
+    "Table.TransformColumnTypes": 23,
+    "Table.RenameColumns": 22,
+    "Folder.Files": 21,
+    "Table.AddColumn": 21,
+    "Table.ExpandTableColumn": 21,
+    "Table.SelectRows": 21,
+    "Table.ColumnNames": 20,
+    "Table.SelectColumns": 20,
+    "Table.Distinct": 13,
+    "Table.PromoteHeaders": 7,
+    "Excel.Workbook": 5,
+    "Table.Sort": 5,
+    "File.Contents": 4,
+    "Table.Combine": 4,
+    "Table.RemoveColumns": 4,
+    "Text.Contains": 4,
+    "List.First": 3,
+    "List.PositionOf": 3,
+    "List.RemoveNulls": 3,
+    "List.Transform": 3,
+    "Number.FromText": 3,
+    "Table.ReplaceValue": 3,
+    "Text.BetweenDelimiters": 3,
+    "Text.Combine": 3,
+    "Text.From": 3,
+    "Text.Length": 3,
+    "Text.Middle": 3,
+    "Text.PositionOf": 3,
+    "Text.Select": 3,
+    "List.IsEmpty": 2,
+    "Record.FieldValues": 2,
+    "List.Contains": 1,
+    "List.RemoveMatchingItems": 1,
+    "List.Select": 1,
+    "List.Skip": 1,
+    "Table.DuplicateColumn": 1,
+    "Table.FuzzyNestedJoin": 1,
+    "Table.RemoveLastN": 1,
+    "Table.ReplaceErrorValues": 1,
+    "Table.SplitColumn": 1,
+    "Table.UnpivotOtherColumns": 1,
+    "Text.Trim": 1
+  }
+}

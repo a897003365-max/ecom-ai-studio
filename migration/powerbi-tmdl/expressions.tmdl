@@ -1,0 +1,2599 @@
+expression 参数2 = #"07-旗舰店商品销售数据" meta [IsParameterQuery=true, BinaryIdentifier=#"示例文件 (2)", Type="Binary", IsParameterQueryRequired=true]
+	lineageTag: 790a0323-4ad8-447a-b5fe-87e8a2bd6343
+	queryGroup: '从 02-商品明细库存表 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Table
+
+	annotation PBI_NavigationStepName = 导航
+
+expression '转换示例文件 (2)' =
+		let
+		    源 = Excel.Workbook(参数2, null, true),
+		    茵曼_Sheet = 源{[Item="茵曼",Kind="Sheet"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(茵曼_Sheet, [PromoteAllScalars=true])
+		in
+		    提升的标题
+	lineageTag: f073e8fd-1741-48c6-ab24-b15affda2e72
+	queryGroup: '从 02-商品明细库存表 转换文件'
+
+	annotation PBI_ResultType = Table
+
+expression '示例文件 (2)' =
+		let
+		    源 = Folder.Files("D:\麻大师\日更数据\天猫旗舰店\03-各店铺销售目标"),
+		    删除的其他列 = Table.SelectColumns(源,{"Content"}),
+		    导航1 = 删除的其他列{0}[Content]
+		in
+		    导航1
+	lineageTag: 1fb6597d-99d2-40f8-a824-c8c1ed92a8ec
+	queryGroup: '从 02-商品明细库存表 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression '转换文件 (2)' =
+		let
+		    源 = (参数2 as binary) => let
+		    源 = Excel.Workbook(参数2, null, true),
+		    茵曼_Sheet = 源{[Item="茵曼",Kind="Sheet"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(茵曼_Sheet, [PromoteAllScalars=true])
+		in
+		    提升的标题
+		in
+		    源
+	mAttributes: [ FunctionQueryBinding = "{""exemplarFormulaName"":""转换示例文件 (2)""}" ]
+	lineageTag: c0ad417b-2b9f-422d-b1b7-9a045c60eb1e
+	queryGroup: '从 02-商品明细库存表 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Function
+
+expression 参数3 = #"示例文件 (3)" meta [IsParameterQuery=true, BinaryIdentifier=#"示例文件 (3)", Type="Binary", IsParameterQueryRequired=true]
+	lineageTag: 566d8500-5cc1-4192-8732-a7c3692818c7
+	queryGroup: '从 01-店铺数据辅助表 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression '转换示例文件 (3)' =
+		let
+		    源 = Excel.Workbook(参数3, null, true),
+		    Sheet1_Sheet = 源{[Item="Sheet1",Kind="Sheet"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(Sheet1_Sheet, [PromoteAllScalars=true])
+		in
+		    提升的标题
+	lineageTag: 42fb94a1-cace-42ab-93b9-5b916969f186
+	queryGroup: '从 01-店铺数据辅助表 转换文件'
+
+	annotation PBI_ResultType = Table
+
+expression '示例文件 (3)' =
+		let
+		    源 = Folder.Files("D:\麻大师\日更数据\天猫旗舰店\01-店铺数据辅助表"),
+		    删除的其他列 = Table.SelectColumns(源,{"Content"}),
+		    导航1 = 删除的其他列{0}[Content]
+		in
+		    导航1
+	lineageTag: ff4d0de0-05fd-4e95-919f-3de13dd03856
+	queryGroup: '从 01-店铺数据辅助表 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression '转换文件 (3)' =
+		let
+		    源 = (参数3 as binary) => let
+		    源 = Excel.Workbook(参数3, null, true),
+		    Sheet1_Sheet = 源{[Item="Sheet1",Kind="Sheet"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(Sheet1_Sheet, [PromoteAllScalars=true])
+		in
+		    提升的标题
+		in
+		    源
+	mAttributes: [ FunctionQueryBinding = "{""exemplarFormulaName"":""转换示例文件 (3)""}" ]
+	lineageTag: 546576df-2891-4a16-8b52-6d3745c08823
+	queryGroup: '从 01-店铺数据辅助表 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Function
+
+expression 参数4 = #"示例文件 (4)" meta [IsParameterQuery=true, BinaryIdentifier=#"示例文件 (4)", Type="Binary", IsParameterQueryRequired=true]
+	lineageTag: 2c0fc249-cd60-4daf-85f5-59f6b3ffda6c
+	queryGroup: '从 05-旗舰店ID对照表 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression '转换示例文件 (4)' =
+		let
+		    源 = Excel.Workbook(参数4, null, true),
+		    Sheet1_Sheet = 源{[Item="Sheet1",Kind="Sheet"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(Sheet1_Sheet, [PromoteAllScalars=true])
+		in
+		    提升的标题
+	lineageTag: 0a3df959-a53d-4b7c-89d3-ddd22ec07ef2
+	queryGroup: '从 05-旗舰店ID对照表 转换文件'
+
+	annotation PBI_ResultType = Table
+
+expression '示例文件 (4)' =
+		let
+		    源 = Folder.Files("D:\麻大师\日更数据\天猫旗舰店\05-旗舰店ID对照表"),
+		    删除的其他列 = Table.SelectColumns(源,{"Content"}),
+		    导航1 = 删除的其他列{0}[Content]
+		in
+		    导航1
+	lineageTag: d9b22b8b-3089-4552-8ce8-e6e10e7be75b
+	queryGroup: '从 05-旗舰店ID对照表 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Exception
+
+expression '转换文件 (4)' =
+		let
+		    源 = (参数4 as binary) => let
+		    源 = Excel.Workbook(参数4, null, true),
+		    Sheet1_Sheet = 源{[Item="Sheet1",Kind="Sheet"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(Sheet1_Sheet, [PromoteAllScalars=true])
+		in
+		    提升的标题
+		in
+		    源
+	mAttributes: [ FunctionQueryBinding = "{""exemplarFormulaName"":""转换示例文件 (4)""}" ]
+	lineageTag: 6fdbfc70-eb01-453c-8b2e-f8e0324f2b3b
+	queryGroup: '从 05-旗舰店ID对照表 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Function
+
+expression 参数5 = #"示例文件 (5)" meta [IsParameterQuery=true, BinaryIdentifier=#"示例文件 (5)", Type="Binary", IsParameterQueryRequired=true]
+	lineageTag: 8231123b-315b-44c8-8aa7-298100c816cb
+	queryGroup: '从 03-各店铺销售目标 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression '转换示例文件 (5)' =
+		let
+		    源 = Excel.Workbook(参数5, null, true),
+		    Sheet1_Sheet = 源{[Item="Sheet1",Kind="Sheet"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(Sheet1_Sheet, [PromoteAllScalars=true])
+		in
+		    提升的标题
+	lineageTag: bd00a2d2-a639-477b-88f5-548618fd20f0
+	queryGroup: '从 03-各店铺销售目标 转换文件'
+
+	annotation PBI_ResultType = Table
+
+expression '示例文件 (5)' =
+		let
+		    源 = Folder.Files("D:\麻大师\日更数据\天猫旗舰店\03-各店铺销售目标"),
+		    删除的其他列 = Table.SelectColumns(源,{"Content"}),
+		    导航1 = 删除的其他列{0}[Content]
+		in
+		    导航1
+	lineageTag: c09cd6a6-0bbd-4d77-93c6-0daaf556c8eb
+	queryGroup: '从 03-各店铺销售目标 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Exception
+
+expression '转换文件 (5)' =
+		let
+		    源 = (参数5 as binary) => let
+		    源 = Excel.Workbook(参数5, null, true),
+		    Sheet1_Sheet = 源{[Item="Sheet1",Kind="Sheet"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(Sheet1_Sheet, [PromoteAllScalars=true])
+		in
+		    提升的标题
+		in
+		    源
+	mAttributes: [ FunctionQueryBinding = "{""exemplarFormulaName"":""转换示例文件 (5)""}" ]
+	lineageTag: 7e695248-bbba-4d69-b847-25936420ed2d
+	queryGroup: '从 03-各店铺销售目标 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Function
+
+expression 参数6 = #"示例文件 (6)" meta [IsParameterQuery=true, BinaryIdentifier=#"示例文件 (6)", Type="Binary", IsParameterQueryRequired=true]
+	lineageTag: f9bb8288-d4d6-428b-95c8-d540fe47946f
+	queryGroup: '从 07-旗舰店销售数据 转换文件 (2)\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression '转换示例文件 (6)' =
+		let
+		    源 = Excel.Workbook(参数6, null, true),
+		    Sheet1_Sheet = 源{[Item="Sheet1",Kind="Sheet"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(Sheet1_Sheet, [PromoteAllScalars=true])
+		in
+		    提升的标题
+	lineageTag: a8e43b52-da67-4b20-ab74-323d78a79795
+	queryGroup: '从 07-旗舰店销售数据 转换文件 (2)'
+
+	annotation PBI_ResultType = Table
+
+expression '示例文件 (6)' =
+		let
+		    源 = Folder.Files("D:\麻大师\日更数据\天猫旗舰店\07-旗舰店商品销售数据"),
+		    删除的其他列 = Table.SelectColumns(源,{"Content"}),
+		    导航1 = 删除的其他列{0}[Content]
+		in
+		    导航1
+	lineageTag: 2d1bd3ea-cbaa-46b5-b018-0d000d126287
+	queryGroup: '从 07-旗舰店销售数据 转换文件 (2)\帮助程序查询'
+
+	annotation PBI_ResultType = Exception
+
+expression '转换文件 (6)' =
+		let
+		    源 = (参数6 as binary) => let
+		    源 = Excel.Workbook(参数6, null, true),
+		    Sheet1_Sheet = 源{[Item="Sheet1",Kind="Sheet"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(Sheet1_Sheet, [PromoteAllScalars=true])
+		in
+		    提升的标题
+		in
+		    源
+	mAttributes: [ FunctionQueryBinding = "{""exemplarFormulaName"":""转换示例文件 (6)""}" ]
+	lineageTag: 7a782968-57c6-4706-98d5-3978d0aef5cd
+	queryGroup: '从 07-旗舰店销售数据 转换文件 (2)\帮助程序查询'
+
+	annotation PBI_ResultType = Function
+
+expression 参数7 = #"示例文件 (7)" meta [IsParameterQuery=true, BinaryIdentifier=#"示例文件 (7)", Type="Binary", IsParameterQueryRequired=true]
+	lineageTag: 2be4c2f9-3218-41f2-86c9-b167b4d9fdc1
+	queryGroup: '从 04-旗舰店基础数据 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression '转换示例文件 (7)' =
+		let
+		    源 = Excel.Workbook(参数7, null, true),
+		    #"天猫-茵曼旗舰店_Sheet" = 源{[Item="天猫-茵曼旗舰店",Kind="Sheet"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(#"天猫-茵曼旗舰店_Sheet", [PromoteAllScalars=true])
+		in
+		    提升的标题
+	lineageTag: a590682f-4c86-4d52-a47e-606512f7f021
+	queryGroup: '从 04-旗舰店基础数据 转换文件'
+
+	annotation PBI_ResultType = Table
+
+expression '示例文件 (7)' =
+		let
+		    源 = Folder.Files("D:\麻大师\日更数据\天猫旗舰店\04-旗舰店基础数据"),
+		    删除的其他列 = Table.SelectColumns(源,{"Content"}),
+		    导航1 = 删除的其他列{0}[Content]
+		in
+		    导航1
+	lineageTag: 37f94055-267f-473f-8d24-3fbf102dba32
+	queryGroup: '从 04-旗舰店基础数据 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Exception
+
+expression '转换文件 (7)' =
+		let
+		    源 = (参数7 as binary) => let
+		    源 = Excel.Workbook(参数7, null, true),
+		    #"天猫-茵曼旗舰店_Sheet" = 源{[Item="天猫-茵曼旗舰店",Kind="Sheet"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(#"天猫-茵曼旗舰店_Sheet", [PromoteAllScalars=true])
+		in
+		    提升的标题
+		in
+		    源
+	mAttributes: [ FunctionQueryBinding = "{""exemplarFormulaName"":""转换示例文件 (7)""}" ]
+	lineageTag: 91c28151-54e7-48c2-8b00-079fdae81ee0
+	queryGroup: '从 04-旗舰店基础数据 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Function
+
+expression 参数1 = 示例文件 meta [IsParameterQuery=true, BinaryIdentifier=示例文件, Type="Binary", IsParameterQueryRequired=true]
+	lineageTag: 6cf153fa-1bcb-4d00-8878-c08776da205a
+	queryGroup: '从 07-旗舰店销售数据 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression 转换示例文件 =
+		let
+		    源 = Excel.Workbook(参数1, null, true),
+		    #"【生意参谋平台】1_Sheet" = 源{[Item="【生意参谋平台】1",Kind="Sheet"]}[Data]
+		in
+		    #"【生意参谋平台】1_Sheet"
+	lineageTag: 62720c1e-e5ff-416e-9636-2a3eb293b16e
+	queryGroup: '从 07-旗舰店销售数据 转换文件'
+
+	annotation PBI_ResultType = Table
+
+expression 示例文件 =
+		let
+		    源 = Folder.Files("D:\麻大师\日更数据\天猫旗舰店\07-旗舰店商品销售数据"),
+		    删除的其他列 = Table.SelectColumns(源,{"Content"}),
+		    导航1 = 删除的其他列{0}[Content]
+		in
+		    导航1
+	lineageTag: 1a3a9964-5375-4b72-89e3-3bcf7f7bf52d
+	queryGroup: '从 07-旗舰店销售数据 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Exception
+
+expression 转换文件 =
+		let
+		    源 = (参数1 as binary) => let
+		    源 = Excel.Workbook(参数1, null, true),
+		    #"【生意参谋平台】1_Sheet" = 源{[Item="【生意参谋平台】1",Kind="Sheet"]}[Data]
+		in
+		    #"【生意参谋平台】1_Sheet"
+		in
+		    源
+	mAttributes: [ FunctionQueryBinding = "{""exemplarFormulaName"":""转换示例文件""}" ]
+	lineageTag: 70ba59db-72ef-48b5-af77-d8cacc5b26ea
+	queryGroup: '从 07-旗舰店销售数据 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Function
+
+expression 参数9 = #"示例文件 (9)" meta [IsParameterQuery=true, BinaryIdentifier=#"示例文件 (9)", Type="Binary", IsParameterQueryRequired=true]
+	lineageTag: a7bfa85d-fc5e-4cbc-a6a2-c9eb0e9534c9
+	queryGroup: '从 08-旗舰店推广花费 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression '转换示例文件 (9)' =
+		let
+		    源 = Excel.Workbook(参数9, null, true),
+		    #"天猫-茵曼旗舰店_Sheet" = 源{[Item="天猫-茵曼旗舰店",Kind="Sheet"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(#"天猫-茵曼旗舰店_Sheet", [PromoteAllScalars=true])
+		in
+		    提升的标题
+	lineageTag: 447111ad-c0f5-4c4a-b812-1f9cc30fc423
+	queryGroup: '从 08-旗舰店推广花费 转换文件'
+
+	annotation PBI_ResultType = Table
+
+expression '示例文件 (9)' =
+		let
+		    源 = Folder.Files("D:\麻大师\日更数据\天猫旗舰店\08-旗舰店推广花费"),
+		    删除的其他列 = Table.SelectColumns(源,{"Content"}),
+		    导航1 = 删除的其他列{0}[Content]
+		in
+		    导航1
+	lineageTag: 3f844f91-4484-42c1-95c4-24c5464b2585
+	queryGroup: '从 08-旗舰店推广花费 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Exception
+
+expression '转换文件 (9)' =
+		let
+		    源 = (参数9 as binary) => let
+		    源 = Excel.Workbook(参数9, null, true),
+		    #"天猫-茵曼旗舰店_Sheet" = 源{[Item="天猫-茵曼旗舰店",Kind="Sheet"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(#"天猫-茵曼旗舰店_Sheet", [PromoteAllScalars=true])
+		in
+		    提升的标题
+		in
+		    源
+	mAttributes: [ FunctionQueryBinding = "{""exemplarFormulaName"":""转换示例文件 (9)""}" ]
+	lineageTag: 3e2cb647-1b90-4e9f-96ca-6737710e45f3
+	queryGroup: '从 08-旗舰店推广花费 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Function
+
+expression 参数11 = #"示例文件 (11)" meta [IsParameterQuery=true, BinaryIdentifier=#"示例文件 (11)", Type="Binary", IsParameterQueryRequired=true]
+	lineageTag: eb779782-c011-4863-85d3-c86fcb8b689a
+	queryGroup: '从 08-旗舰店推广花费 转换文件 (2)\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression '示例文件 (11)' =
+		let
+		    源 = Folder.Files("D:\麻大师\日更数据\天猫旗舰店\08-旗舰店推广花费"),
+		    导航1 = 源{0}[Content]
+		in
+		    导航1
+	lineageTag: fc231d63-407d-4970-9d1e-77c20c7fe171
+	queryGroup: '从 08-旗舰店推广花费 转换文件 (2)\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression '转换示例文件 (11)' =
+		let
+		    源 = Csv.Document(参数11,[Delimiter=",", Columns=80, Encoding=936, QuoteStyle=QuoteStyle.None]),
+		    提升的标题 = Table.PromoteHeaders(源, [PromoteAllScalars=true])
+		in
+		    提升的标题
+	lineageTag: 6bbc8a4f-6a83-4aac-b4fe-0bc147bdbfb9
+	queryGroup: '从 08-旗舰店推广花费 转换文件 (2)'
+
+	annotation PBI_ResultType = Table
+
+expression '转换文件 (11)' =
+		let
+		    源 = (参数11 as binary) => let
+		    源 = Csv.Document(参数11,[Delimiter=",", Columns=80, Encoding=936, QuoteStyle=QuoteStyle.None]),
+		    提升的标题 = Table.PromoteHeaders(源, [PromoteAllScalars=true])
+		in
+		    提升的标题
+		in
+		    源
+	mAttributes: [ FunctionQueryBinding = "{""exemplarFormulaName"":""转换示例文件 (11)""}" ]
+	lineageTag: 6892e67c-4fd1-41f2-808d-d33b5787db4e
+	queryGroup: '从 08-旗舰店推广花费 转换文件 (2)\帮助程序查询'
+
+	annotation PBI_ResultType = Function
+
+expression 参数12 = #"示例文件 (12)" meta [IsParameterQuery=true, BinaryIdentifier=#"示例文件 (12)", Type="Binary", IsParameterQueryRequired=true]
+	lineageTag: 5eb36900-f71b-4e80-9017-7b51104f8520
+	queryGroup: '从 02-商品明细库存表 (2) 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression '转换示例文件 (12)' =
+		let
+		    源 = Excel.Workbook(参数12, null, true),
+		    Sheet1_Sheet = 源{[Item="Sheet1",Kind="Sheet"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(Sheet1_Sheet, [PromoteAllScalars=true])
+		in
+		    提升的标题
+	lineageTag: 567eb34a-6d69-4f96-a1c0-f18637d81f2b
+	queryGroup: '从 02-商品明细库存表 (2) 转换文件'
+
+	annotation PBI_ResultType = Table
+
+expression '示例文件 (12)' =
+		let
+		    源 = Folder.Files("D:\麻大师\日更数据\天猫旗舰店\02-商品明细库存表"),
+		    导航1 = 源{0}[Content]
+		in
+		    导航1
+	lineageTag: b29bf276-cadf-4d83-abc2-22883e4ee583
+	queryGroup: '从 02-商品明细库存表 (2) 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression '转换文件 (12)' =
+		let
+		    源 = (参数12 as binary) => let
+		    源 = Excel.Workbook(参数12, null, true),
+		    Sheet1_Sheet = 源{[Item="Sheet1",Kind="Sheet"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(Sheet1_Sheet, [PromoteAllScalars=true])
+		in
+		    提升的标题
+		in
+		    源
+	mAttributes: [ FunctionQueryBinding = "{""exemplarFormulaName"":""转换示例文件 (12)""}" ]
+	lineageTag: 604c5f79-6abc-42da-908b-03c457ac81f2
+	queryGroup: '从 02-商品明细库存表 (2) 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Function
+
+expression 参数13 = #"示例文件 (13)" meta [IsParameterQuery=true, BinaryIdentifier=#"示例文件 (13)", Type="Binary", IsParameterQueryRequired=true]
+	lineageTag: 156b13fe-9f0a-4e87-828c-7aa483d74e31
+	queryGroup: '从 08-旗舰店推广花费 (2) 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression '示例文件 (13)' =
+		let
+		    源 = Folder.Files("D:\麻大师\日更数据\天猫旗舰店\08-旗舰店推广花费"),
+		    导航1 = 源{0}[Content]
+		in
+		    导航1
+	lineageTag: 5cd6f36f-daa3-484d-a96e-a3c5ad821b4f
+	queryGroup: '从 08-旗舰店推广花费 (2) 转换文件\帮助程序查询'
+
+	annotation PBI_NavigationStepName = 导航
+
+	annotation PBI_ResultType = Binary
+
+expression '转换示例文件 (13)' =
+		let
+		    源 = Csv.Document(参数13,[Delimiter=",", Columns=76, Encoding=936, QuoteStyle=QuoteStyle.None]),
+		    提升的标题 = Table.PromoteHeaders(源, [PromoteAllScalars=true])
+		in
+		    提升的标题
+	lineageTag: e1abf322-d480-4a98-8ae6-d49491716966
+	queryGroup: '从 08-旗舰店推广花费 (2) 转换文件'
+
+	annotation PBI_ResultType = Table
+
+expression '转换文件 (13)' =
+		let
+		    源 = (参数13 as binary) => let
+		    源 = Csv.Document(参数13,[Delimiter=",", Columns=76, Encoding=936, QuoteStyle=QuoteStyle.None]),
+		    提升的标题 = Table.PromoteHeaders(源, [PromoteAllScalars=true])
+		in
+		    提升的标题
+		in
+		    源
+	mAttributes: [ FunctionQueryBinding = "{""exemplarFormulaName"":""转换示例文件 (13)""}" ]
+	lineageTag: 98d2f92e-cd77-4772-be75-f32b7d7e8bc9
+	queryGroup: '从 08-旗舰店推广花费 (2) 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Function
+
+expression 参数14 = #"示例文件 (14)" meta [IsParameterQuery=true, BinaryIdentifier=#"示例文件 (14)", Type="Binary", IsParameterQueryRequired=true]
+	lineageTag: 5156b836-2c71-4938-87c2-ba90137e9038
+	queryGroup: '从 08-旗舰店推广花费 转换文件 (3)\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression '示例文件 (14)' =
+		let
+		    源 = Folder.Files("D:\麻大师\日更数据\天猫旗舰店\08-旗舰店推广花费"),
+		    导航1 = 源{0}[Content]
+		in
+		    导航1
+	lineageTag: fe1f6edf-57e1-4aa5-b4c8-63d55706454a
+	queryGroup: '从 08-旗舰店推广花费 转换文件 (3)\帮助程序查询'
+
+	annotation PBI_NavigationStepName = 导航
+
+	annotation PBI_ResultType = Binary
+
+expression '转换示例文件 (14)' =
+		let
+		    源 = Csv.Document(参数14,[Delimiter=",", Columns=76, Encoding=936, QuoteStyle=QuoteStyle.None]),
+		    提升的标题 = Table.PromoteHeaders(源, [PromoteAllScalars=true])
+		in
+		    提升的标题
+	lineageTag: 74357e6f-3484-4807-83bc-6c0194ca42b1
+	queryGroup: '从 08-旗舰店推广花费 转换文件 (3)'
+
+	annotation PBI_ResultType = Table
+
+expression '转换文件 (14)' =
+		let
+		    源 = (参数14 as binary) => let
+		    源 = Csv.Document(参数14,[Delimiter=",", Columns=76, Encoding=936, QuoteStyle=QuoteStyle.None]),
+		    提升的标题 = Table.PromoteHeaders(源, [PromoteAllScalars=true])
+		in
+		    提升的标题
+		in
+		    源
+	mAttributes: [ FunctionQueryBinding = "{""exemplarFormulaName"":""转换示例文件 (14)""}" ]
+	lineageTag: bfdf405e-c476-45d7-9fce-a6fc4c2179a5
+	queryGroup: '从 08-旗舰店推广花费 转换文件 (3)\帮助程序查询'
+
+	annotation PBI_ResultType = Function
+
+expression 参数15 = #"示例文件 (15)" meta [IsParameterQuery=true, BinaryIdentifier=#"示例文件 (15)", Type="Binary", IsParameterQueryRequired=true]
+	lineageTag: 999682cb-0e68-4e00-8d45-8ba0bebfd18c
+	queryGroup: '从 04-旗舰店基础数据 (2) 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression '转换示例文件 (15)' =
+		let
+		    源 = Excel.Workbook(参数15, null, true),
+		    data_Sheet = 源{[Item="data",Kind="Sheet"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(data_Sheet, [PromoteAllScalars=true])
+		in
+		    提升的标题
+	lineageTag: 35d49d45-9a21-495c-941f-0026fc79cb78
+	queryGroup: '从 04-旗舰店基础数据 (2) 转换文件'
+
+	annotation PBI_ResultType = Table
+
+expression '示例文件 (15)' =
+		let
+		    源 = Folder.Files("D:\麻大师\日更数据\天猫旗舰店\04-旗舰店基础数据"),
+		    导航1 = 源{0}[Content]
+		in
+		    导航1
+	lineageTag: 9eb23a06-bbaf-4d7d-a00d-ab5f5b3f59ff
+	queryGroup: '从 04-旗舰店基础数据 (2) 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression '转换文件 (15)' =
+		let
+		    源 = (参数15 as binary) => let
+		    源 = Excel.Workbook(参数15, null, true),
+		    data_Sheet = 源{[Item="data",Kind="Sheet"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(data_Sheet, [PromoteAllScalars=true])
+		in
+		    提升的标题
+		in
+		    源
+	mAttributes: [ FunctionQueryBinding = "{""exemplarFormulaName"":""转换示例文件 (15)""}" ]
+	lineageTag: 014d5f6b-7b26-4789-b36d-f3500bfc586c
+	queryGroup: '从 04-旗舰店基础数据 (2) 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Function
+
+expression 参数16 = #"示例文件 (16)" meta [IsParameterQuery=true, BinaryIdentifier=#"示例文件 (16)", Type="Binary", IsParameterQueryRequired=true]
+	lineageTag: 7bdeaa2e-4fdc-42ed-a205-16087aec185a
+	queryGroup: '从 03-各店铺销售目标 转换文件 (2)\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression '转换示例文件 (16)' =
+		let
+		    源 = Excel.Workbook(参数16, null, true),
+		    Sheet1_Sheet = 源{[Item="Sheet1",Kind="Sheet"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(Sheet1_Sheet, [PromoteAllScalars=true])
+		in
+		    提升的标题
+	lineageTag: 6388193f-4aab-4dc7-b335-3adc9a7e8709
+	queryGroup: '从 03-各店铺销售目标 转换文件 (2)'
+
+	annotation PBI_ResultType = Table
+
+expression '示例文件 (16)' =
+		let
+		    源 = Folder.Files("D:\麻大师\日更数据\天猫旗舰店\03-各店铺销售目标"),
+		    导航1 = 源{0}[Content]
+		in
+		    导航1
+	lineageTag: 931a7c1f-7f0f-4cf0-8ab8-eaae3b27ddd5
+	queryGroup: '从 03-各店铺销售目标 转换文件 (2)\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression '转换文件 (16)' =
+		let
+		    源 = (参数16 as binary) => let
+		    源 = Excel.Workbook(参数16, null, true),
+		    Sheet1_Sheet = 源{[Item="Sheet1",Kind="Sheet"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(Sheet1_Sheet, [PromoteAllScalars=true])
+		in
+		    提升的标题
+		in
+		    源
+	mAttributes: [ FunctionQueryBinding = "{""exemplarFormulaName"":""转换示例文件 (16)""}" ]
+	lineageTag: 444af5fc-d5aa-4d00-bc16-9b767dc1b835
+	queryGroup: '从 03-各店铺销售目标 转换文件 (2)\帮助程序查询'
+
+	annotation PBI_ResultType = Function
+
+expression 参数17 = #"示例文件 (17)" meta [IsParameterQuery=true, BinaryIdentifier=#"示例文件 (17)", Type="Binary", IsParameterQueryRequired=true]
+	lineageTag: 94879341-02d5-4b43-a873-9deb078e2510
+	queryGroup: '从 10-旗舰店客服数据 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression '转换示例文件 (17)' =
+		let
+		    源 = Excel.Workbook(参数17, null, true),
+		    数据信息_Sheet = 源{[Item="数据信息",Kind="Sheet"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(数据信息_Sheet, [PromoteAllScalars=true])
+		in
+		    提升的标题
+	lineageTag: 3eb2bdbc-d11c-476e-aeed-89b0f6784583
+	queryGroup: '从 10-旗舰店客服数据 转换文件'
+
+	annotation PBI_ResultType = Table
+
+expression '示例文件 (17)' =
+		let
+		    源 = Folder.Files("D:\麻大师\日更数据\天猫旗舰店\10-旗舰店客服数据"),
+		    导航1 = 源{0}[Content]
+		in
+		    导航1
+	lineageTag: f23ee241-3e9d-499d-bf89-995153dae42f
+	queryGroup: '从 10-旗舰店客服数据 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression '转换文件 (17)' =
+		let
+		    源 = (参数17 as binary) => let
+		    源 = Excel.Workbook(参数17, null, true),
+		    数据信息_Sheet = 源{[Item="数据信息",Kind="Sheet"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(数据信息_Sheet, [PromoteAllScalars=true])
+		in
+		    提升的标题
+		in
+		    源
+	mAttributes: [ FunctionQueryBinding = "{""exemplarFormulaName"":""转换示例文件 (17)""}" ]
+	lineageTag: e4da4c93-1711-465b-b115-fa6f39a875fb
+	queryGroup: '从 10-旗舰店客服数据 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Function
+
+expression 参数18 = #"示例文件 (18)" meta [IsParameterQuery=true, BinaryIdentifier=#"示例文件 (18)", Type="Binary", IsParameterQueryRequired=true]
+	lineageTag: 586a2fd3-5559-43fb-aab1-3bdb9465f10c
+	queryGroup: '从 12-旗舰店流量数据 转换文件 (2)\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression '转换示例文件 (18)' =
+		let
+		    源 = Excel.Workbook(参数18, null, true),
+		    Sheet1_Sheet = 源{[Item="Sheet1",Kind="Sheet"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(Sheet1_Sheet, [PromoteAllScalars=true])
+		in
+		    提升的标题
+	lineageTag: 447d6092-5a63-420e-a66e-9d76e0fee5b8
+	queryGroup: '从 12-旗舰店流量数据 转换文件 (2)'
+
+	annotation PBI_ResultType = Table
+
+expression '示例文件 (18)' =
+		let
+		    源 = Folder.Files("D:\麻大师\日更数据\天猫旗舰店\12-旗舰店流量数据"),
+		    导航1 = 源{0}[Content]
+		in
+		    导航1
+	lineageTag: 3bd2c5ca-a6c2-48ad-b05e-b1db425982e3
+	queryGroup: '从 12-旗舰店流量数据 转换文件 (2)\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression '转换文件 (18)' =
+		let
+		    源 = (参数18 as binary) => let
+		    源 = Excel.Workbook(参数18, null, true),
+		    Sheet1_Sheet = 源{[Item="Sheet1",Kind="Sheet"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(Sheet1_Sheet, [PromoteAllScalars=true])
+		in
+		    提升的标题
+		in
+		    源
+	mAttributes: [ FunctionQueryBinding = "{""exemplarFormulaName"":""转换示例文件 (18)""}" ]
+	lineageTag: d312bf7a-1a0d-4ac8-a5eb-bb91f2f25020
+	queryGroup: '从 12-旗舰店流量数据 转换文件 (2)\帮助程序查询'
+
+	annotation PBI_ResultType = Function
+
+expression 参数21 = #"示例文件 (21)" meta [IsParameterQuery=true, BinaryIdentifier=#"示例文件 (21)", Type="Binary", IsParameterQueryRequired=true]
+	lineageTag: 29d030da-6b27-4218-8b2e-d1a0ab8853f9
+	queryGroup: '从 06-旗舰店流量数据 转换文件 (4)\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression '转换示例文件 (21)' =
+		let
+		    源 = Excel.Workbook(参数21, null, true),
+		    分载体流量来源1 = 源{[Name="分载体流量来源"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(分载体流量来源1, [PromoteAllScalars=true])
+		in
+		    提升的标题
+	lineageTag: 6a8c15ba-ae18-4975-91ee-c1aa100d9cb1
+	queryGroup: '从 06-旗舰店流量数据 转换文件 (4)'
+
+	annotation PBI_ResultType = Table
+
+expression '示例文件 (21)' =
+		let
+		    源 = Folder.Files("D:\麻大师\日更数据\天猫旗舰店\06-旗舰店流量数据"),
+		    导航1 = 源{0}[Content]
+		in
+		    导航1
+	lineageTag: dbbcfb4a-1bda-4ea0-bab6-60e7de645ed0
+	queryGroup: '从 06-旗舰店流量数据 转换文件 (4)\帮助程序查询'
+
+	annotation PBI_NavigationStepName = 导航
+
+	annotation PBI_ResultType = Binary
+
+expression '转换文件 (21)' =
+		let
+		    源 = (参数21 as binary) => let
+		    源 = Excel.Workbook(参数21, null, true),
+		    分载体流量来源1 = 源{[Name="分载体流量来源"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(分载体流量来源1, [PromoteAllScalars=true])
+		in
+		    提升的标题
+		in
+		    源
+	mAttributes: [ FunctionQueryBinding = "{""exemplarFormulaName"":""转换示例文件 (21)""}" ]
+	lineageTag: c6c8c0e2-c213-4fb7-aab6-dc21f51dd6c3
+	queryGroup: '从 06-旗舰店流量数据 转换文件 (4)\帮助程序查询'
+
+	annotation PBI_ResultType = Function
+
+expression 参数22 = #"示例文件 (22)" meta [IsParameterQuery=true, BinaryIdentifier=#"示例文件 (22)", Type="Binary", IsParameterQueryRequired=true]
+	lineageTag: 52574eea-0228-4d05-9b3b-b6064413eb7a
+	queryGroup: '从 02-商品明细库存表 转换文件 (2)\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression '转换示例文件 (22)' =
+		let
+		    源 = Excel.Workbook(参数22, null, true),
+		    export_Sheet = 源{[Item="export",Kind="Sheet"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(export_Sheet, [PromoteAllScalars=true])
+		in
+		    提升的标题
+	lineageTag: 372ed0d4-4680-45b5-87c1-ef54e989c329
+	queryGroup: '从 02-商品明细库存表 转换文件 (2)'
+
+	annotation PBI_ResultType = Table
+
+expression '示例文件 (22)' =
+		let
+		    源 = Folder.Files("D:\麻大师\日更数据\天猫旗舰店\02-商品明细库存表"),
+		    导航1 = 源{0}[Content]
+		in
+		    导航1
+	lineageTag: f1c39135-3140-4f69-8e5e-49d1dd013cbe
+	queryGroup: '从 02-商品明细库存表 转换文件 (2)\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression '转换文件 (22)' =
+		let
+		    源 = (参数22 as binary) => let
+		    源 = Excel.Workbook(参数22, null, true),
+		    export_Sheet = 源{[Item="export",Kind="Sheet"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(export_Sheet, [PromoteAllScalars=true])
+		in
+		    提升的标题
+		in
+		    源
+	mAttributes: [ FunctionQueryBinding = "{""exemplarFormulaName"":""转换示例文件 (22)""}" ]
+	lineageTag: b1dee3ab-db8a-44dd-b411-9babec9f4453
+	queryGroup: '从 02-商品明细库存表 转换文件 (2)\帮助程序查询'
+
+	annotation PBI_ResultType = Function
+
+expression 参数27 = #"示例文件 (27)" meta [IsParameterQuery=true, BinaryIdentifier=#"示例文件 (27)", Type="Binary", IsParameterQueryRequired=true]
+	lineageTag: 394a4a99-cc8c-4a30-bc0d-aebfba2878d7
+	queryGroup: '从 00-各渠道销售数据 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression '转换示例文件 (27)' =
+		let
+		    源 = Excel.Workbook(参数27, null, true),
+		    Sheet1_Sheet = 源{[Item="Sheet1",Kind="Sheet"]}[Data]
+		in
+		    Sheet1_Sheet
+	lineageTag: f16a136d-6a44-4572-9bb5-83fe00d7af8f
+	queryGroup: '从 00-各渠道销售数据 转换文件'
+
+	annotation PBI_ResultType = Exception
+
+expression '示例文件 (27)' =
+		let
+		    源 = Folder.Files("D:\麻大师\日更数据\天猫旗舰店\00-各渠道销售数据"),
+		    导航1 = 源{0}[Content]
+		in
+		    导航1
+	lineageTag: eec483ab-6ad1-4d4f-a693-cde15ad355f3
+	queryGroup: '从 00-各渠道销售数据 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression '转换文件 (27)' =
+		let
+		    源 = (参数27 as binary) => let
+		    源 = Excel.Workbook(参数27, null, true),
+		    Sheet1_Sheet = 源{[Item="Sheet1",Kind="Sheet"]}[Data]
+		in
+		    Sheet1_Sheet
+		in
+		    源
+	mAttributes: [ FunctionQueryBinding = "{""exemplarFormulaName"":""转换示例文件 (27)""}" ]
+	lineageTag: 88ff8121-66f1-4d05-827f-be531a8ad012
+	queryGroup: '从 00-各渠道销售数据 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Function
+
+expression 参数28 = #"示例文件 (28)" meta [IsParameterQuery=true, BinaryIdentifier=#"示例文件 (28)", Type="Binary", IsParameterQueryRequired=true]
+	lineageTag: 950f375c-4ce0-4f40-a426-330d54d95dd7
+	queryGroup: '从 13-ERP各渠道商品信息 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression '转换示例文件 (28)' =
+		let
+		    源 = Excel.Workbook(参数28, null, true),
+		    Sheet0_Sheet = 源{[Item="Sheet0",Kind="Sheet"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(Sheet0_Sheet, [PromoteAllScalars=true])
+		in
+		    提升的标题
+	lineageTag: 5c8be96b-eb66-4874-bd72-574531905ab8
+	queryGroup: '从 13-ERP各渠道商品信息 转换文件'
+
+	annotation PBI_ResultType = Table
+
+expression '示例文件 (28)' =
+		let
+		    源 = Folder.Files("D:\麻大师\日更数据\天猫旗舰店\13-ERP各渠道商品信息"),
+		    导航1 = 源{0}[Content]
+		in
+		    导航1
+	lineageTag: 4307abd5-6f00-48ac-8743-99d7c031c43e
+	queryGroup: '从 13-ERP各渠道商品信息 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression '转换文件 (28)' =
+		let
+		    源 = (参数28 as binary) => let
+		    源 = Excel.Workbook(参数28, null, true),
+		    Sheet0_Sheet = 源{[Item="Sheet0",Kind="Sheet"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(Sheet0_Sheet, [PromoteAllScalars=true])
+		in
+		    提升的标题
+		in
+		    源
+	mAttributes: [ FunctionQueryBinding = "{""exemplarFormulaName"":""转换示例文件 (28)""}" ]
+	lineageTag: 98fe778a-628a-41a8-9b11-ab88ba786a18
+	queryGroup: '从 13-ERP各渠道商品信息 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Function
+
+expression 参数29 = #"示例文件 (29)" meta [IsParameterQuery=true, BinaryIdentifier=#"示例文件 (29)", Type="Binary", IsParameterQueryRequired=true]
+	lineageTag: e9180f74-d9cf-4c60-bf98-87cfaabf3530
+	queryGroup: '从 14-推广竞品数据 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression '转换示例文件 (29)' =
+		let
+		    源 = Excel.Workbook(参数29, null, true),
+		    Sheet1_Sheet = 源{[Item="Sheet1",Kind="Sheet"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(Sheet1_Sheet, [PromoteAllScalars=true])
+		in
+		    提升的标题
+	lineageTag: 5a2aabe1-a782-40b6-a43e-6d86f82821ca
+	queryGroup: '从 14-推广竞品数据 转换文件'
+
+	annotation PBI_ResultType = Table
+
+expression '示例文件 (29)' =
+		let
+		    源 = Folder.Files("D:\麻大师\日更数据\天猫旗舰店\14-推广竞品数据"),
+		    导航1 = 源{0}[Content]
+		in
+		    导航1
+	lineageTag: da862e25-9c4b-4035-91c7-215298d0d623
+	queryGroup: '从 14-推广竞品数据 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+	annotation PBI_NavigationStepName = 导航
+
+expression '转换文件 (29)' =
+		let
+		    源 = (参数29 as binary) => let
+		    源 = Excel.Workbook(参数29, null, true),
+		    Sheet1_Sheet = 源{[Item="Sheet1",Kind="Sheet"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(Sheet1_Sheet, [PromoteAllScalars=true])
+		in
+		    提升的标题
+		in
+		    源
+	mAttributes: [ FunctionQueryBinding = "{""exemplarFormulaName"":""转换示例文件 (29)""}" ]
+	lineageTag: 7f9f516a-ca83-4ef1-85ff-0bb97422c915
+	queryGroup: '从 14-推广竞品数据 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Function
+
+expression 参数30 = #"示例文件 (30)" meta [IsParameterQuery=true, BinaryIdentifier=#"示例文件 (30)", Type="Binary", IsParameterQueryRequired=true]
+	lineageTag: e0cfabc4-5612-40b6-8439-9666fcba8511
+	queryGroup: '从 10-1客服绩效明细 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression '转换示例文件 (30)' =
+		let
+		    源 = Excel.Workbook(参数30, null, true),
+		    数据信息_Sheet = 源{[Item="数据信息",Kind="Sheet"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(数据信息_Sheet, [PromoteAllScalars=true])
+		in
+		    提升的标题
+	lineageTag: 57c05a51-ed80-48b2-8956-f062805664cb
+	queryGroup: '从 10-1客服绩效明细 转换文件'
+
+	annotation PBI_ResultType = Table
+
+expression '示例文件 (30)' =
+		let
+		    源 = Folder.Files("D:\麻大师\日更数据\天猫旗舰店\10-1客服绩效明细"),
+		    导航1 = 源{0}[Content]
+		in
+		    导航1
+	lineageTag: 29df597b-0535-4f88-8577-13d23537de04
+	queryGroup: '从 10-1客服绩效明细 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression '转换文件 (30)' =
+		let
+		    源 = (参数30 as binary) => let
+		    源 = Excel.Workbook(参数30, null, true),
+		    数据信息_Sheet = 源{[Item="数据信息",Kind="Sheet"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(数据信息_Sheet, [PromoteAllScalars=true])
+		in
+		    提升的标题
+		in
+		    源
+	mAttributes: [ FunctionQueryBinding = "{""exemplarFormulaName"":""转换示例文件 (30)""}" ]
+	lineageTag: b6e3f0ea-8984-4d8a-a166-3738a151cfb0
+	queryGroup: '从 10-1客服绩效明细 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Function
+
+expression 参数31 = #"示例文件 (31)" meta [IsParameterQuery=true, BinaryIdentifier=#"示例文件 (31)", Type="Binary", IsParameterQueryRequired=true]
+	lineageTag: d2b39194-289a-4e37-9155-04d9d520d712
+	queryGroup: '从 10-2客服排班表 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression '转换示例文件 (31)' =
+		let
+		    源 = Excel.Workbook(参数31, null, true),
+		    Sheet1_Sheet = 源{[Item="Sheet1",Kind="Sheet"]}[Data]
+		in
+		    Sheet1_Sheet
+	lineageTag: 8b4f0106-99ab-40ea-8fa9-d50e46fd0d57
+	queryGroup: '从 10-2客服排班表 转换文件'
+
+	annotation PBI_ResultType = Table
+
+expression '示例文件 (31)' =
+		let
+		    源 = Folder.Files("D:\麻大师\日更数据\天猫旗舰店\淘宝客服排班表"),
+		    导航1 = 源{0}[Content]
+		in
+		    导航1
+	lineageTag: 9f225780-3b89-42d2-a7fd-9e867bae82c1
+	queryGroup: '从 10-2客服排班表 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+	annotation PBI_NavigationStepName = 导航
+
+expression '转换文件 (31)' =
+		let
+		    源 = (参数31 as binary) => let
+		    源 = Excel.Workbook(参数31, null, true),
+		    Sheet1_Sheet = 源{[Item="Sheet1",Kind="Sheet"]}[Data]
+		in
+		    Sheet1_Sheet
+		in
+		    源
+	mAttributes: [ FunctionQueryBinding = "{""exemplarFormulaName"":""转换示例文件 (31)""}" ]
+	lineageTag: 01779739-a15e-4100-89b8-735574c8a480
+	queryGroup: '从 10-2客服排班表 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Function
+
+expression 参数34 = #"示例文件 (34)" meta [IsParameterQuery=true, BinaryIdentifier=#"示例文件 (34)", Type="Binary", IsParameterQueryRequired=true]
+	lineageTag: 3f8c2501-c471-444a-8954-3afdf0322c50
+	queryGroup: '从 10-1客服绩效明细 转换文件 (2)\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression '转换示例文件 (34)' =
+		let
+		    源 = Excel.Workbook(参数34, null, true),
+		    数据信息_Sheet = 源{[Item="数据信息",Kind="Sheet"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(数据信息_Sheet, [PromoteAllScalars=true])
+		in
+		    提升的标题
+	lineageTag: d32bb739-719d-45b0-8318-580daf971ae8
+	queryGroup: '从 10-1客服绩效明细 转换文件 (2)'
+
+	annotation PBI_ResultType = Table
+
+expression '示例文件 (34)' =
+		let
+		    源 = Folder.Files("D:\麻大师\日更数据\天猫旗舰店\10-1客服绩效明细"),
+		    导航1 = 源{0}[Content]
+		in
+		    导航1
+	lineageTag: 92da1edb-aa19-4f62-a72a-795a55eae146
+	queryGroup: '从 10-1客服绩效明细 转换文件 (2)\帮助程序查询'
+
+	annotation PBI_NavigationStepName = 导航
+
+	annotation PBI_ResultType = Binary
+
+expression '转换文件 (34)' =
+		let
+		    源 = (参数34 as binary) => let
+		    源 = Excel.Workbook(参数34, null, true),
+		    数据信息_Sheet = 源{[Item="数据信息",Kind="Sheet"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(数据信息_Sheet, [PromoteAllScalars=true])
+		in
+		    提升的标题
+		in
+		    源
+	mAttributes: [ FunctionQueryBinding = "{""exemplarFormulaName"":""转换示例文件 (34)""}" ]
+	lineageTag: ae12bbaf-89e5-4ec7-97ac-40525f311c60
+	queryGroup: '从 10-1客服绩效明细 转换文件 (2)\帮助程序查询'
+
+	annotation PBI_ResultType = Function
+
+expression 参数33 = #"示例文件 (33)" meta [IsParameterQuery=true, BinaryIdentifier=#"示例文件 (33)", Type="Binary", IsParameterQueryRequired=true]
+	lineageTag: 466ff1b3-2e80-4ed4-a536-18e2548af99d
+	queryGroup: '从 13-1-ERP打印订单信息 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression '转换示例文件 (33)' =
+		let
+		    源 = Excel.Workbook(参数33, null, true),
+		    Sheet_Sheet = 源{[Item="Sheet",Kind="Sheet"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(Sheet_Sheet, [PromoteAllScalars=true])
+		in
+		    提升的标题
+	lineageTag: c4f8690f-ba5f-4247-b4b5-b92b676185b0
+	queryGroup: '从 13-1-ERP打印订单信息 转换文件'
+
+	annotation PBI_ResultType = Table
+
+expression '示例文件 (33)' =
+		let
+		    源 = Folder.Files("D:\麻大师\日更数据\天猫旗舰店\13-1-ERP打印订单信息"),
+		    导航1 = 源{0}[Content]
+		in
+		    导航1
+	lineageTag: 9b2821b6-a56e-48c1-b8ae-6e1684ffb19d
+	queryGroup: '从 13-1-ERP打印订单信息 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression '转换文件 (33)' =
+		let
+		    源 = (参数33 as binary) => let
+		    源 = Excel.Workbook(参数33, null, true),
+		    Sheet_Sheet = 源{[Item="Sheet",Kind="Sheet"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(Sheet_Sheet, [PromoteAllScalars=true])
+		in
+		    提升的标题
+		in
+		    源
+	mAttributes: [ FunctionQueryBinding = "{""exemplarFormulaName"":""转换示例文件 (33)""}" ]
+	lineageTag: 76d3e3f5-12f1-48d4-8dd5-329e9411d4c6
+	queryGroup: '从 13-1-ERP打印订单信息 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Function
+
+expression '转换文件 (36)' =
+		let
+		    源 = (参数28 as binary) => let
+		    源 = Excel.Workbook(参数28, null, true),
+		    Sheet0_Sheet = 源{[Item="Sheet0",Kind="Sheet"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(Sheet0_Sheet, [PromoteAllScalars=true])
+		in
+		    提升的标题
+		in
+		    源
+	lineageTag: 0400e496-231d-4c5f-9d2b-fc73c6a7155d
+
+	annotation PBI_ResultType = Function
+
+expression '示例文件 (36)' =
+		let
+		    源 = Folder.Files("D:\麻大师\日更数据\天猫旗舰店\13-ERP各渠道商品信息"),
+		    导航1 = 源{0}[Content]
+		in
+		    导航1
+	lineageTag: 9391a847-aafa-4cbd-8f9e-c931687b9ba9
+
+	annotation PBI_NavigationStepName = 导航
+
+	annotation PBI_ResultType = Binary
+
+expression 参数35 = #"示例文件 (35)" meta [IsParameterQuery=true, BinaryIdentifier=#"示例文件 (35)", Type="Binary", IsParameterQueryRequired=true]
+	lineageTag: 786e441f-fa5d-49ba-a59e-59b8b36feb5f
+	queryGroup: '从 25年双十一付定 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression '转换示例文件 (35)' =
+		let
+		    源 = Excel.Workbook(参数35, null, true),
+		    #"营销-活动分析-预售活动详情-分商品效果_双11预售_定金期__Sheet" = 源{[Item="营销-活动分析-预售活动详情-分商品效果_双11预售_定金期_",Kind="Sheet"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(#"营销-活动分析-预售活动详情-分商品效果_双11预售_定金期__Sheet", [PromoteAllScalars=true])
+		in
+		    提升的标题
+	lineageTag: cc789e7b-1d71-4ca7-823a-c9dd4e27a18c
+	queryGroup: '从 25年双十一付定 转换文件'
+
+	annotation PBI_ResultType = Table
+
+expression '示例文件 (35)' =
+		let
+		    源 = Folder.Files("D:\麻大师\日更数据\天猫旗舰店\00-各渠道销售数据\25年双十一付定"),
+		    导航1 = 源{0}[Content]
+		in
+		    导航1
+	lineageTag: b6ccc244-0e6d-4762-94c2-795f57156de2
+	queryGroup: '从 25年双十一付定 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression '转换文件 (35)' =
+		let
+		    源 = (参数35 as binary) => let
+		    源 = Excel.Workbook(参数35, null, true),
+		    #"营销-活动分析-预售活动详情-分商品效果_双11预售_定金期__Sheet" = 源{[Item="营销-活动分析-预售活动详情-分商品效果_双11预售_定金期_",Kind="Sheet"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(#"营销-活动分析-预售活动详情-分商品效果_双11预售_定金期__Sheet", [PromoteAllScalars=true])
+		in
+		    提升的标题
+		in
+		    源
+	mAttributes: [ FunctionQueryBinding = "{""exemplarFormulaName"":""转换示例文件 (35)""}" ]
+	lineageTag: fce2830d-93ee-41f8-869b-bf919a915971
+	queryGroup: '从 25年双十一付定 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Function
+
+expression 参数36 = #"示例文件 (37)" meta [IsParameterQuery=true, BinaryIdentifier=#"示例文件 (37)", Type="Binary", IsParameterQueryRequired=true]
+	lineageTag: 3665e3b6-3d90-4104-8250-f8e50059cdbf
+	queryGroup: '从 10-1客服绩效明细 转换文件 (3)\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression '转换示例文件 (36)' =
+		let
+		    源 = Excel.Workbook(参数36, null, true),
+		    数据信息_Sheet = 源{[Item="数据信息",Kind="Sheet"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(数据信息_Sheet, [PromoteAllScalars=true])
+		in
+		    提升的标题
+	lineageTag: f89329e3-c94b-40ef-9b56-3172e776b1e8
+	queryGroup: '从 10-1客服绩效明细 转换文件 (3)'
+
+	annotation PBI_NavigationStepName = 导航
+
+	annotation PBI_ResultType = Table
+
+expression '示例文件 (37)' =
+		let
+		    源 = Folder.Files("D:\麻大师\日更数据\天猫旗舰店\10-1淘宝客服绩效明细\自制报表"),
+		    #"D:\麻大师\日更数据\天猫旗舰店\10-1淘宝客服绩效明细\自制报表\_自制报表-报表查看-客服绩效_20251015_20251015_售后 xlsx1" = 源{[#"Folder Path"="D:\麻大师\日更数据\天猫旗舰店\10-1淘宝客服绩效明细\自制报表\",Name="自制报表-报表查看-客服绩效_20251015_20251015_售后.xlsx"]}[Content]
+		in
+		    #"D:\麻大师\日更数据\天猫旗舰店\10-1淘宝客服绩效明细\自制报表\_自制报表-报表查看-客服绩效_20251015_20251015_售后 xlsx1"
+	lineageTag: b8c2e3cc-d7f0-4114-9597-695a3118c865
+	queryGroup: '从 10-1客服绩效明细 转换文件 (3)\帮助程序查询'
+
+	annotation PBI_NavigationStepName = 导航
+
+	annotation PBI_ResultType = Binary
+
+expression '转换文件 (37)' =
+		let
+		    源 = (参数36 as binary) => let
+		    源 = Excel.Workbook(参数36, null, true),
+		    数据信息_Sheet = 源{[Item="数据信息",Kind="Sheet"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(数据信息_Sheet, [PromoteAllScalars=true])
+		in
+		    提升的标题
+		in
+		    源
+	mAttributes: [ FunctionQueryBinding = "{""exemplarFormulaName"":""转换示例文件 (36)""}" ]
+	lineageTag: c1e2e4da-ebf3-4d57-80df-fbf5f7c9d5c6
+	queryGroup: '从 10-1客服绩效明细 转换文件 (3)\帮助程序查询'
+
+	annotation PBI_NavigationStepName = 导航
+
+	annotation PBI_ResultType = Function
+
+expression 参数32 = #"示例文件 (32)" meta [IsParameterQuery=true, BinaryIdentifier=#"示例文件 (32)", Type="Binary", IsParameterQueryRequired=true]
+	lineageTag: 59558a0a-3da2-451f-bc83-2d74b9635012
+	queryGroup: '从 10-2京东客服绩效明细 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression 参数37 = #"示例文件 (38)" meta [IsParameterQuery=true, BinaryIdentifier=#"示例文件 (38)", Type="Binary", IsParameterQueryRequired=true]
+	lineageTag: 47b250de-ee5e-449e-88c0-edfb27984ad6
+	queryGroup: '从 京东客服排班表 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression '转换示例文件 (32)' =
+		let
+		    源 = Excel.Workbook(参数32, null, true),
+		    服务商工作量报表1 = 源{[Name="服务商工作量报表"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(服务商工作量报表1, [PromoteAllScalars=true])
+		in
+		    提升的标题
+	lineageTag: 250ffd6c-f33d-4422-9078-380a8ab179ff
+	queryGroup: '从 10-2京东客服绩效明细 转换文件'
+
+	annotation PBI_ResultType = Table
+
+expression '示例文件 (32)' =
+		let
+		    源 = Folder.Files("D:\麻大师\日更数据\天猫旗舰店\10-2京东客服绩效明细\工作量数据"),
+		    导航1 = 源{0}[Content]
+		in
+		    导航1
+	lineageTag: 9762b166-0d8b-40db-b2d7-a93ad5c891f7
+	queryGroup: '从 10-2京东客服绩效明细 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+	annotation PBI_NavigationStepName = 导航
+
+expression '转换文件 (32)' =
+		let
+		    源 = (参数32 as binary) => let
+		    源 = Excel.Workbook(参数32, null, true),
+		    服务商工作量报表1 = 源{[Name="服务商工作量报表"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(服务商工作量报表1, [PromoteAllScalars=true])
+		in
+		    提升的标题
+		in
+		    源
+	mAttributes: [ FunctionQueryBinding = "{""exemplarFormulaName"":""转换示例文件 (32)""}" ]
+	lineageTag: c34a6355-0ae8-420a-a997-b05157ea9897
+	queryGroup: '从 10-2京东客服绩效明细 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Function
+
+expression '转换示例文件 (37)' =
+		let
+		    源 = Excel.Workbook(参数37, null, true),
+		    Sheet1_Sheet = 源{[Item="Sheet1",Kind="Sheet"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(Sheet1_Sheet, [PromoteAllScalars=true])
+		in
+		    提升的标题
+	lineageTag: fca72878-3b40-45b6-9fab-82966a60bd19
+	queryGroup: '从 京东客服排班表 转换文件'
+
+	annotation PBI_ResultType = Table
+
+expression '示例文件 (38)' =
+		let
+		    源 = Folder.Files("D:\麻大师\日更数据\天猫旗舰店\京东客服分组表"),
+		    导航1 = 源{0}[Content]
+		in
+		    导航1
+	lineageTag: bfc8085e-7f38-4b0b-afc8-35d645219925
+	queryGroup: '从 京东客服排班表 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+	annotation PBI_NavigationStepName = 导航
+
+expression '转换文件 (38)' =
+		let
+		    源 = (参数37 as binary) => let
+		    源 = Excel.Workbook(参数37, null, true),
+		    Sheet1_Sheet = 源{[Item="Sheet1",Kind="Sheet"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(Sheet1_Sheet, [PromoteAllScalars=true])
+		in
+		    提升的标题
+		in
+		    源
+	mAttributes: [ FunctionQueryBinding = "{""exemplarFormulaName"":""转换示例文件 (37)""}" ]
+	lineageTag: c9c16706-794f-4572-b805-47ea76da8f7d
+	queryGroup: '从 京东客服排班表 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Function
+
+expression 参数38 = #"示例文件 (39)" meta [IsParameterQuery=true, BinaryIdentifier=#"示例文件 (39)", Type="Binary", IsParameterQueryRequired=true]
+	lineageTag: 120b68bf-a629-4788-96c8-0f863cc86f9c
+	queryGroup: '从 绩效数据 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression '转换示例文件 (38)' =
+		let
+		    源 = Excel.Workbook(参数38, null, true),
+		    促成下单1 = 源{[Name="促成下单"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(促成下单1, [PromoteAllScalars=true])
+		in
+		    提升的标题
+	lineageTag: 9f22b893-41b6-409b-8514-da75748053fa
+	queryGroup: '从 绩效数据 转换文件'
+
+	annotation PBI_ResultType = Table
+
+expression '示例文件 (39)' =
+		let
+		    源 = Folder.Files("D:\麻大师\日更数据\天猫旗舰店\10-2京东客服绩效明细\绩效数据"),
+		    导航1 = 源{0}[Content]
+		in
+		    导航1
+	lineageTag: ebab2a6d-a85f-48c6-9287-b5c72b8df7d1
+	queryGroup: '从 绩效数据 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression '转换文件 (39)' =
+		let
+		    源 = (参数38 as binary) => let
+		    源 = Excel.Workbook(参数38, null, true),
+		    促成下单1 = 源{[Name="促成下单"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(促成下单1, [PromoteAllScalars=true])
+		in
+		    提升的标题
+		in
+		    源
+	mAttributes: [ FunctionQueryBinding = "{""exemplarFormulaName"":""转换示例文件 (38)""}" ]
+	lineageTag: 24ba56ba-b012-4c20-8ba8-9224c1ef72c4
+	queryGroup: '从 绩效数据 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Function
+
+expression 参数39 = #"示例文件 (40)" meta [IsParameterQuery=true, BinaryIdentifier=#"示例文件 (40)", Type="Binary", IsParameterQueryRequired=true]
+	lineageTag: c2d1dd65-aa2f-46b4-b99a-de6a4a6db17e
+	queryGroup: '从 客服员工日报统计 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression '转换示例文件 (39)' =
+		let
+		    源 = Excel.Workbook(参数39, null, true),
+		    客服员工日报1 = 源{[Name="客服员工日报"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(客服员工日报1, [PromoteAllScalars=true])
+		in
+		    提升的标题
+	lineageTag: eace7eb0-0936-4b28-b933-b249d2515fb5
+	queryGroup: '从 客服员工日报统计 转换文件'
+
+	annotation PBI_ResultType = Table
+
+expression '示例文件 (40)' =
+		let
+		    源 = Folder.Files("D:\麻大师\日更数据\天猫旗舰店\10-2京东客服绩效明细\客服员工日报统计"),
+		    导航1 = 源{0}[Content]
+		in
+		    导航1
+	lineageTag: 642f33e6-dbf9-4cda-abe4-37bd9b464a41
+	queryGroup: '从 客服员工日报统计 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression '转换文件 (40)' =
+		let
+		    源 = (参数39 as binary) => let
+		    源 = Excel.Workbook(参数39, null, true),
+		    客服员工日报1 = 源{[Name="客服员工日报"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(客服员工日报1, [PromoteAllScalars=true])
+		in
+		    提升的标题
+		in
+		    源
+	mAttributes: [ FunctionQueryBinding = "{""exemplarFormulaName"":""转换示例文件 (39)""}" ]
+	lineageTag: 61bd6bae-dc9b-40ee-b127-843e35830d05
+	queryGroup: '从 客服员工日报统计 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Function
+
+expression 参数40 = #"示例文件 (41)" meta [IsParameterQuery=true, BinaryIdentifier=#"示例文件 (41)", Type="Binary", IsParameterQueryRequired=true]
+	lineageTag: 8e5b10bd-4a9c-4d98-ad5c-4bdc15588496
+	queryGroup: '从 10-2京东客服营销明细 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression 参数41 = #"示例文件 (42)" meta [IsParameterQuery=true, BinaryIdentifier=#"示例文件 (42)", Type="Binary", IsParameterQueryRequired=true]
+	lineageTag: 5deeab68-da5f-46bb-ab8d-c852a7cf304d
+	queryGroup: '从 10-3京东客服绩效数据 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression 参数42 = #"示例文件 (43)" meta [IsParameterQuery=true, BinaryIdentifier=#"示例文件 (43)", Type="Binary", IsParameterQueryRequired=true]
+	lineageTag: 10e92163-b9b9-4e93-9a59-de70f5b32e41
+	queryGroup: '从 10-2京东客服营销明细 转换文件 (2)\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression '转换示例文件 (40)' =
+		let
+		    源 = Excel.Workbook(参数40, null, true),
+		    工作量对比报表1 = 源{[Name="工作量对比报表"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(工作量对比报表1, [PromoteAllScalars=true])
+		in
+		    提升的标题
+	lineageTag: 94cc98c9-ef7a-423c-9186-fac95a81279c
+	queryGroup: '从 10-2京东客服营销明细 转换文件'
+
+	annotation PBI_ResultType = Table
+
+expression '示例文件 (41)' =
+		let
+		    源 = Folder.Files("D:\麻大师\日更数据\天猫旗舰店\10-2京东客服绩效明细\工作量数据"),
+		    导航1 = 源{0}[Content]
+		in
+		    导航1
+	lineageTag: 93170ff5-8d44-4f28-83ad-96d8154d7936
+	queryGroup: '从 10-2京东客服营销明细 转换文件\帮助程序查询'
+
+	annotation PBI_NavigationStepName = 导航
+
+	annotation PBI_ResultType = Binary
+
+expression '转换文件 (41)' =
+		let
+		    源 = (参数40 as binary) => let
+		    源 = Excel.Workbook(参数40, null, true),
+		    工作量对比报表1 = 源{[Name="工作量对比报表"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(工作量对比报表1, [PromoteAllScalars=true])
+		in
+		    提升的标题
+		in
+		    源
+	mAttributes: [ FunctionQueryBinding = "{""exemplarFormulaName"":""转换示例文件 (40)""}" ]
+	lineageTag: 053cb87d-9c8f-4723-a91e-c7e774565051
+	queryGroup: '从 10-2京东客服营销明细 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Function
+
+expression '转换示例文件 (41)' =
+		let
+		    源 = Excel.Workbook(参数41, null, true),
+		    汇总1 = 源{[Name="汇总"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(汇总1, [PromoteAllScalars=true])
+		in
+		    提升的标题
+	lineageTag: 1116e370-3030-4eda-bc5d-fb2c4378ae16
+	queryGroup: '从 10-3京东客服绩效数据 转换文件'
+
+	annotation PBI_ResultType = Table
+
+expression '示例文件 (42)' =
+		let
+		    源 = Folder.Files("D:\麻大师\日更数据\天猫旗舰店\10-2京东客服绩效明细\绩效数据"),
+		    导航1 = 源{0}[Content]
+		in
+		    导航1
+	lineageTag: 3fc61701-c85e-450a-9258-ccbda303b333
+	queryGroup: '从 10-3京东客服绩效数据 转换文件\帮助程序查询'
+
+	annotation PBI_NavigationStepName = 导航
+
+	annotation PBI_ResultType = Binary
+
+expression '转换文件 (42)' =
+		let
+		    源 = (参数41 as binary) => let
+		    源 = Excel.Workbook(参数41, null, true),
+		    汇总1 = 源{[Name="汇总"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(汇总1, [PromoteAllScalars=true])
+		in
+		    提升的标题
+		in
+		    源
+	mAttributes: [ FunctionQueryBinding = "{""exemplarFormulaName"":""转换示例文件 (41)""}" ]
+	lineageTag: 1465ea13-cc4d-474f-8a3a-9201e5ea5780
+	queryGroup: '从 10-3京东客服绩效数据 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Function
+
+expression '转换示例文件 (42)' =
+		let
+		    源 = Excel.Workbook(参数42, null, true),
+		    服务商工作量报表1 = 源{[Name="工作量对比报表"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(服务商工作量报表1, [PromoteAllScalars=true])
+		in
+		    提升的标题
+	lineageTag: 403bfb22-ee8a-4849-ba74-0ac2a496759d
+	queryGroup: '从 10-2京东客服营销明细 转换文件 (2)'
+
+	annotation PBI_ResultType = Table
+
+	annotation PBI_NavigationStepName = 导航
+
+expression '示例文件 (43)' =
+		let
+		    源 = Folder.Files("D:\麻大师\日更数据\天猫旗舰店\10-2京东客服绩效明细\工作量数据"),
+		    导航1 = 源{0}[Content]
+		in
+		    导航1
+	lineageTag: 47f28bec-5695-4076-8a77-ec1c4243f191
+	queryGroup: '从 10-2京东客服营销明细 转换文件 (2)\帮助程序查询'
+
+	annotation PBI_NavigationStepName = 导航
+
+	annotation PBI_ResultType = Binary
+
+expression '转换文件 (43)' =
+		let
+		    源 = (参数42 as binary) => let
+		    源 = Excel.Workbook(参数42, null, true),
+		    服务商工作量报表1 = 源{[Name="工作量对比报表"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(服务商工作量报表1, [PromoteAllScalars=true])
+		in
+		    提升的标题
+		in
+		    源
+	mAttributes: [ FunctionQueryBinding = "{""exemplarFormulaName"":""转换示例文件 (42)""}" ]
+	lineageTag: b5ff4d4f-e78a-408a-b161-a0f708e5a9d7
+	queryGroup: '从 10-2京东客服营销明细 转换文件 (2)\帮助程序查询'
+
+	annotation PBI_ResultType = Function
+
+	annotation PBI_NavigationStepName = 导航
+
+expression 参数44 = #"示例文件 (45)" meta [IsParameterQuery=true, BinaryIdentifier=#"示例文件 (45)", Type="Binary", IsParameterQueryRequired=true]
+	lineageTag: e39b5e9e-49c9-4e74-bb94-4f58669ec0f2
+	queryGroup: '从 接待数据 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression '转换示例文件 (44)' =
+		let
+		    源 = Excel.Workbook(参数44, null, true),
+		    客服接待明细对比报表1 = 源{[Name="客服接待明细对比报表"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(客服接待明细对比报表1, [PromoteAllScalars=true])
+		in
+		    提升的标题
+	lineageTag: 5a739bea-59d4-4d01-aff2-8e6f6239e0cb
+	queryGroup: '从 接待数据 转换文件'
+
+	annotation PBI_ResultType = Table
+
+expression '示例文件 (45)' =
+		let
+		    源 = Folder.Files("D:\麻大师\日更数据\天猫旗舰店\10-2京东客服绩效明细\接待数据"),
+		    导航1 = 源{0}[Content]
+		in
+		    导航1
+	lineageTag: 6913dac8-aba1-4004-a58b-aefa78b3622b
+	queryGroup: '从 接待数据 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression '转换文件 (45)' =
+		let
+		    源 = (参数44 as binary) => let
+		    源 = Excel.Workbook(参数44, null, true),
+		    客服接待明细对比报表1 = 源{[Name="客服接待明细对比报表"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(客服接待明细对比报表1, [PromoteAllScalars=true])
+		in
+		    提升的标题
+		in
+		    源
+	mAttributes: [ FunctionQueryBinding = "{""exemplarFormulaName"":""转换示例文件 (44)""}" ]
+	lineageTag: 29d60be4-bb76-4352-a616-db880c9b5c76
+	queryGroup: '从 接待数据 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Function
+
+expression 参数45 = #"示例文件 (46)" meta [IsParameterQuery=true, BinaryIdentifier=#"示例文件 (46)", Type="Binary", IsParameterQueryRequired=true]
+	lineageTag: 6b291fba-68fd-44db-be0e-0e98d57a623f
+	queryGroup: '从 营销数据 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression 参数46 = #"示例文件 (47)" meta [IsParameterQuery=true, BinaryIdentifier=#"示例文件 (47)", Type="Binary", IsParameterQueryRequired=true]
+	lineageTag: 85c0e2a5-2e60-4339-a693-e0ec2ab64afe
+	queryGroup: '从 考勤数据 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression '转换示例文件 (45)' =
+		let
+		    源 = Excel.Workbook(参数45, null, true),
+		    促成下单1 = 源{[Name="促成下单"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(促成下单1, [PromoteAllScalars=true])
+		in
+		    提升的标题
+	lineageTag: 13fe30f3-b048-4cc3-91cf-1301833ed652
+	queryGroup: '从 营销数据 转换文件'
+
+	annotation PBI_ResultType = Table
+
+expression '示例文件 (46)' =
+		let
+		    源 = Folder.Files("D:\麻大师\日更数据\天猫旗舰店\10-2京东客服绩效明细\营销数据"),
+		    导航1 = 源{0}[Content]
+		in
+		    导航1
+	lineageTag: b5a3adb2-0f8f-4383-8d9a-ea53f3913367
+	queryGroup: '从 营销数据 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression '转换文件 (46)' =
+		let
+		    源 = (参数45 as binary) => let
+		    源 = Excel.Workbook(参数45, null, true),
+		    促成下单1 = 源{[Name="促成下单"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(促成下单1, [PromoteAllScalars=true])
+		in
+		    提升的标题
+		in
+		    源
+	mAttributes: [ FunctionQueryBinding = "{""exemplarFormulaName"":""转换示例文件 (45)""}" ]
+	lineageTag: 3f2d7732-e1cc-4e81-8b7e-b391a4f042ca
+	queryGroup: '从 营销数据 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Function
+
+expression '转换示例文件 (46)' =
+		let
+		    源 = Excel.Workbook(参数46, null, true),
+		    服务商工作量报表1 = 源{[Name="服务商工作量报表"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(服务商工作量报表1, [PromoteAllScalars=true])
+		in
+		    提升的标题
+	lineageTag: 97f2e5c2-6ed8-41de-ae2f-00fb15471c18
+	queryGroup: '从 考勤数据 转换文件'
+
+	annotation PBI_ResultType = Table
+
+expression '示例文件 (47)' =
+		let
+		    源 = Folder.Files("D:\麻大师\日更数据\天猫旗舰店\10-2京东客服绩效明细\考勤数据"),
+		    导航1 = 源{0}[Content]
+		in
+		    导航1
+	lineageTag: 5a2f7e55-2152-4c04-ab87-3f1ad7889855
+	queryGroup: '从 考勤数据 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression '转换文件 (47)' =
+		let
+		    源 = (参数46 as binary) => let
+		    源 = Excel.Workbook(参数46, null, true),
+		    服务商工作量报表1 = 源{[Name="服务商工作量报表"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(服务商工作量报表1, [PromoteAllScalars=true])
+		in
+		    提升的标题
+		in
+		    源
+	mAttributes: [ FunctionQueryBinding = "{""exemplarFormulaName"":""转换示例文件 (46)""}" ]
+	lineageTag: fc9f1ca5-66e9-4128-84b6-42bb4de74bf5
+	queryGroup: '从 考勤数据 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Function
+
+expression 参数47 = #"示例文件 (48)" meta [IsParameterQuery=true, BinaryIdentifier=#"示例文件 (48)", Type="Binary", IsParameterQueryRequired=true]
+	lineageTag: bf9df689-9a83-4bd1-9477-533405046b66
+	queryGroup: '从 接待评价分析 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression '转换示例文件 (47)' =
+		let
+		    源 = Excel.Workbook(参数47, null, true),
+		    数据信息_Sheet = 源{[Item="数据信息",Kind="Sheet"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(数据信息_Sheet, [PromoteAllScalars=true])
+		in
+		    提升的标题
+	lineageTag: 05fd5869-bf46-435b-882e-df0bd7639519
+	queryGroup: '从 接待评价分析 转换文件'
+
+	annotation PBI_ResultType = Table
+
+expression '示例文件 (48)' =
+		let
+		    源 = Folder.Files("D:\麻大师\日更数据\天猫旗舰店\10-1淘宝客服绩效明细\专项分析\接待评价分析"),
+		    导航1 = 源{0}[Content]
+		in
+		    导航1
+	lineageTag: 68f71106-5cca-44b1-8876-344eb1d595c7
+	queryGroup: '从 接待评价分析 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression '转换文件 (48)' =
+		let
+		    源 = (参数47 as binary) => let
+		    源 = Excel.Workbook(参数47, null, true),
+		    数据信息_Sheet = 源{[Item="数据信息",Kind="Sheet"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(数据信息_Sheet, [PromoteAllScalars=true])
+		in
+		    提升的标题
+		in
+		    源
+	mAttributes: [ FunctionQueryBinding = "{""exemplarFormulaName"":""转换示例文件 (47)""}" ]
+	lineageTag: d2343292-831c-42d4-8187-ac34b039b047
+	queryGroup: '从 接待评价分析 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Function
+
+expression 参数48 = #"示例文件 (49)" meta [IsParameterQuery=true, BinaryIdentifier=#"示例文件 (49)", Type="Binary", IsParameterQueryRequired=true]
+	lineageTag: 77c3a88f-540d-456a-82c3-a3b729d4c22c
+	queryGroup: '从 接待评价分析 转换文件 (2)\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression 参数49 = #"示例文件 (50)" meta [IsParameterQuery=true, BinaryIdentifier=#"示例文件 (50)", Type="Binary", IsParameterQueryRequired=true]
+	lineageTag: 5102c4f8-50a0-44d1-bf83-09b11fb4d9e2
+	queryGroup: '从 接待评价分析 转换文件 (3)\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression '转换示例文件 (48)' =
+		let
+		    源 = Excel.Workbook(参数48, null, true),
+		    数据信息_Sheet = 源{[Item="数据信息",Kind="Sheet"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(数据信息_Sheet, [PromoteAllScalars=true])
+		in
+		    提升的标题
+	lineageTag: 423a74a5-2188-490e-b342-86099238a1cc
+	queryGroup: '从 接待评价分析 转换文件 (2)'
+
+	annotation PBI_ResultType = Table
+
+expression '示例文件 (49)' =
+		let
+		    源 = Folder.Files("D:\麻大师\日更数据\天猫旗舰店\10-1淘宝客服绩效明细\专项分析\接待评价分析"),
+		    导航1 = 源{0}[Content]
+		in
+		    导航1
+	lineageTag: 816d3531-4187-4b68-b555-579986d221ae
+	queryGroup: '从 接待评价分析 转换文件 (2)\帮助程序查询'
+
+	annotation PBI_NavigationStepName = 导航
+
+	annotation PBI_ResultType = Binary
+
+expression '转换文件 (49)' =
+		let
+		    源 = (参数48 as binary) => let
+		    源 = Excel.Workbook(参数48, null, true),
+		    数据信息_Sheet = 源{[Item="数据信息",Kind="Sheet"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(数据信息_Sheet, [PromoteAllScalars=true])
+		in
+		    提升的标题
+		in
+		    源
+	mAttributes: [ FunctionQueryBinding = "{""exemplarFormulaName"":""转换示例文件 (48)""}" ]
+	lineageTag: 4f3fa18c-5bc5-4825-9a53-1bcfebd7a908
+	queryGroup: '从 接待评价分析 转换文件 (2)\帮助程序查询'
+
+	annotation PBI_ResultType = Function
+
+expression '转换示例文件 (49)' =
+		let
+		    源 = Excel.Workbook(参数49, null, true),
+		    数据信息_Sheet = 源{[Item="数据信息",Kind="Sheet"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(数据信息_Sheet, [PromoteAllScalars=true])
+		in
+		    提升的标题
+	lineageTag: 89daaf6b-c019-4f8d-a1ae-367eb9392cfb
+	queryGroup: '从 接待评价分析 转换文件 (3)'
+
+	annotation PBI_ResultType = Table
+
+expression '示例文件 (50)' =
+		let
+		    源 = Folder.Files("D:\麻大师\日更数据\天猫旗舰店\10-1淘宝客服绩效明细\专项分析\接待评价分析"),
+		    导航1 = 源{0}[Content]
+		in
+		    导航1
+	lineageTag: bf1951d8-cba3-4ea5-9879-92ac389e3504
+	queryGroup: '从 接待评价分析 转换文件 (3)\帮助程序查询'
+
+	annotation PBI_NavigationStepName = 导航
+
+	annotation PBI_ResultType = Binary
+
+expression '转换文件 (50)' =
+		let
+		    源 = (参数49 as binary) => let
+		    源 = Excel.Workbook(参数49, null, true),
+		    数据信息_Sheet = 源{[Item="数据信息",Kind="Sheet"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(数据信息_Sheet, [PromoteAllScalars=true])
+		in
+		    提升的标题
+		in
+		    源
+	mAttributes: [ FunctionQueryBinding = "{""exemplarFormulaName"":""转换示例文件 (49)""}" ]
+	lineageTag: fecd382a-851a-4e65-bb24-c195c0e3e8a9
+	queryGroup: '从 接待评价分析 转换文件 (3)\帮助程序查询'
+
+	annotation PBI_ResultType = Function
+
+expression 参数50 = #"示例文件 (51)" meta [IsParameterQuery=true, BinaryIdentifier=#"示例文件 (51)", Type="Binary", IsParameterQueryRequired=true]
+	lineageTag: 981a30ee-85ff-4c9b-8f60-59c928f08aa5
+	queryGroup: '从 旗帜 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression 参数51 = #"示例文件 (52)" meta [IsParameterQuery=true, BinaryIdentifier=#"示例文件 (52)", Type="Binary", IsParameterQueryRequired=true]
+	lineageTag: 4b465197-4216-4428-971e-f2e009fb1b00
+	queryGroup: '从 订单 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression '转换示例文件 (50)' =
+		let
+		    源 = Excel.Workbook(参数50, null, true),
+		    Sheet1_Sheet = 源{[Item="export",Kind="Sheet"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(Sheet1_Sheet, [PromoteAllScalars=true])
+		in
+		    提升的标题
+	lineageTag: f3aa39c5-0096-4d72-bf52-02eed3de8792
+	queryGroup: '从 旗帜 转换文件'
+
+	annotation PBI_ResultType = Table
+
+	annotation PBI_NavigationStepName = 导航
+
+expression '示例文件 (51)' =
+		let
+		    源 = Folder.Files("D:\麻大师\日更数据\天猫旗舰店\02-商品明细库存表\淘宝\旗帜"),
+		    导航1 = 源{0}[Content]
+		in
+		    导航1
+	lineageTag: 0fd36cf8-3d09-45f4-a41a-261591909f56
+	queryGroup: '从 旗帜 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression '转换文件 (51)' =
+		let
+		    源 = (参数50 as binary) => let
+		    源 = Excel.Workbook(参数50, null, true),
+		    Sheet1_Sheet = 源{[Item="export",Kind="Sheet"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(Sheet1_Sheet, [PromoteAllScalars=true])
+		in
+		    提升的标题
+		in
+		    源
+	mAttributes: [ FunctionQueryBinding = "{""exemplarFormulaName"":""转换示例文件 (50)""}" ]
+	lineageTag: 88ccab66-4a10-4c02-a6c9-7fe307535d36
+	queryGroup: '从 旗帜 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Function
+
+	annotation PBI_NavigationStepName = 导航
+
+expression '转换示例文件 (51)' =
+		let
+		    源 = Excel.Workbook(参数51, null, true),
+		    Sheet1_Sheet = 源{[Item="export",Kind="Sheet"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(Sheet1_Sheet, [PromoteAllScalars=true])
+		in
+		    提升的标题
+	lineageTag: 54012d72-8ba7-40a2-9aa9-69c74650a5bc
+	queryGroup: '从 订单 转换文件'
+
+	annotation PBI_NavigationStepName = 导航
+
+	annotation PBI_ResultType = Table
+
+expression '示例文件 (52)' =
+		let
+		    源 = Folder.Files("D:\麻大师\日更数据\天猫旗舰店\02-商品明细库存表\淘宝\订单"),
+		    导航1 = 源{0}[Content]
+		in
+		    导航1
+	lineageTag: 5f600f57-0fa8-4d33-9538-78d763625014
+	queryGroup: '从 订单 转换文件\帮助程序查询'
+
+	annotation PBI_NavigationStepName = 导航
+
+	annotation PBI_ResultType = Binary
+
+expression '转换文件 (52)' =
+		let
+		    源 = (参数51 as binary) => let
+		    源 = Excel.Workbook(参数51, null, true),
+		    Sheet1_Sheet = 源{[Item="export",Kind="Sheet"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(Sheet1_Sheet, [PromoteAllScalars=true])
+		in
+		    提升的标题
+		in
+		    源
+	mAttributes: [ FunctionQueryBinding = "{""exemplarFormulaName"":""转换示例文件 (51)""}" ]
+	lineageTag: b02283d0-67ae-4b8f-b966-58d36ec29661
+	queryGroup: '从 订单 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Function
+
+	annotation PBI_NavigationStepName = 导航
+
+expression 参数52 = #"示例文件 (53)" meta [IsParameterQuery=true, BinaryIdentifier=#"示例文件 (53)", Type="Binary", IsParameterQueryRequired=true]
+	lineageTag: 03dc28ea-63f7-406a-91b5-272d4bc0aba7
+	queryGroup: '从 京东pop 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression '转换示例文件 (52)' =
+		let
+		    源 = Excel.Workbook(参数52, null, true),
+		    Sheet1_Sheet = 源{[Item="Sheet1",Kind="Sheet"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(Sheet1_Sheet, [PromoteAllScalars=true])
+		in
+		    提升的标题
+	lineageTag: df7219b2-1c60-4bf8-935f-a18714fe3110
+	queryGroup: '从 京东pop 转换文件'
+
+	annotation PBI_ResultType = Table
+
+expression '示例文件 (53)' =
+		let
+		    源 = Folder.Files("D:\麻大师\日更数据\天猫旗舰店\02-商品明细库存表\京东pop"),
+		    导航1 = 源{0}[Content]
+		in
+		    导航1
+	lineageTag: 33532da2-100d-4f73-b818-5ca042952c4a
+	queryGroup: '从 京东pop 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression '转换文件 (53)' =
+		let
+		    源 = (参数52 as binary) => let
+		    源 = Excel.Workbook(参数52, null, true),
+		    Sheet1_Sheet = 源{[Item="Sheet1",Kind="Sheet"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(Sheet1_Sheet, [PromoteAllScalars=true])
+		in
+		    提升的标题
+		in
+		    源
+	mAttributes: [ FunctionQueryBinding = "{""exemplarFormulaName"":""转换示例文件 (52)""}" ]
+	lineageTag: b07e1217-1d4c-49ef-bc18-352a015ce6a5
+	queryGroup: '从 京东pop 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Function
+
+expression 商家备注打标 = ```
+		(商家备注 as nullable text, 订单状态1 as nullable text) =>
+		let
+		    备注 = if 商家备注 = null then "" else 商家备注,
+		    包含等通知 = 
+		        Text.Contains(备注, "等通知") or 
+		        Text.Contains(备注, "等客户通知") or 
+		        Text.Contains(备注, "延迟") or 
+		        Text.Contains(备注, "延期") or 
+		        Text.Contains(备注, "号发货") or 
+		        Text.Contains(备注, "日发货") or 
+		        Text.Contains(备注, "指定"),
+		    包含定制 = 
+		        Text.Contains(备注, "定制") or 
+		        Text.Contains(备注, "折叠") or 
+		        Text.Contains(备注, "横折") or 
+		        Text.Contains(备注, "竖折"),
+		    包含不发出 = Text.Contains(备注, "不发出")
+		in
+		    if 订单状态1 <> "待发" then 订单状态1 else
+		        if 包含不发出 then "置换" else
+		            if 包含等通知 and 包含定制 then "等通知，定制" else
+		                if 包含等通知 then "等通知" else
+		                    if 包含定制 then "定制" else "待发"
+		```
+	lineageTag: 8ee48113-6e64-4cc6-88ad-d2c4e491eaf2
+
+	annotation PBI_NavigationStepName = 导航
+
+	annotation PBI_ResultType = Function
+
+expression 参数55 = #"示例文件 (56)" meta [IsParameterQuery=true, BinaryIdentifier=#"示例文件 (56)", Type="Binary", IsParameterQueryRequired=true]
+	lineageTag: b449c447-b337-4612-8294-b50c18e5530b
+	queryGroup: '从 月恩工厂发货表 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression '转换示例文件 (55)' =
+		let
+		    源 = Excel.Workbook(参数55, null, true),
+		    已发_Sheet = 源{[Item="已发",Kind="Sheet"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(已发_Sheet, [PromoteAllScalars=true])
+		in
+		    提升的标题
+	lineageTag: bbe0d688-c971-4585-bab8-d53987469875
+	queryGroup: '从 月恩工厂发货表 转换文件'
+
+	annotation PBI_ResultType = Table
+
+expression '示例文件 (56)' =
+		let
+		    源 = Folder.Files("D:\麻大师\日更数据\天猫旗舰店\02-商品明细库存表\发货表\月恩工厂发货表"),
+		    导航1 = 源{0}[Content]
+		in
+		    导航1
+	lineageTag: 164fafb2-5be8-4c1f-a26a-56d6fd8f055c
+	queryGroup: '从 月恩工厂发货表 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression '转换文件 (56)' =
+		let
+		    源 = (参数55 as binary) => let
+		    源 = Excel.Workbook(参数55, null, true),
+		    已发_Sheet = 源{[Item="已发",Kind="Sheet"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(已发_Sheet, [PromoteAllScalars=true])
+		in
+		    提升的标题
+		in
+		    源
+	mAttributes: [ FunctionQueryBinding = "{""exemplarFormulaName"":""转换示例文件 (55)""}" ]
+	lineageTag: 5c614803-404f-49fd-a3a3-feeff973b0e6
+	queryGroup: '从 月恩工厂发货表 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Function
+
+expression 参数56 = #"示例文件 (57)" meta [IsParameterQuery=true, BinaryIdentifier=#"示例文件 (57)", Type="Binary", IsParameterQueryRequired=true]
+	lineageTag: 5ad868ef-8f49-4e5a-aa91-283a57087b47
+	queryGroup: '从 京东自营 转换文件 (2)\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression 参数8 = #"示例文件 (8)" meta [IsParameterQuery=true, BinaryIdentifier=#"示例文件 (8)", Type="Binary", IsParameterQueryRequired=true]
+	lineageTag: a1b76859-13d5-4d22-9dc4-92e0845e2686
+	queryGroup: '从 抖音订单 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression '示例文件 (57)' =
+		let
+		    源 = Folder.Files("D:\麻大师\日更数据\天猫旗舰店\02-商品明细库存表\京东自营"),
+		    导航1 = 源{0}[Content]
+		in
+		    导航1
+	lineageTag: d46d13b9-a8b0-44d8-8fb4-ebd90195591f
+	queryGroup: '从 京东自营 转换文件 (2)\帮助程序查询'
+
+	annotation PBI_NavigationStepName = 导航
+
+	annotation PBI_ResultType = Binary
+
+expression '转换示例文件 (56)' =
+		let
+		    源 = Csv.Document(参数56,[Delimiter=",", Columns=39, Encoding=936, QuoteStyle=QuoteStyle.Csv]),
+		    提升的标题 = Table.PromoteHeaders(源, [PromoteAllScalars=true])
+		in
+		    提升的标题
+	lineageTag: 50bff7f3-0c5a-4ead-a973-a5011d71219a
+	queryGroup: '从 京东自营 转换文件 (2)'
+
+	annotation PBI_ResultType = Table
+
+expression '转换文件 (57)' =
+		let
+		    源 = (参数56 as binary) => let
+		    源 = Csv.Document(参数56,[Delimiter=",", Columns=39, Encoding=936, QuoteStyle=QuoteStyle.Csv]),
+		    提升的标题 = Table.PromoteHeaders(源, [PromoteAllScalars=true])
+		in
+		    提升的标题
+		in
+		    源
+	mAttributes: [ FunctionQueryBinding = "{""exemplarFormulaName"":""转换示例文件 (56)""}" ]
+	lineageTag: 91c9501a-f801-471b-880a-6478f0789679
+	queryGroup: '从 京东自营 转换文件 (2)\帮助程序查询'
+
+	annotation PBI_ResultType = Function
+
+expression '示例文件 (8)' =
+		let
+		    源 = Folder.Files("D:\麻大师\日更数据\天猫旗舰店\02-商品明细库存表\抖音"),
+		    导航1 = 源{0}[Content]
+		in
+		    导航1
+	lineageTag: 9a23ddb0-002d-4bd3-a54d-1c6d589fadc1
+	queryGroup: '从 抖音订单 转换文件\帮助程序查询'
+
+	annotation PBI_NavigationStepName = 导航
+
+	annotation PBI_ResultType = Binary
+
+expression '转换示例文件 (8)' =
+		let
+		    源 = Csv.Document(参数8,[Delimiter=",", Columns=88, Encoding=65001, QuoteStyle=QuoteStyle.Csv]),
+		    提升的标题 = Table.PromoteHeaders(源, [PromoteAllScalars=true])
+		in
+		    提升的标题
+	lineageTag: 9c58fe72-2d10-44c3-ab9c-9c4634b7b846
+	queryGroup: '从 抖音订单 转换文件'
+
+	annotation PBI_ResultType = Table
+
+expression '转换文件 (8)' =
+		let
+		    源 = (参数8 as binary) => let
+		    源 = Csv.Document(参数8,[Delimiter=",", Columns=88, Encoding=65001, QuoteStyle=QuoteStyle.Csv]),
+		    提升的标题 = Table.PromoteHeaders(源, [PromoteAllScalars=true])
+		in
+		    提升的标题
+		in
+		    源
+	mAttributes: [ FunctionQueryBinding = "{""exemplarFormulaName"":""转换示例文件 (8)""}" ]
+	lineageTag: b5765fc2-78e6-4969-8c0b-50bf06230885
+	queryGroup: '从 抖音订单 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Function
+
+expression 参数10 = #"示例文件 (10)" meta [IsParameterQuery=true, BinaryIdentifier=#"示例文件 (10)", Type="Binary", IsParameterQueryRequired=true]
+	lineageTag: 157b3fb8-812a-4bcd-b6a4-498b26a6d628
+	queryGroup: '从 营销数据改版 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression '转换示例文件 (10)' =
+		let
+		    源 = Excel.Workbook(参数10, null, true),
+		    促成指标1 = 源{[Name="促成指标"]}[Data]
+		in
+		    促成指标1
+	lineageTag: 14d928a2-3081-4897-b79c-00f2646a31a6
+	queryGroup: '从 营销数据改版 转换文件'
+
+	annotation PBI_ResultType = Table
+
+expression '示例文件 (10)' =
+		let
+		    源 = Folder.Files("D:\麻大师\日更数据\天猫旗舰店\10-2京东客服绩效明细\营销数据改版"),
+		    导航1 = 源{0}[Content]
+		in
+		    导航1
+	lineageTag: cad58861-3bd3-4e1a-b409-cdae2537322f
+	queryGroup: '从 营销数据改版 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression '转换文件 (10)' =
+		let
+		    源 = (参数10 as binary) => let
+		    源 = Excel.Workbook(参数10, null, true),
+		    促成指标1 = 源{[Name="促成指标"]}[Data]
+		in
+		    促成指标1
+		in
+		    源
+	mAttributes: [ FunctionQueryBinding = "{""exemplarFormulaName"":""转换示例文件 (10)""}" ]
+	lineageTag: 03e724fd-9039-490c-8b16-18ecf933a7b0
+	queryGroup: '从 营销数据改版 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Function
+
+expression 订单状态对应表 =
+		let
+		    源 = Excel.Workbook(File.Contents("D:\麻大师\日更数据\天猫旗舰店\商品信息文件\订单状态对应表.xlsx"), null, true),
+		    Sheet1_Sheet = 源{[Item="Sheet1",Kind="Sheet"]}[Data],
+		    更改的类型 = Table.TransformColumnTypes(Sheet1_Sheet,{{"Column1", type text}, {"Column2", type text}}),
+		    提升的标题 = Table.PromoteHeaders(更改的类型, [PromoteAllScalars=true]),
+		    更改的类型1 = Table.TransformColumnTypes(提升的标题,{{"订单状态（原始）", type text}, {"订单状态1", type text}})
+		in
+		    更改的类型1
+	lineageTag: 00dae88a-c662-4a06-bcab-60dff1f72bae
+
+	annotation PBI_NavigationStepName = 导航
+
+	annotation PBI_ResultType = Table
+
+expression 参数19 = #"示例文件 (19)" meta [IsParameterQuery=true, BinaryIdentifier=#"示例文件 (19)", Type="Binary", IsParameterQueryRequired=true]
+	lineageTag: dba31142-7591-428e-8e05-1c9989f05f51
+	queryGroup: '从 11-旗舰店UD推广计划 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression '示例文件 (19)' =
+		let
+		    源 = Folder.Files("D:\麻大师\日更数据\天猫旗舰店\11-旗舰店UD推广计划"),
+		    导航1 = 源{0}[Content]
+		in
+		    导航1
+	lineageTag: d4850c9b-5550-43af-9429-a2455c526bdb
+	queryGroup: '从 11-旗舰店UD推广计划 转换文件\帮助程序查询'
+
+	annotation PBI_NavigationStepName = 导航
+
+	annotation PBI_ResultType = Binary
+
+expression '转换示例文件 (19)' =
+		let
+		    源 = Csv.Document(参数19,[Delimiter=",", Columns=45, Encoding=936, QuoteStyle=QuoteStyle.None]),
+		    提升的标题 = Table.PromoteHeaders(源, [PromoteAllScalars=true])
+		in
+		    提升的标题
+	lineageTag: 91793b53-de4e-456a-974b-cf1870adfbcb
+	queryGroup: '从 11-旗舰店UD推广计划 转换文件'
+
+	annotation PBI_ResultType = Table
+
+expression '转换文件 (19)' =
+		let
+		    源 = (参数19 as binary) => let
+		    源 = Csv.Document(参数19,[Delimiter=",", Columns=45, Encoding=936, QuoteStyle=QuoteStyle.None]),
+		    提升的标题 = Table.PromoteHeaders(源, [PromoteAllScalars=true])
+		in
+		    提升的标题
+		in
+		    源
+	mAttributes: [ FunctionQueryBinding = "{""exemplarFormulaName"":""转换示例文件 (19)""}" ]
+	lineageTag: 1629a7a9-e625-4101-b397-05240c0fedad
+	queryGroup: '从 11-旗舰店UD推广计划 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Function
+
+expression 参数20 = #"示例文件 (20)" meta [IsParameterQuery=true, BinaryIdentifier=#"示例文件 (20)", Type="Binary", IsParameterQueryRequired=true]
+	lineageTag: 8c03b1ce-945f-4ef8-ad5a-3d2d65790f39
+	queryGroup: '从 商品带图 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression '转换示例文件 (20)' =
+		let
+		    源 = Excel.Workbook(参数20, null, true),
+		    #"品类-商品排行_全部商品_2025-12-23175552_Sheet" = 源{[Item="品类-商品排行_全部商品_2025-12-23175552",Kind="Sheet"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(#"品类-商品排行_全部商品_2025-12-23175552_Sheet", [PromoteAllScalars=true])
+		in
+		    提升的标题
+	lineageTag: 8162b18a-e0b9-4309-9a60-0689fad23e93
+	queryGroup: '从 商品带图 转换文件'
+
+	annotation PBI_ResultType = Table
+
+expression '示例文件 (20)' =
+		let
+		    源 = Folder.Files("D:\麻大师\日更数据\天猫旗舰店\商品带图"),
+		    导航1 = 源{0}[Content]
+		in
+		    导航1
+	lineageTag: b1399e6c-369a-4bac-bc03-c2ceb91aeb67
+	queryGroup: '从 商品带图 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression '转换文件 (20)' =
+		let
+		    源 = (参数20 as binary) => let
+		    源 = Excel.Workbook(参数20, null, true),
+		    #"品类-商品排行_全部商品_2025-12-23175552_Sheet" = 源{[Item="品类-商品排行_全部商品_2025-12-23175552",Kind="Sheet"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(#"品类-商品排行_全部商品_2025-12-23175552_Sheet", [PromoteAllScalars=true])
+		in
+		    提升的标题
+		in
+		    源
+	mAttributes: [ FunctionQueryBinding = "{""exemplarFormulaName"":""转换示例文件 (20)""}" ]
+	lineageTag: e5a59ef4-b30a-4eed-91e5-84a1daa5290f
+	queryGroup: '从 商品带图 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Function
+
+expression 参数23 = #"示例文件 (23)" meta [IsParameterQuery=true, BinaryIdentifier=#"示例文件 (23)", Type="Binary", IsParameterQueryRequired=true]
+	lineageTag: 15fecf22-7191-433f-83b1-13ce4f9836c7
+	queryGroup: '从 08-1关键词报表数据 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression '示例文件 (23)' =
+		let
+		    源 = Folder.Files("D:\麻大师\日更数据\天猫旗舰店\08-1关键词报表数据"),
+		    导航1 = 源{0}[Content]
+		in
+		    导航1
+	lineageTag: c65293bb-6c02-417d-897d-4b715caa94ae
+	queryGroup: '从 08-1关键词报表数据 转换文件\帮助程序查询'
+
+	annotation PBI_NavigationStepName = 导航
+
+	annotation PBI_ResultType = Binary
+
+expression '转换示例文件 (23)' =
+		let
+		    源 = Csv.Document(参数23,[Delimiter=",", Columns=77, Encoding=936, QuoteStyle=QuoteStyle.None]),
+		    提升的标题 = Table.PromoteHeaders(源, [PromoteAllScalars=true])
+		in
+		    提升的标题
+	lineageTag: 3f90b896-085d-4fd7-8851-911e546897fb
+	queryGroup: '从 08-1关键词报表数据 转换文件'
+
+	annotation PBI_ResultType = Table
+
+expression '转换文件 (23)' =
+		let
+		    源 = (参数23 as binary) => let
+		    源 = Csv.Document(参数23,[Delimiter=",", Columns=77, Encoding=936, QuoteStyle=QuoteStyle.None]),
+		    提升的标题 = Table.PromoteHeaders(源, [PromoteAllScalars=true])
+		in
+		    提升的标题
+		in
+		    源
+	mAttributes: [ FunctionQueryBinding = "{""exemplarFormulaName"":""转换示例文件 (23)""}" ]
+	lineageTag: 0dddbfe3-a718-47db-a7ee-998cc7102104
+	queryGroup: '从 08-1关键词报表数据 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Function
+
+expression 参数24 = #"示例文件 (24)" meta [IsParameterQuery=true, BinaryIdentifier=#"示例文件 (24)", Type="Binary", IsParameterQueryRequired=true]
+	lineageTag: fc65c74d-b150-4d17-80ef-d94af67353dd
+	queryGroup: '从 08-2人群报表数据 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression '示例文件 (24)' =
+		let
+		    源 = Folder.Files("D:\麻大师\日更数据\天猫旗舰店\08-2人群报表数据"),
+		    导航1 = 源{0}[Content]
+		in
+		    导航1
+	lineageTag: f762613e-a2e9-45e2-a39f-bfd16f440a8d
+	queryGroup: '从 08-2人群报表数据 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression '转换示例文件 (24)' =
+		let
+		    源 = Csv.Document(参数24,[Delimiter=",", Columns=75, Encoding=936, QuoteStyle=QuoteStyle.None]),
+		    提升的标题 = Table.PromoteHeaders(源, [PromoteAllScalars=true])
+		in
+		    提升的标题
+	lineageTag: dff71b8b-f12f-499e-ae74-a3f79a24fb28
+	queryGroup: '从 08-2人群报表数据 转换文件'
+
+	annotation PBI_ResultType = Table
+
+expression '转换文件 (24)' =
+		let
+		    源 = (参数24 as binary) => let
+		    源 = Csv.Document(参数24,[Delimiter=",", Columns=75, Encoding=936, QuoteStyle=QuoteStyle.None]),
+		    提升的标题 = Table.PromoteHeaders(源, [PromoteAllScalars=true])
+		in
+		    提升的标题
+		in
+		    源
+	mAttributes: [ FunctionQueryBinding = "{""exemplarFormulaName"":""转换示例文件 (24)""}" ]
+	lineageTag: f4c84297-a482-4703-9675-d39f45e7b0ae
+	queryGroup: '从 08-2人群报表数据 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Function
+
+expression 辅1-店铺简称 =
+		let
+		    源 = Excel.Workbook(File.Contents("D:\麻大师\日更数据\天猫旗舰店\00-各渠道销售数据\简称表格.xlsx"), null, true),
+		    Sheet1_Sheet = 源{[Item="Sheet1",Kind="Sheet"]}[Data],
+		    更改的类型 = Table.TransformColumnTypes(Sheet1_Sheet,{{"Column1", type text}, {"Column2", type text}}),
+		    提升的标题 = Table.PromoteHeaders(更改的类型, [PromoteAllScalars=true]),
+		    更改的类型1 = Table.TransformColumnTypes(提升的标题,{{"店铺昵称", type text}, {"简称", type text}})
+		in
+		    更改的类型1
+	lineageTag: f76caab7-7687-4226-86b1-0b5d73d99615
+
+	annotation PBI_NavigationStepName = 导航
+
+	annotation PBI_ResultType = Table
+
+expression 25年双十一付定 =
+		let
+		    源 = Folder.Files("D:\麻大师\日更数据\天猫旗舰店\00-各渠道销售数据\25年双十一付定"),
+		    筛选的隐藏文件1 = Table.SelectRows(源, each [Attributes]?[Hidden]? <> true),
+		    调用自定义函数1 = Table.AddColumn(筛选的隐藏文件1, "转换文件 (35)", each #"转换文件 (35)"([Content])),
+		    重命名的列1 = Table.RenameColumns(调用自定义函数1, {"Name", "Source.Name"}),
+		    删除的其他列1 = Table.SelectColumns(重命名的列1, {"Source.Name", "转换文件 (35)"}),
+		    扩展的表格列1 = Table.ExpandTableColumn(删除的其他列1, "转换文件 (35)", Table.ColumnNames(#"转换文件 (35)"(#"示例文件 (35)"))),
+		    更改的类型 = Table.TransformColumnTypes(扩展的表格列1,{{"Source.Name", type text}, {"日期", type date}, {"排名", Int64.Type}, {"商品名称", type text}, {"商品ID", Int64.Type}, {"预售订单金额", Int64.Type}, {"定金支付买家数", Int64.Type}, {"定金支付件数", Int64.Type}, {"定金支付金额", Int64.Type}, {"商品访客数(定金期)", Int64.Type}}),
+		    已添加自定义 = Table.AddColumn(更改的类型, "渠道", each "预售"),
+		    重命名的列 = Table.RenameColumns(已添加自定义,{{"渠道", "是否预售"}}),
+		    替换的值 = Table.ReplaceValue(重命名的列,null,0,Replacer.ReplaceValue,{"Source.Name", "日期", "排名", "商品名称", "商品ID", "预售订单金额", "定金支付买家数", "定金支付件数", "定金支付金额", "商品访客数(定金期)", "是否预售"}),
+		    更改的类型1 = Table.TransformColumnTypes(替换的值,{{"商品ID", type text}, {"日期", type datetime}})
+		in
+		    更改的类型1
+	lineageTag: 77bd5ad4-a6a9-40da-9a48-2d9512239bc0
+
+	annotation PBI_NavigationStepName = 导航
+
+	annotation PBI_ResultType = Table
+
+expression 接待评价分析 =
+		let
+		    源 = Folder.Files("D:\麻大师\日更数据\天猫旗舰店\10-1淘宝客服绩效明细\专项分析\接待评价分析"),
+		    筛选的隐藏文件1 = Table.SelectRows(源, each [Attributes]?[Hidden]? <> true),
+		    调用自定义函数1 = Table.AddColumn(筛选的隐藏文件1, "转换文件 (50)", each #"转换文件 (50)"([Content])),
+		    重命名的列1 = Table.RenameColumns(调用自定义函数1, {"Name", "Source.Name"}),
+		    删除的其他列1 = Table.SelectColumns(重命名的列1, {"Source.Name", "转换文件 (50)"}),
+		    扩展的表格列1 = Table.ExpandTableColumn(删除的其他列1, "转换文件 (50)", Table.ColumnNames(#"转换文件 (50)"(#"示例文件 (50)"))),
+		    提升的标题 = Table.PromoteHeaders(扩展的表格列1, [PromoteAllScalars=true]),
+		    更改的类型 = Table.TransformColumnTypes(提升的标题,{{"客服绩效-专项分析-接待评价分析_20251112_20251112_全部 (1).xlsx", type text}, {"旺旺昵称", type text}, {"接待人数", type any}, {"发出评价数", type any}, {"收到评价数", type any}, {"很满意", type any}, {"满意", type any}, {"一般", type any}, {"不满", type any}, {"很不满", type any}, {"评价发送率", type any}, {"评价返回率", type any}, {"客户满意率", type any}, {"客户服务满意度", type any}, {"发出评价数_1", type any}, {"收到评价数_2", type any}, {"很满意_3", type any}, {"满意_4", type any}, {"一般_5", type any}, {"不满_6", type any}, {"很不满_7", type any}, {"评价发送率_8", type any}, {"评价返回率_9", type any}, {"客户满意率_10", type any}, {"客户服务满意度_11", type any}, {"发出评价数_12", type any}, {"收到评价数_13", type any}, {"很满意_14", type any}, {"满意_15", type any}, {"一般_16", type any}, {"不满_17", type any}, {"很不满_18", type any}, {"评价发送率_19", type any}, {"评价返回率_20", type any}, {"客户满意率_21", type any}, {"客户服务满意度_22", type any}, {"旺旺分组", type text}}),
+		    筛选的行 = Table.SelectRows(更改的类型, each ([旺旺昵称] <> "平均值" and [旺旺昵称] <> "旺旺昵称" and [旺旺昵称] <> "汇总值"))
+		in
+		    筛选的行
+	lineageTag: 5a322c05-8359-4e4d-9ec5-80e805468fa3
+
+	annotation PBI_NavigationStepName = 导航
+
+	annotation PBI_ResultType = Table
+
+expression 参数25 = #"示例文件 (25)" meta [IsParameterQuery=true, BinaryIdentifier=#"示例文件 (25)", Type="Binary", IsParameterQueryRequired=true]
+	lineageTag: 7e618a94-ce5f-48d8-94bb-82758879f678
+	queryGroup: '从 月 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression '转换示例文件 (25)' =
+		let
+		    源 = Excel.Workbook(参数25, null, true),
+		    #"市场排行_商品_交易总量_不限_全网_住宅家具>床垫类_202_Sheet" = 源{[Item="市场排行_商品_交易总量_不限_全网_住宅家具>床垫类_202",Kind="Sheet"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(#"市场排行_商品_交易总量_不限_全网_住宅家具>床垫类_202_Sheet", [PromoteAllScalars=true])
+		in
+		    提升的标题
+	lineageTag: 302ddbe7-15c5-494c-ba4f-152f18e859fd
+	queryGroup: '从 月 转换文件'
+
+	annotation PBI_ResultType = Table
+
+expression '示例文件 (25)' =
+		let
+		    源 = Folder.Files("D:\麻大师\周更数据\周报素材\市场数据\床垫类\月"),
+		    导航1 = 源{0}[Content]
+		in
+		    导航1
+	lineageTag: a69e1d64-53ef-4a2a-b1b0-02581f3cdd38
+	queryGroup: '从 月 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression '转换文件 (25)' =
+		let
+		    源 = (参数25 as binary) => let
+		    源 = Excel.Workbook(参数25, null, true),
+		    #"市场排行_商品_交易总量_不限_全网_住宅家具>床垫类_202_Sheet" = 源{[Item="市场排行_商品_交易总量_不限_全网_住宅家具>床垫类_202",Kind="Sheet"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(#"市场排行_商品_交易总量_不限_全网_住宅家具>床垫类_202_Sheet", [PromoteAllScalars=true])
+		in
+		    提升的标题
+		in
+		    源
+	mAttributes: [ FunctionQueryBinding = "{""exemplarFormulaName"":""转换示例文件 (25)""}" ]
+	lineageTag: 148b1212-00e1-462e-a969-f6aab7b82ae9
+	queryGroup: '从 月 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Function
+
+expression 参数26 = #"示例文件 (26)" meta [IsParameterQuery=true, BinaryIdentifier=#"示例文件 (26)", Type="Binary", IsParameterQueryRequired=true]
+	lineageTag: 51153cea-7999-4964-9591-50bc3e4776e4
+	queryGroup: '从 儿童床垫 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression '转换示例文件 (26)' =
+		let
+		    源 = Excel.Workbook(参数26, null, true),
+		    #"市场排行_商品_交易总量_不限_全网_住宅家具>儿童家具>儿童_Sheet" = 源{[Item="市场排行_商品_交易总量_不限_全网_住宅家具>儿童家具>儿童",Kind="Sheet"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(#"市场排行_商品_交易总量_不限_全网_住宅家具>儿童家具>儿童_Sheet", [PromoteAllScalars=true])
+		in
+		    提升的标题
+	lineageTag: 6b5eacd9-54c8-4737-b03f-916729373f55
+	queryGroup: '从 儿童床垫 转换文件'
+
+	annotation PBI_ResultType = Table
+
+expression '示例文件 (26)' =
+		let
+		    源 = Folder.Files("D:\麻大师\周更数据\周报素材\市场数据\儿童床垫"),
+		    导航1 = 源{0}[Content]
+		in
+		    导航1
+	lineageTag: 6670b918-23f1-411c-a2d4-daed6126370f
+	queryGroup: '从 儿童床垫 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression '转换文件 (26)' =
+		let
+		    源 = (参数26 as binary) => let
+		    源 = Excel.Workbook(参数26, null, true),
+		    #"市场排行_商品_交易总量_不限_全网_住宅家具>儿童家具>儿童_Sheet" = 源{[Item="市场排行_商品_交易总量_不限_全网_住宅家具>儿童家具>儿童",Kind="Sheet"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(#"市场排行_商品_交易总量_不限_全网_住宅家具>儿童家具>儿童_Sheet", [PromoteAllScalars=true])
+		in
+		    提升的标题
+		in
+		    源
+	mAttributes: [ FunctionQueryBinding = "{""exemplarFormulaName"":""转换示例文件 (26)""}" ]
+	lineageTag: aa273906-f9d8-431f-80f8-d6487aa6c9d8
+	queryGroup: '从 儿童床垫 转换文件\帮助程序查询'
+
+	annotation PBI_ResultType = Function
+
+expression 参数43 = #"示例文件 (44)" meta [IsParameterQuery=true, BinaryIdentifier=#"示例文件 (44)", Type="Binary", IsParameterQueryRequired=true]
+	lineageTag: f4de5e14-c779-4cb9-90ad-48ebd3adf539
+	queryGroup: '从 05-旗舰店ID对照表 转换文件 (2)\帮助程序查询'
+
+	annotation PBI_ResultType = Binary
+
+expression '转换示例文件 (43)' =
+		let
+		    源 = Excel.Workbook(参数43, null, true),
+		    #"商品-宝贝管理-我的宝贝_Sheet" = 源{[Item="商品-宝贝管理-我的宝贝",Kind="Sheet"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(#"商品-宝贝管理-我的宝贝_Sheet", [PromoteAllScalars=true])
+		in
+		    提升的标题
+	lineageTag: 9e5af799-5c20-4154-b230-9f226e95041e
+	queryGroup: '从 05-旗舰店ID对照表 转换文件 (2)'
+
+	annotation PBI_ResultType = Table
+
+expression '示例文件 (44)' =
+		let
+		    源 = Folder.Files("D:\麻大师\日更数据\天猫旗舰店\05-旗舰店ID对照表"),
+		    导航1 = 源{0}[Content]
+		in
+		    导航1
+	lineageTag: fc84cb74-edb8-4b58-8e3e-d802b97b1826
+	queryGroup: '从 05-旗舰店ID对照表 转换文件 (2)\帮助程序查询'
+
+	annotation PBI_NavigationStepName = 导航
+
+	annotation PBI_ResultType = Binary
+
+expression '转换文件 (44)' =
+		let
+		    源 = (参数43 as binary) => let
+		    源 = Excel.Workbook(参数43, null, true),
+		    #"商品-宝贝管理-我的宝贝_Sheet" = 源{[Item="商品-宝贝管理-我的宝贝",Kind="Sheet"]}[Data],
+		    提升的标题 = Table.PromoteHeaders(#"商品-宝贝管理-我的宝贝_Sheet", [PromoteAllScalars=true])
+		in
+		    提升的标题
+		in
+		    源
+	mAttributes: [ FunctionQueryBinding = "{""exemplarFormulaName"":""转换示例文件 (43)""}" ]
+	lineageTag: ca5994a7-f414-456a-bef7-55a7ffe0e7ef
+	queryGroup: '从 05-旗舰店ID对照表 转换文件 (2)\帮助程序查询'
+
+	annotation PBI_ResultType = Function
+

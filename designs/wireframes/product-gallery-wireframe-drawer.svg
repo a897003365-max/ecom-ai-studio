@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 460" role="img" font-family="-apple-system, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif">
+<title>商品详情抽屉线稿</title>
+<desc>点击卡片后右侧抽屉的四个分区：身份区、核心 KPI、次要指标、SKU 明细表格；卡片移出字段在身份区与次要指标区承接</desc>
+<rect width="680" height="460" fill="#071014"/>
+<text x="24" y="24" font-size="13" font-weight="500" fill="#edf3ef">详情抽屉 · 720px（移动端 100vw 全宽）· 点击卡片滑出</text>
+<rect x="60" y="38" width="560" height="400" rx="12" fill="#0d1a1f" stroke="#9db3ad" stroke-width="1"/>
+<rect x="76" y="54" width="64" height="64" rx="8" fill="#122126" stroke="#3a4a46" stroke-width="0.8"/>
+<text x="152" y="68" font-size="11" font-weight="500" fill="#a6e536" letter-spacing="2">PRODUCT DETAIL</text>
+<text x="152" y="90" font-size="15" font-weight="500" fill="#edf3ef">零压记忆棉床垫 · 深睡 Pro 系列</text>
+<text x="152" y="108" font-size="11" fill="#7a8b85">SPU ZY-M-001 · 12 个 SKU · 周期 07-01 ~ 07-31</text>
+<text x="588" y="66" font-size="13" fill="#7a8b85">✕</text>
+<line x1="76" y1="132" x2="604" y2="132" stroke="#3a4a46" stroke-width="0.8"/>
+<rect x="76" y="144" width="124" height="52" rx="8" fill="#101f24" stroke="#3a4a46" stroke-width="0.8"/>
+<text x="88" y="162" font-size="11" fill="#7a8b85">商家实收</text>
+<text x="88" y="184" font-size="16" font-weight="500" fill="#a6e536">¥12.3万</text>
+<rect x="210" y="144" width="124" height="52" rx="8" fill="#101f24" stroke="#3a4a46" stroke-width="0.8"/>
+<text x="222" y="162" font-size="11" fill="#7a8b85">销量</text>
+<text x="222" y="184" font-size="16" font-weight="500" fill="#edf3ef">1.2万件</text>
+<rect x="344" y="144" width="124" height="52" rx="8" fill="#101f24" stroke="#3a4a46" stroke-width="0.8"/>
+<text x="356" y="162" font-size="11" fill="#7a8b85">毛利率</text>
+<text x="356" y="184" font-size="16" font-weight="500" fill="#edf3ef">34.5%</text>
+<rect x="478" y="144" width="126" height="52" rx="8" fill="#101f24" stroke="#3a4a46" stroke-width="0.8"/>
+<text x="490" y="162" font-size="11" fill="#7a8b85">实收变化</text>
+<text x="490" y="184" font-size="16" font-weight="500" fill="#85d83f">↗ +12.3%</text>
+<rect x="76" y="208" width="528" height="44" rx="8" fill="none" stroke="#3a4a46" stroke-width="0.8" stroke-dasharray="3 3"/>
+<text x="88" y="226" font-size="11" fill="#7a8b85">件单价 ¥486</text>
+<text x="220" y="226" font-size="11" fill="#7a8b85">上期实收 ¥10.9万</text>
+<text x="370" y="226" font-size="11" fill="#7a8b85">退货率 3.2%</text>
+<text x="492" y="226" font-size="11" fill="#7a8b85">实收占比 8.4%</text>
+<rect x="492" y="238" width="88" height="3" rx="1.5" fill="#a6e536" opacity="0.7"/>
+<line x1="76" y1="266" x2="604" y2="266" stroke="#3a4a46" stroke-width="0.8"/>
+<text x="76" y="288" font-size="11" font-weight="500" fill="#a6e536" letter-spacing="2">SKU BREAKDOWN</text>
+<rect x="400" y="274" width="120" height="22" rx="5" fill="#122126" stroke="#5f6b66" stroke-width="0.8"/>
+<text x="410" y="289" font-size="11" fill="#7a8b85">搜索 SKU</text>
+<rect x="528" y="274" width="76" height="22" rx="5" fill="#122126" stroke="#5f6b66" stroke-width="0.8"/>
+<text x="538" y="289" font-size="11" fill="#9db3ad">排序 ▾</text>
+<rect x="76" y="304" width="528" height="26" rx="5" fill="#101f24"/>
+<text x="86" y="321" font-size="11" fill="#7a8b85">SKU</text>
+<text x="240" y="321" font-size="11" fill="#7a8b85">实收</text>
+<text x="330" y="321" font-size="11" fill="#7a8b85">较上期</text>
+<text x="420" y="321" font-size="11" fill="#7a8b85">毛利率</text>
+<text x="500" y="321" font-size="11" fill="#7a8b85">销量 · 占比</text>
+<line x1="76" y1="342" x2="604" y2="342" stroke="#2c3a36" stroke-width="0.8"/>
+<rect x="86" y="350" width="90" height="7" rx="2" fill="#3a4a46"/>
+<rect x="240" y="350" width="50" height="7" rx="2" fill="#2c3a36"/>
+<rect x="330" y="350" width="40" height="7" rx="2" fill="#27500a"/>
+<rect x="420" y="350" width="36" height="7" rx="2" fill="#2c3a36"/>
+<rect x="500" y="350" width="44" height="7" rx="2" fill="#2c3a36"/>
+<line x1="76" y1="368" x2="604" y2="368" stroke="#2c3a36" stroke-width="0.8"/>
+<rect x="86" y="376" width="90" height="7" rx="2" fill="#3a4a46"/>
+<rect x="240" y="376" width="50" height="7" rx="2" fill="#2c3a36"/>
+<rect x="330" y="376" width="40" height="7" rx="2" fill="#712b13"/>
+<rect x="420" y="376" width="36" height="7" rx="2" fill="#2c3a36"/>
+<rect x="500" y="376" width="44" height="7" rx="2" fill="#2c3a36"/>
+<line x1="76" y1="394" x2="604" y2="394" stroke="#2c3a36" stroke-width="0.8"/>
+<rect x="86" y="402" width="90" height="7" rx="2" fill="#3a4a46"/>
+<rect x="240" y="402" width="50" height="7" rx="2" fill="#2c3a36"/>
+<rect x="330" y="402" width="40" height="7" rx="2" fill="#27500a"/>
+<rect x="420" y="402" width="36" height="7" rx="2" fill="#2c3a36"/>
+<rect x="500" y="402" width="44" height="7" rx="2" fill="#2c3a36"/>
+<text x="24" y="70" font-size="11" font-weight="500" fill="#9db3ad">① 身份区</text>
+<text x="24" y="86" font-size="11" fill="#7a8b85">承接卡片移出</text>
+<text x="24" y="100" font-size="11" fill="#7a8b85">的 SPU/SKU</text>
+<text x="24" y="170" font-size="11" font-weight="500" fill="#9db3ad">② 核心 KPI</text>
+<text x="24" y="186" font-size="11" fill="#7a8b85">≤1100px 2×2</text>
+<text x="24" y="230" font-size="11" font-weight="500" fill="#9db3ad">③ 次要指标</text>
+<text x="24" y="312" font-size="11" font-weight="500" fill="#9db3ad">④ SKU 表</text>
+<text x="24" y="328" font-size="11" fill="#7a8b85">12px 字号</text>
+<text x="24" y="342" font-size="11" fill="#7a8b85">横向滚动</text>
+</svg>

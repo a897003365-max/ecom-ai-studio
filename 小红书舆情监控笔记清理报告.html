@@ -1,0 +1,1559 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>小红书舆情监控笔记清理报告 · 麻大师</title>
+<style>
+:root {
+  --bg:#0b0f1a; --panel:#131a2b; --panel2:#1a2336; --line:#25304a;
+  --text:#e6ecf5; --muted:#8b97b3; --dim:#5a6party;
+  --accent:#3ddc84; --warn:#ffb454; --danger:#ff6b6b; --info:#5b9dff;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;line-height:1.6;padding:0 0 80px}
+.wrap{max-width:1180px;margin:0 auto;padding:32px 24px}
+header{border-bottom:1px solid var(--line);padding-bottom:24px;margin-bottom:28px}
+h1{margin:0 0 6px;font-size:24px;font-weight:700;letter-spacing:.5px}
+.sub{color:var(--muted);font-size:13px}
+.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:24px 0}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 20px}
+.card .k{color:var(--muted);font-size:12px;margin-bottom:6px}
+.card .v{font-size:30px;font-weight:700;font-variant-numeric:tabular-nums}
+.card .u{color:var(--muted);font-size:11px;margin-top:4px}
+.card.r .v{color:var(--accent)}
+.card.d .v{color:var(--danger)}
+.card.k .v{color:var(--info)}
+.card.v .v{color:var(--warn)}
+.sec{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px 22px;margin:18px 0}
+.sec h2{margin:0 0 10px;font-size:15px;font-weight:600;color:var(--text)}
+.sec p{margin:8px 0;color:var(--muted);font-size:13.5px}
+.sec .code{font-family:ui-monospace,"SF Mono",Consolas,monospace;background:#0b0f1a;border:1px solid var(--line);border-radius:8px;padding:8px 12px;font-size:12.5px;color:#c8d3e6;word-break:break-all;margin:8px 0}
+.badge{display:inline-block;padding:2px 10px;border-radius:999px;font-size:11.5px;font-weight:600}
+.badge.ok{background:rgba(61,220,132,.14);color:var(--accent)}
+ul.check{list-style:none;padding:0;margin:8px 0}
+ul.check li{padding:5px 0 5px 26px;position:relative;font-size:13.5px;color:var(--text)}
+ul.check li:before{content:"";position:absolute;left:0;top:9px;width:14px;height:14px;border-radius:4px;background:var(--accent);opacity:.85}
+ul.check li.d:before{background:var(--danger)}
+details.grp{margin:10px 0;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--panel2)}
+details.grp summary{cursor:pointer;padding:12px 16px;font-size:13.5px;font-weight:600;list-style:none;display:flex;align-items:center;gap:10px}
+details.grp summary::-webkit-details-marker{display:none}
+details.grp summary:before{content:"+";color:var(--info);font-weight:700;width:16px;display:inline-block}
+details.grp[open] summary:before{content:"–"}
+.cnt{background:rgba(255,107,107,.16);color:var(--danger);border-radius:6px;padding:1px 8px;font-size:12px;font-weight:700}
+.kw{color:#cdd6e8}
+.tbl-wrap{overflow-x:auto;border-top:1px solid var(--line)}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th{text-align:left;padding:9px 12px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--line);white-space:nowrap;position:sticky;top:0;background:var(--panel2)}
+td{padding:8px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+td.mono{font-family:ui-monospace,monospace;color:var(--muted);font-size:11px}
+td.t{color:#dfe6f2;max-width:240px}
+td.a{color:var(--muted);white-space:nowrap}
+td.num{font-variant-numeric:tabular-nums;text-align:right;color:#cdd6e8}
+td.date{color:var(--muted);white-space:nowrap;font-size:11.5px}
+td.body{color:var(--muted);max-width:340px;font-size:11.5px}
+tr:hover td{background:rgba(91,157,255,.06)}
+.foot{margin-top:28px;color:var(--muted);font-size:12px;border-top:1px solid var(--line);padding-top:16px}
+.foot b{color:var(--text)}
+@media(max-width:720px){.cards{grid-template-columns:repeat(2,1fr)}.wrap{padding:20px 14px}}
+</style></head>
+<body><div class="wrap">
+<header>
+  <h1>小红书舆情监控笔记清理报告</h1>
+  <div class="sub">品牌：麻大师 · 数据源 local-data/sentiment/crawled-notes.json · 生成时间 2026-08-25 10:34 · 服务端实时读文件已生效</div>
+</header>
+
+<div class="cards">
+  <div class="card"><div class="k">原始笔记数</div><div class="v">647</div><div class="u">含 (noteId,keyword) 去重前全部行</div></div>
+  <div class="card d"><div class="k">去除无关</div><div class="v">137</div><div class="u">对应 77 个唯一笔记 · 横跨 28 个关键词</div></div>
+  <div class="card r"><div class="k">保留相关</div><div class="v">510</div><div class="u">全部正文/标题含「麻大师」</div></div>
+  <div class="card k"><div class="k">监控关键词</div><div class="v">38</div><div class="u">均带「麻大师」前缀</div></div>
+</div>
+
+<div class="sec">
+  <h2>清理逻辑</h2>
+  <p>小红书按「麻大师 xxx」关键词搜索时，算法会关联返回大量同类行业内容（喜临门售后、红星美凯龙活动、李佳琦直播床垫、DIY 床垫、通用选购攻略等），虽被搜中但<strong style="color:var(--text)">正文与标题均未出现「麻大师」品牌名</strong>，属与品牌无关的噪音，会污染舆情分析。</p>
+  <p><b>判定标准</b>：对每条笔记合并 title + noteBody，若不含子串「麻大师」即判为无关并移除。该标准偏保守——只要笔记任一处提及「麻大师」即保留。</p>
+</div>
+
+<div class="sec">
+  <h2>验证状态</h2>
+  <ul class="check">
+    <li>本地文件已写回 <span class="badge ok">510 条</span> 全部含「麻大师」</li>
+    <li>远程 API <code>GET /api/sentiment/crawled</code> 实时返回 <span class="badge ok">510 条</span>（服务端每次 readFileSync，无需重启）</li>
+    <li>无关笔记数：<span class="badge ok">0</span>（页面刷新即看到清理后明细）</li>
+    <li class="d">原始数据已备份，可一键回滚</li>
+  </ul>
+</div>
+
+<div class="sec">
+  <h2>备份与回滚</h2>
+  <p>原始 647 条完整保留在备份文件，删除可逆：</p>
+  <div class="code">local-data/sentiment/crawled-notes.backup-20260825-103227.json</div>
+  <p>回滚命令（覆盖回原始数据）：</p>
+  <div class="code">cp local-data/sentiment/crawled-notes.backup-20260825-103227.json local-data/sentiment/crawled-notes.json</div>
+</div>
+
+<h2 style="font-size:15px;font-weight:600;margin:28px 0 4px">被去除的 137 条无关笔记清单（按搜索关键词分组）</h2>
+<p style="color:var(--muted);font-size:13px;margin:0 0 8px">下方每条均为「标题+正文均无『麻大师』」的噪音笔记。展开可看 noteId、正文摘要。</p>
+
+    <details class="grp" open>
+      <summary><span class="cnt">14</span> <span class="kw">麻大师豆芽0胶床垫</span></summary>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>noteId</th><th>标题</th><th>作者</th><th>赞</th><th>评</th><th>发布时间</th><th>正文摘要（无"麻大师"）</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="mono">6a86c4440000000033031be9</td>
+          <td class="t">《退了3张床垫！过来人忠告》长文避坑</td>
+          <td class="a">麻辣potato</td>
+          <td class="num">34</td>
+          <td class="num">32</td>
+          <td class="date">2026-08-20 17:09…</td>
+          <td class="body">装修进度慢慢推进到80%，终于闲下来好好复盘一下！ 当初网购床垫真的狠狠踩坑，被卷包床垫坑到自闭😭 睡一晚起来腰酸背痛，腰像断了一样，而且床边特别容易打滑，坐一点都不稳！ 家里有小…</td>
+        </tr>
+        <tr>
+          <td class="mono">69d792ba000000001d01b6d6</td>
+          <td class="t">我退了3张了，才知道……</td>
+          <td class="a">。。。</td>
+          <td class="num">356</td>
+          <td class="num">131</td>
+          <td class="date">2026-04-09 19:51…</td>
+          <td class="body">买张床垫真的所有商家都吻了上来，全部的消息都是店家真的快崩溃了，说的只有优点没有缺点。。。。还说刚好有优会，我这个人很怕被骗，研究了好久终于研究清楚了 1.不买卷包床垫，卷包一点儿…</td>
+        </tr>
+        <tr>
+          <td class="mono">69d62061000000001b0000e0</td>
+          <td class="t">不愧是我蹲了3个月才下手的全拆卸床垫！</td>
+          <td class="a">机智汪汪（装修版</td>
+          <td class="num">25</td>
+          <td class="num">9</td>
+          <td class="date">2026-04-08 17:31…</td>
+          <td class="body">不愧是我蹲了3个月才下手的全拆卸床垫！真的太牛了！ 以前总觉得买床垫随便睡睡就行，直到看了那些甲醛超标、黑心棉的案例，才知道不注意真得后悔莫及！这次做足了功课，特意挑的这种0胶水全…</td>
+        </tr>
+        <tr>
+          <td class="mono">6a7ae402000000002201201d</td>
+          <td class="t">救命！！！买了三张床垫全退了！真的气炸了……</td>
+          <td class="a">李发发的home</td>
+          <td class="num">2</td>
+          <td class="num">0</td>
+          <td class="date">2026-08-11 16:57…</td>
+          <td class="body">真是九敏🆘了！！买个床垫一度踩坑，真不能光听商家说什么就是什么，还是得了解材料才好，毕竟是自己家用的，退货这么多床垫，我都感觉自己成床垫半个内行了... 	 1、舒适层是踩雷的重点…</td>
+        </tr>
+        <tr>
+          <td class="mono">69e5c8ac000000002102e740</td>
+          <td class="t">装修避雷❗床垫怎么选不踩坑❓</td>
+          <td class="a">搞套家电</td>
+          <td class="num">7102</td>
+          <td class="num">58</td>
+          <td class="date">2026-04-20 17:45…</td>
+          <td class="body">装修避雷❗床垫怎么选不踩坑❓记住这9点不出错！ #床垫 #床垫怎么选</td>
+        </tr>
+        <tr>
+          <td class="mono">6a340a460000000022019860</td>
+          <td class="t">这床真的太舒服了</td>
+          <td class="a">太阳不大</td>
+          <td class="num">105</td>
+          <td class="num">26</td>
+          <td class="date">2026-06-18 23:09…</td>
+          <td class="body">花了200自制了一张床垫，真的太舒服了。原来老的床垫睡得腰疼，加了一个3cm厚小弹簧➕1450密的空气纤维，再用床笠一包，真的太舒服了，真的不比那种贵的差，支撑很好，腰再也不疼了[…</td>
+        </tr>
+        <tr>
+          <td class="mono">6a212fec000000003701ef1b</td>
+          <td class="t">避雷某宝这家床垫</td>
+          <td class="a">hello</td>
+          <td class="num">4</td>
+          <td class="num">21</td>
+          <td class="date">2026-06-04 15:57…</td>
+          <td class="body">选这家是觉得拉链能拉开，能看得见质量应该是能放心的，谁知道是恶心！关键出了问题这个态度真让人恼火，一会甩锅给工人，一会又说植物纤维就是这样，客服都承认咯，这家每张都是问题床垫，只是…</td>
+        </tr>
+        <tr>
+          <td class="mono">69e1f6b20000000022028a6c</td>
+          <td class="t">我妈说我睡这么高 是要登基吗？😢</td>
+          <td class="a">X喜哈哈</td>
+          <td class="num">6</td>
+          <td class="num">7</td>
+          <td class="date">2026-04-17 17:00…</td>
+          <td class="body">没有量尺寸这床垫也太高了 每晚睡觉像是要爬上龙床… 没有一米九的腿怕是下不来 不过有一说一这床垫睡起来挺舒服的… #床垫[话题] #睡觉的最高境界[话题] #卧室[话题] #家具[…</td>
+        </tr>
+        <tr>
+          <td class="mono">69b822b3000000001f003d01</td>
+          <td class="t">产后软床加硬最终解法</td>
+          <td class="a">丸子u</td>
+          <td class="num">51</td>
+          <td class="num">9</td>
+          <td class="date">2026-03-16 23:33…</td>
+          <td class="body">上万的床垫不想换，但产后腰疼不能一直睡软床，最终还是自己动手改了。 	 参考了xhs上的帖子+踩坑，走了一些弯路，分享一下改造过程 	 ❗️结论 1. 对于喜欢软床的人来说，一下子…</td>
+        </tr>
+        <tr>
+          <td class="mono">6a2eada500000000080271f4</td>
+          <td class="t">大无语！新买的黄麻床垫含量直接造假😭</td>
+          <td class="a">unfinished，</td>
+          <td class="num">22</td>
+          <td class="num">48</td>
+          <td class="date">2026-06-14 21:33…</td>
+          <td class="body">真心被气到！网购床垫最怕的事还是遇上了 冲着商家真黄麻床垫、高密度黄麻的宣传入手，详情页、主图、直播都说天然黄麻材质，主打透气护脊、无胶水零掺杂，性价比拉满。满心期待新家床垫，拆开…</td>
+        </tr>
+        <tr>
+          <td class="mono">6a12fb5f000000003502c1bb</td>
+          <td class="t">我不行了。。。。。</td>
+          <td class="a">生椰香草冻</td>
+          <td class="num">208</td>
+          <td class="num">256</td>
+          <td class="date">2026-05-24 21:21…</td>
+          <td class="body">网购的床垫。商家你就这样敷衍我。我的天然冰丝和天然乳胶呢。。还好我今天突发奇想想看一下里面长啥样。找拉链都找了好久才找到[失望R][失望R]#有时候真的很无助[话题] #不用管我死…</td>
+        </tr>
+        <tr>
+          <td class="mono">6a4f5cb50000000011015b55</td>
+          <td class="t">再说一遍！！！这种好东西多推给我。。。</td>
+          <td class="a">小番薯</td>
+          <td class="num">0</td>
+          <td class="num">0</td>
+          <td class="date">2026-07-09 16:32…</td>
+          <td class="body">之前一直因为床垫太软整夜的睡不着觉，频繁换了几张床垫后还是一直没有找到合适的，硬度一直都是不喜欢的，都准备放弃了直接忍忍算了，后面网上发现有这种软床加硬神器。。。赶紧买了一个回来铺…</td>
+        </tr>
+        <tr>
+          <td class="mono">69fee283000000001e00fd72</td>
+          <td class="t">(无标题)</td>
+          <td class="a">李迪-丽热巴</td>
+          <td class="num">4</td>
+          <td class="num">32</td>
+          <td class="date">2026-05-09 15:30…</td>
+          <td class="body">买过两张喜师傅家的床垫，做的这种全拆的很满意。继续回购一张护脊的，期待收货 #喜师傅床垫[话题]#床垫怎么选[话题]#好物分享[话题] 标签：喜师傅床垫、床垫怎么选、好物分享</td>
+        </tr>
+        <tr>
+          <td class="mono">6a603d4d000000001101f26b</td>
+          <td class="t">怎样床垫避免弹簧偷工减料？</td>
+          <td class="a">小郭的床垫</td>
+          <td class="num">9</td>
+          <td class="num">0</td>
+          <td class="date">2026-07-22 18:30…</td>
+          <td class="body">#床垫舒适层[话题] #床垫[话题] #床垫弹簧[话题] #家具[话题] #科普[话题] 标签：床垫舒适层、床垫、床垫弹簧、家具、科普</td>
+        </tr>
+        </tbody>
+      </table></div>
+    </details>
+    <details class="grp" open>
+      <summary><span class="cnt">14</span> <span class="kw">麻大师豆苗儿童床垫</span></summary>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>noteId</th><th>标题</th><th>作者</th><th>赞</th><th>评</th><th>发布时间</th><th>正文摘要（无"麻大师"）</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="mono">6a71eeea00000000220140be</td>
+          <td class="t">🏠10m²治愈系儿童房，是老母亲满满的爱🤎</td>
+          <td class="a">徐星星呀✨（家有小月龄）</td>
+          <td class="num">351</td>
+          <td class="num">12</td>
+          <td class="date">2026-08-04 21:53…</td>
+          <td class="body">午后的阳光穿过米白纱帘， 滤成绒绒的柔光，落在原木床上， 也落在摊开的绘本、毛绒玩偶和床垫上， 真羡慕我儿子小小年纪就有这么好看的房间～ 	 #宅家过夏天[话题] #打造儿童房[话…</td>
+        </tr>
+        <tr>
+          <td class="mono">69d792ba000000001d01b6d6</td>
+          <td class="t">我退了3张了，才知道……</td>
+          <td class="a">。。。</td>
+          <td class="num">356</td>
+          <td class="num">131</td>
+          <td class="date">2026-04-09 19:51…</td>
+          <td class="body">买张床垫真的所有商家都吻了上来，全部的消息都是店家真的快崩溃了，说的只有优点没有缺点。。。。还说刚好有优会，我这个人很怕被骗，研究了好久终于研究清楚了 1.不买卷包床垫，卷包一点儿…</td>
+        </tr>
+        <tr>
+          <td class="mono">6a3231af000000001603e0f4</td>
+          <td class="t">冒黑烟的儿童床垫！千万别给孩子用😭</td>
+          <td class="a">🐈快乐汽水猫</td>
+          <td class="num">9</td>
+          <td class="num">33</td>
+          <td class="date">2026-06-17 13:33…</td>
+          <td class="body">因为换了定制的大床，需要新的床垫。购买之前反复确认有没有胶水，的确没有胶水，但是加了胶质材料，打开就很大味道。 一共定了3个打开就是很大一股味道，拆开塑料包装脱线，缝合粗制滥造（内…</td>
+        </tr>
+        <tr>
+          <td class="mono">6a86c4440000000033031be9</td>
+          <td class="t">《退了3张床垫！过来人忠告》长文避坑</td>
+          <td class="a">麻辣potato</td>
+          <td class="num">34</td>
+          <td class="num">32</td>
+          <td class="date">2026-08-20 17:09…</td>
+          <td class="body">装修进度慢慢推进到80%，终于闲下来好好复盘一下！ 当初网购床垫真的狠狠踩坑，被卷包床垫坑到自闭😭 睡一晚起来腰酸背痛，腰像断了一样，而且床边特别容易打滑，坐一点都不稳！ 家里有小…</td>
+        </tr>
+        <tr>
+          <td class="mono">6a82d7850000000033035eeb</td>
+          <td class="t">20家儿童寝具生产企业被约谈</td>
+          <td class="a">生活帮</td>
+          <td class="num">896</td>
+          <td class="num">132</td>
+          <td class="date">2026-08-17 17:42…</td>
+          <td class="body">央视新闻8月17日消息，近日，北京市消费者协会约谈20家儿童寝具生产企业。其中“金多喜”品牌的样品铬含量超标2倍，铅含量超标10倍。“金多喜”“禧漫屋”“爱果乐（木应）”“惠千贝”…</td>
+        </tr>
+        <tr>
+          <td class="mono">6a4ca9ff000000002101441b</td>
+          <td class="t">儿童房布置🌳新地毯皮肤get！</td>
+          <td class="a">一颗大侠</td>
+          <td class="num">127</td>
+          <td class="num">4</td>
+          <td class="date">2026-07-07 15:25…</td>
+          <td class="body">儿童房升级啦 又get了新皮肤 这块「田园谣曲」铺上 整个房间都森系了很多 上面还有小路 小孩哥每天拿着小车车玩 关键可拆洗也太方便了！！ 	 #母婴好物[话题] #儿童房设计[话…</td>
+        </tr>
+        <tr>
+          <td class="mono">6a2027be000000003502719b</td>
+          <td class="t">(无标题)</td>
+          <td class="a">念念</td>
+          <td class="num">7</td>
+          <td class="num">2</td>
+          <td class="date">2026-06-03 21:10…</td>
+          <td class="body">给娃换了新床垫，试睡的真实反馈（芭蕉果春苗C款） 	 家有幼儿园小朋友一枚，之前一直睡旧床垫，最近总说早上起来腰酸背痛，而且睡姿越来越差，趴着睡、扭成麻花睡都有。咨询了朋友，说儿童…</td>
+        </tr>
+        <tr>
+          <td class="mono">6a3e9993000000000f0296ea</td>
+          <td class="t">幼儿床垫选择</td>
+          <td class="a">ㅤ嘉嘉不说话</td>
+          <td class="num">56</td>
+          <td class="num">10</td>
+          <td class="date">2026-06-26 23:24…</td>
+          <td class="body">最近托班通知陆续下来，就开始认真做了一下儿童床垫的功课 🧸 	 一开始其实没想这么复杂，但后来刷到一个小红书上热度很高的商家，发现报关单和检测报告存在一些问题 ⚠️（真的很不可思议…</td>
+        </tr>
+        <tr>
+          <td class="mono">6a72a08e000000002403fd22</td>
+          <td class="t">薅到床垫了！717拿下豆7床垫</td>
+          <td class="a">张张爱分享🌻（软装中）</td>
+          <td class="num">1</td>
+          <td class="num">3</td>
+          <td class="date">2026-08-05 10:31…</td>
+          <td class="body">是好价嘛，到货给家人们测评细节 蹲各位的好价[大笑R]</td>
+        </tr>
+        <tr>
+          <td class="mono">6a212fec000000003701ef1b</td>
+          <td class="t">避雷某宝这家床垫</td>
+          <td class="a">hello</td>
+          <td class="num">4</td>
+          <td class="num">21</td>
+          <td class="date">2026-06-04 15:57…</td>
+          <td class="body">选这家是觉得拉链能拉开，能看得见质量应该是能放心的，谁知道是恶心！关键出了问题这个态度真让人恼火，一会甩锅给工人，一会又说植物纤维就是这样，客服都承认咯，这家每张都是问题床垫，只是…</td>
+        </tr>
+        <tr>
+          <td class="mono">6a7ae402000000002201201d</td>
+          <td class="t">救命！！！买了三张床垫全退了！真的气炸了……</td>
+          <td class="a">李发发的home</td>
+          <td class="num">2</td>
+          <td class="num">0</td>
+          <td class="date">2026-08-11 16:57…</td>
+          <td class="body">真是九敏🆘了！！买个床垫一度踩坑，真不能光听商家说什么就是什么，还是得了解材料才好，毕竟是自己家用的，退货这么多床垫，我都感觉自己成床垫半个内行了... 	 1、舒适层是踩雷的重点…</td>
+        </tr>
+        <tr>
+          <td class="mono">6a3e734900000000080035fe</td>
+          <td class="t">床垫恐怖啊！</td>
+          <td class="a">姜酱酱</td>
+          <td class="num">3</td>
+          <td class="num">9</td>
+          <td class="date">2026-06-26 20:40…</td>
+          <td class="body">床垫这东西现在可以这样做了吗，塌陷的看起来用了二十年的感觉，黄麻这东西也不软啊，线脱成这样，看到很多说这牌子床垫不行，还不信，说买回来看看，5.0的评分神奇了，还有味道，宝妈小孩用…</td>
+        </tr>
+        <tr>
+          <td class="mono">6a2eada500000000080271f4</td>
+          <td class="t">大无语！新买的黄麻床垫含量直接造假😭</td>
+          <td class="a">unfinished，</td>
+          <td class="num">22</td>
+          <td class="num">48</td>
+          <td class="date">2026-06-14 21:33…</td>
+          <td class="body">真心被气到！网购床垫最怕的事还是遇上了 冲着商家真黄麻床垫、高密度黄麻的宣传入手，详情页、主图、直播都说天然黄麻材质，主打透气护脊、无胶水零掺杂，性价比拉满。满心期待新家床垫，拆开…</td>
+        </tr>
+        <tr>
+          <td class="mono">6a5d8d7f00000000050390c0</td>
+          <td class="t">避雷！山姆喜临门儿童黄麻护脊床垫</td>
+          <td class="a">十六六</td>
+          <td class="num">22</td>
+          <td class="num">60</td>
+          <td class="date">2026-07-20 10:52…</td>
+          <td class="body">今年3月在山姆购入这款喜临门儿童黄麻床垫，谁知踩了大坑。四个月来全天开窗通风，但只要关上房门密闭片刻，床垫异味立刻充斥房间，自行检测TVOC接近超标，一千多的床垫只有当废品。 家里…</td>
+        </tr>
+        </tbody>
+      </table></div>
+    </details>
+    <details class="grp" open>
+      <summary><span class="cnt">12</span> <span class="kw">麻大师儿童豆苗床垫</span></summary>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>noteId</th><th>标题</th><th>作者</th><th>赞</th><th>评</th><th>发布时间</th><th>正文摘要（无"麻大师"）</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="mono">6a3231af000000001603e0f4</td>
+          <td class="t">冒黑烟的儿童床垫！千万别给孩子用😭</td>
+          <td class="a">🐈快乐汽水猫</td>
+          <td class="num">9</td>
+          <td class="num">33</td>
+          <td class="date">2026-06-17 13:33…</td>
+          <td class="body">因为换了定制的大床，需要新的床垫。购买之前反复确认有没有胶水，的确没有胶水，但是加了胶质材料，打开就很大味道。 一共定了3个打开就是很大一股味道，拆开塑料包装脱线，缝合粗制滥造（内…</td>
+        </tr>
+        <tr>
+          <td class="mono">6a71eeea00000000220140be</td>
+          <td class="t">🏠10m²治愈系儿童房，是老母亲满满的爱🤎</td>
+          <td class="a">徐星星呀✨（家有小月龄）</td>
+          <td class="num">351</td>
+          <td class="num">12</td>
+          <td class="date">2026-08-04 21:53…</td>
+          <td class="body">午后的阳光穿过米白纱帘， 滤成绒绒的柔光，落在原木床上， 也落在摊开的绘本、毛绒玩偶和床垫上， 真羡慕我儿子小小年纪就有这么好看的房间～ 	 #宅家过夏天[话题] #打造儿童房[话…</td>
+        </tr>
+        <tr>
+          <td class="mono">6a82d7850000000033035eeb</td>
+          <td class="t">20家儿童寝具生产企业被约谈</td>
+          <td class="a">生活帮</td>
+          <td class="num">896</td>
+          <td class="num">132</td>
+          <td class="date">2026-08-17 17:42…</td>
+          <td class="body">央视新闻8月17日消息，近日，北京市消费者协会约谈20家儿童寝具生产企业。其中“金多喜”品牌的样品铬含量超标2倍，铅含量超标10倍。“金多喜”“禧漫屋”“爱果乐（木应）”“惠千贝”…</td>
+        </tr>
+        <tr>
+          <td class="mono">6a26735200000000150250ea</td>
+          <td class="t">黄麻床垫给孩子睡上了，没有所谓的酸臭味</td>
+          <td class="a">果儿（装修版）</td>
+          <td class="num">25</td>
+          <td class="num">26</td>
+          <td class="date">2026-06-08 15:46…</td>
+          <td class="body">黄麻床垫买了，给孩子睡的，因为孩子比较瘦，太硬了会觉得不舒服，所以给她买的加了两层，一层3D，一层羊绒，而且上面的面料可以打开，很方便，也能看到没有胶水，睡着体感合适，孩子喜欢的，…</td>
+        </tr>
+        <tr>
+          <td class="mono">6a3e9993000000000f0296ea</td>
+          <td class="t">幼儿床垫选择</td>
+          <td class="a">ㅤ嘉嘉不说话</td>
+          <td class="num">56</td>
+          <td class="num">10</td>
+          <td class="date">2026-06-26 23:24…</td>
+          <td class="body">最近托班通知陆续下来，就开始认真做了一下儿童床垫的功课 🧸 	 一开始其实没想这么复杂，但后来刷到一个小红书上热度很高的商家，发现报关单和检测报告存在一些问题 ⚠️（真的很不可思议…</td>
+        </tr>
+        <tr>
+          <td class="mono">6a2027be000000003502719b</td>
+          <td class="t">(无标题)</td>
+          <td class="a">念念</td>
+          <td class="num">7</td>
+          <td class="num">2</td>
+          <td class="date">2026-06-03 21:10…</td>
+          <td class="body">给娃换了新床垫，试睡的真实反馈（芭蕉果春苗C款） 	 家有幼儿园小朋友一枚，之前一直睡旧床垫，最近总说早上起来腰酸背痛，而且睡姿越来越差，趴着睡、扭成麻花睡都有。咨询了朋友，说儿童…</td>
+        </tr>
+        <tr>
+          <td class="mono">6a75ae8300000000060065ad</td>
+          <td class="t">随机分享～宝宝床垫&amp;宝宝床单&amp;抱枕</td>
+          <td class="a">没脾气～</td>
+          <td class="num">1</td>
+          <td class="num">2</td>
+          <td class="date">2026-08-07 18:08…</td>
+          <td class="body">1.栖作 为了小盆友的脊椎 特意又买了硬床垫 关于材质 我们首选的黄麻（买黄麻必须是0胶水 ）说是不易生虫螨而且也不易塌陷 关于舒适度  单独用在床上我觉得体验感更好（我们是舍不得…</td>
+        </tr>
+        <tr>
+          <td class="mono">6a743119000000000e03b400</td>
+          <td class="t">开学宿舍床垫篇</td>
+          <td class="a">酥酥的小猫qwq</td>
+          <td class="num">97</td>
+          <td class="num">58</td>
+          <td class="date">2026-08-06 15:00…</td>
+          <td class="body">听了网友的推荐床垫 #宿舍床垫测评[话题]#床垫怎样选择[话题]#床垫材质那么多到底怎么选[话题]#床垫该如何选择[话题]#床垫[话题]#宿舍床垫[话题]#每家故事床垫[话题]#床…</td>
+        </tr>
+        <tr>
+          <td class="mono">6a2eada500000000080271f4</td>
+          <td class="t">大无语！新买的黄麻床垫含量直接造假😭</td>
+          <td class="a">unfinished，</td>
+          <td class="num">22</td>
+          <td class="num">48</td>
+          <td class="date">2026-06-14 21:33…</td>
+          <td class="body">真心被气到！网购床垫最怕的事还是遇上了 冲着商家真黄麻床垫、高密度黄麻的宣传入手，详情页、主图、直播都说天然黄麻材质，主打透气护脊、无胶水零掺杂，性价比拉满。满心期待新家床垫，拆开…</td>
+        </tr>
+        <tr>
+          <td class="mono">6a212fec000000003701ef1b</td>
+          <td class="t">避雷某宝这家床垫</td>
+          <td class="a">hello</td>
+          <td class="num">4</td>
+          <td class="num">21</td>
+          <td class="date">2026-06-04 15:57…</td>
+          <td class="body">选这家是觉得拉链能拉开，能看得见质量应该是能放心的，谁知道是恶心！关键出了问题这个态度真让人恼火，一会甩锅给工人，一会又说植物纤维就是这样，客服都承认咯，这家每张都是问题床垫，只是…</td>
+        </tr>
+        <tr>
+          <td class="mono">6a5d8d7f00000000050390c0</td>
+          <td class="t">避雷！山姆喜临门儿童黄麻护脊床垫</td>
+          <td class="a">十六六</td>
+          <td class="num">22</td>
+          <td class="num">60</td>
+          <td class="date">2026-07-20 10:52…</td>
+          <td class="body">今年3月在山姆购入这款喜临门儿童黄麻床垫，谁知踩了大坑。四个月来全天开窗通风，但只要关上房门密闭片刻，床垫异味立刻充斥房间，自行检测TVOC接近超标，一千多的床垫只有当废品。 家里…</td>
+        </tr>
+        <tr>
+          <td class="mono">6a72a08e000000002403fd22</td>
+          <td class="t">薅到床垫了！717拿下豆7床垫</td>
+          <td class="a">张张爱分享🌻（软装中）</td>
+          <td class="num">1</td>
+          <td class="num">3</td>
+          <td class="date">2026-08-05 10:31…</td>
+          <td class="body">是好价嘛，到货给家人们测评细节 蹲各位的好价[大笑R]</td>
+        </tr>
+        </tbody>
+      </table></div>
+    </details>
+    <details class="grp" open>
+      <summary><span class="cnt">12</span> <span class="kw">麻大师气味</span></summary>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>noteId</th><th>标题</th><th>作者</th><th>赞</th><th>评</th><th>发布时间</th><th>正文摘要（无"麻大师"）</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="mono">69e1e37f000000001d019e6f</td>
+          <td class="t">装修日记106｜无语了，床垫竟然。。。</td>
+          <td class="a">A小Q的装修日记（散味ing）</td>
+          <td class="num">12</td>
+          <td class="num">43</td>
+          <td class="date">2026-04-17 15:38…</td>
+          <td class="body">想刚买了大品牌，棕榈的床垫，都是纯天然的，味道吹了一个多月了，味道还那么大，联系客服，他说这个是他们正常的味道。 就算你是纯天然也不能有味道呀，房间里的家具电视柜都没有什么味道，反…</td>
+        </tr>
+        <tr>
+          <td class="mono">6a7812e7000000000502b38c</td>
+          <td class="t">留子回国偶遇最不该闻到的气味（？</td>
+          <td class="a">BruceZ</td>
+          <td class="num">75398</td>
+          <td class="num">5003</td>
+          <td class="date">2026-08-09 13:40…</td>
+          <td class="body">真的吓了一大跳…网上一通搜发现浓度比较低的艾草烟雾气味会和大*有些许类似，还好是虚惊一场 希望所有人这辈子都不要闻到大*的臭气 真的是一辈子忘不掉的恶心味道[石化R] #使人晕厥的…</td>
+        </tr>
+        <tr>
+          <td class="mono">69c36f6000000000220025fc</td>
+          <td class="t">暴力拆解床垫，哦豁，胶水棕</td>
+          <td class="a">momo</td>
+          <td class="num">144</td>
+          <td class="num">215</td>
+          <td class="date">2026-03-25 13:15…</td>
+          <td class="body">入住三个月了，总觉得哪里不对劲。 1.小朋友和我一直鼻炎，皮肤过敏，眼睛酸胀，流鼻血。白天缓解，晚上严重。 2.但是卧室并没有味道。 3.实时开窗通风，甲醛试纸也正常。 	 最开始…</td>
+        </tr>
+        <tr>
+          <td class="mono">6a44cf350000000017029c60</td>
+          <td class="t">这个床垫超大一股酸臭味！</td>
+          <td class="a">👑 大大大大大太阳 ☀</td>
+          <td class="num">23</td>
+          <td class="num">102</td>
+          <td class="date">2026-07-01 16:26…</td>
+          <td class="body">商家说是0胶水0甲醛#椰棕床垫[话题] #床垫[话题] #甲醛[话题] 说是高温压制的 标签：椰棕床垫、床垫、甲醛</td>
+        </tr>
+        <tr>
+          <td class="mono">69fae50a00000000350223e2</td>
+          <td class="t">烧了床垫才发现买到了假黄麻～避雷！</td>
+          <td class="a">文轩</td>
+          <td class="num">2</td>
+          <td class="num">46</td>
+          <td class="date">2026-05-06 14:51…</td>
+          <td class="body">以为买到了黄麻中的精品，没想到烧了一些发现是化纤！！！[哭惹R] 	 一股塑料味，也没有黄麻的灰烬，真是一言难尽！ 	 避雷“沐山春”品牌的黄麻床垫呀 	 #黄麻床垫[话题] 标签…</td>
+        </tr>
+        <tr>
+          <td class="mono">6a3159de000000002003a8ea</td>
+          <td class="t">床垫子多久能没有味道呀</td>
+          <td class="a">孙大千在装修</td>
+          <td class="num">3</td>
+          <td class="num">22</td>
+          <td class="date">2026-06-16 22:12…</td>
+          <td class="body">给孩子买的拼接床床垫不知道多久才会没有味道 要是几个月还有味道可咋整  #儿童床垫[话题]  #大自然床垫[话题] #大自然床垫味道[话题] #山棕床垫[话题] 标签：儿童床垫、大…</td>
+        </tr>
+        <tr>
+          <td class="mono">6a55fb7c0000000008003ffe</td>
+          <td class="t">散甲醛</td>
+          <td class="a">Lucy</td>
+          <td class="num">276</td>
+          <td class="num">413</td>
+          <td class="date">2026-07-14 17:03…</td>
+          <td class="body">新床垫味太大，还是找熟人买的环保的， 房间里晾了一个月还是有味，有太阳拿出来晒晒。#除甲醛[话题] 标签：除甲醛</td>
+        </tr>
+        <tr>
+          <td class="mono">6a2eada500000000080271f4</td>
+          <td class="t">大无语！新买的黄麻床垫含量直接造假😭</td>
+          <td class="a">unfinished，</td>
+          <td class="num">22</td>
+          <td class="num">48</td>
+          <td class="date">2026-06-14 21:33…</td>
+          <td class="body">真心被气到！网购床垫最怕的事还是遇上了 冲着商家真黄麻床垫、高密度黄麻的宣传入手，详情页、主图、直播都说天然黄麻材质，主打透气护脊、无胶水零掺杂，性价比拉满。满心期待新家床垫，拆开…</td>
+        </tr>
+        <tr>
+          <td class="mono">69e43fda000000001a026242</td>
+          <td class="t">标题：床垫到手后黄麻还是有酸味。</td>
+          <td class="a">夏与</td>
+          <td class="num">3</td>
+          <td class="num">7</td>
+          <td class="date">2026-04-19 10:37…</td>
+          <td class="body">在某宝买的大牌热销，是双面睡感的那种，买的时候比较担心里面的黄麻会有酸味，按客服说的基本没啥酸味，有味道散个一两天也好了，但是在使用快一周，这个味道还是会有，而且正面空气纤维那面的…</td>
+        </tr>
+        <tr>
+          <td class="mono">6a76eba2000000002202f899</td>
+          <td class="t">严查劣质产品</td>
+          <td class="a">缪慧婷</td>
+          <td class="num">289</td>
+          <td class="num">9</td>
+          <td class="date">2026-08-08 16:41…</td>
+          <td class="body">严查劣质产品，不要再让更多的消费者受到欺骗与侵害 我没有很多粉丝，但是我还是想把这件事情原本的还原出来让更多的网友知道怎样一件事，也避免网友们踩雷。 我于2026年3月26日在淘宝…</td>
+        </tr>
+        <tr>
+          <td class="mono">6a4c57990000000011015d2a</td>
+          <td class="t">胶水棕床垫危害</td>
+          <td class="a">床垫佬周工</td>
+          <td class="num">4</td>
+          <td class="num">0</td>
+          <td class="date">2026-07-07 09:34…</td>
+          <td class="body">周围有胶水棕床垫的赶紧换掉，危害大，持续时间长#胶水棕床垫危害[话题]#床垫材料[话题]#旧床垫及时更换[话题] 标签：旧床垫及时更换、床垫材料、胶水棕床垫危害</td>
+        </tr>
+        <tr>
+          <td class="mono">6a881437000000002702acec</td>
+          <td class="t">大自然床垫测甲醛tvoc准备中</td>
+          <td class="a">喜乐多（软装中）</td>
+          <td class="num">2</td>
+          <td class="num">23</td>
+          <td class="date">2026-08-21 17:02…</td>
+          <td class="body">味道特别特别大，感觉要熏吐了 但是，据说这就是天然乳胶的味道 已经拿风扇对着吹好几天了，还是味道浓郁 	 给孩子买的东西，要日夜睡的 说放心那是假的 于是租了#老爸测评[话题] 的…</td>
+        </tr>
+        </tbody>
+      </table></div>
+    </details>
+    <details class="grp" open>
+      <summary><span class="cnt">11</span> <span class="kw">麻大师豆苗床垫怎么样</span></summary>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>noteId</th><th>标题</th><th>作者</th><th>赞</th><th>评</th><th>发布时间</th><th>正文摘要（无"麻大师"）</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="mono">6a6a037f000000000f01528f</td>
+          <td class="t">(无标题)</td>
+          <td class="a">小鸭鸭</td>
+          <td class="num">78</td>
+          <td class="num">55</td>
+          <td class="date">2026-07-29 21:43…</td>
+          <td class="body">黑心商家！25年六月份买了两张床垫 今天铺床一拽感觉手上有粉末感 仔细一看这层床垫下沉淀的都是白色粉末 已经用除螨仪吸了三遍了 吸出了超级超级多粉末 除螨仪都没电了还是没有完全处理…</td>
+        </tr>
+        <tr>
+          <td class="mono">6a743119000000000e03b400</td>
+          <td class="t">开学宿舍床垫篇</td>
+          <td class="a">酥酥的小猫qwq</td>
+          <td class="num">97</td>
+          <td class="num">58</td>
+          <td class="date">2026-08-06 15:00…</td>
+          <td class="body">听了网友的推荐床垫 #宿舍床垫测评[话题]#床垫怎样选择[话题]#床垫材质那么多到底怎么选[话题]#床垫该如何选择[话题]#床垫[话题]#宿舍床垫[话题]#每家故事床垫[话题]#床…</td>
+        </tr>
+        <tr>
+          <td class="mono">69d792ba000000001d01b6d6</td>
+          <td class="t">我退了3张了，才知道……</td>
+          <td class="a">。。。</td>
+          <td class="num">356</td>
+          <td class="num">131</td>
+          <td class="date">2026-04-09 19:51…</td>
+          <td class="body">买张床垫真的所有商家都吻了上来，全部的消息都是店家真的快崩溃了，说的只有优点没有缺点。。。。还说刚好有优会，我这个人很怕被骗，研究了好久终于研究清楚了 1.不买卷包床垫，卷包一点儿…</td>
+        </tr>
+        <tr>
+          <td class="mono">6a212fec000000003701ef1b</td>
+          <td class="t">避雷某宝这家床垫</td>
+          <td class="a">hello</td>
+          <td class="num">4</td>
+          <td class="num">21</td>
+          <td class="date">2026-06-04 15:57…</td>
+          <td class="body">选这家是觉得拉链能拉开，能看得见质量应该是能放心的，谁知道是恶心！关键出了问题这个态度真让人恼火，一会甩锅给工人，一会又说植物纤维就是这样，客服都承认咯，这家每张都是问题床垫，只是…</td>
+        </tr>
+        <tr>
+          <td class="mono">6a3231af000000001603e0f4</td>
+          <td class="t">冒黑烟的儿童床垫！千万别给孩子用😭</td>
+          <td class="a">🐈快乐汽水猫</td>
+          <td class="num">9</td>
+          <td class="num">33</td>
+          <td class="date">2026-06-17 13:33…</td>
+          <td class="body">因为换了定制的大床，需要新的床垫。购买之前反复确认有没有胶水，的确没有胶水，但是加了胶质材料，打开就很大味道。 一共定了3个打开就是很大一股味道，拆开塑料包装脱线，缝合粗制滥造（内…</td>
+        </tr>
+        <tr>
+          <td class="mono">6a6c1b26000000000502227a</td>
+          <td class="t">(无标题)</td>
+          <td class="a">@说情</td>
+          <td class="num">8</td>
+          <td class="num">1</td>
+          <td class="date">2026-07-31 11:48…</td>
+          <td class="body">最新曝光，这些工业劣质床垫，大家千万别再乱买了！ #宿舍床垫#床垫#大学生#学生床垫#鲸臣床垫</td>
+        </tr>
+        <tr>
+          <td class="mono">6a3e252100000000110064fc</td>
+          <td class="t">更新后续-源氏木语黄麻床垫鉴定</td>
+          <td class="a">陈钇彤</td>
+          <td class="num">95</td>
+          <td class="num">132</td>
+          <td class="date">2026-06-26 15:07…</td>
+          <td class="body">在源氏定制了黄麻床垫，说是无胶热压的 S 型黄麻，怎么和我理解的 S 型不太一样，有没有懂行的朋友帮忙看下👀 	 后续来了，另一侧是 S，图 7-9。</td>
+        </tr>
+        <tr>
+          <td class="mono">69e1f6b20000000022028a6c</td>
+          <td class="t">我妈说我睡这么高 是要登基吗？😢</td>
+          <td class="a">X喜哈哈</td>
+          <td class="num">6</td>
+          <td class="num">7</td>
+          <td class="date">2026-04-17 17:00…</td>
+          <td class="body">没有量尺寸这床垫也太高了 每晚睡觉像是要爬上龙床… 没有一米九的腿怕是下不来 不过有一说一这床垫睡起来挺舒服的… #床垫[话题] #睡觉的最高境界[话题] #卧室[话题] #家具[…</td>
+        </tr>
+        <tr>
+          <td class="mono">6a8119e30000000029031cbf</td>
+          <td class="t">求久睡不塌床垫</td>
+          <td class="a">逢春听雨（单删举报别来）</td>
+          <td class="num">35</td>
+          <td class="num">55</td>
+          <td class="date">2026-08-16 10:01…</td>
+          <td class="body">一编：看的我眼都花了，蓝盒子有点贵，想要一个久睡不塌且不触底的床垫，壮丽 云瑾 林氏还是华娜朵好，实在不行也会提一下预算买蓝盒子，感谢大家的回复(≧∇≦) 二编：好多人啊，超级感谢…</td>
+        </tr>
+        <tr>
+          <td class="mono">6a65ae08000000001303d7a3</td>
+          <td class="t">(无标题)</td>
+          <td class="a">无蝉🍀</td>
+          <td class="num">0</td>
+          <td class="num">1</td>
+          <td class="date">2026-07-26 14:49…</td>
+          <td class="body">便宜没好货 廉价床垫睡俩月就凹陷塌坑，腰越睡越酸，整张垫子歪歪扭扭超糟心！ 重新买了梦宸良品三明治慢回弹记忆棉床垫👍</td>
+        </tr>
+        <tr>
+          <td class="mono">6a2ab07b0000000020038109</td>
+          <td class="t">跟风入手黄麻床垫，这个有没有踩坑？</td>
+          <td class="a">unfinished，</td>
+          <td class="num">19</td>
+          <td class="num">71</td>
+          <td class="date">2026-06-11 20:56…</td>
+          <td class="body">选床垫纠结好久，最后入手了最近很火的黄麻床垫。 主打天然材质透气硬垫，适合腰不好的人，但自己不太会分辨好坏，分不清纯黄麻还是混料。 有没有懂床垫的小伙伴，教教我怎么辨别黄麻床垫材质…</td>
+        </tr>
+        </tbody>
+      </table></div>
+    </details>
+    <details class="grp" open>
+      <summary><span class="cnt">10</span> <span class="kw">麻大师宿舍床垫</span></summary>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>noteId</th><th>标题</th><th>作者</th><th>赞</th><th>评</th><th>发布时间</th><th>正文摘要（无"麻大师"）</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="mono">6a86c4440000000033031be9</td>
+          <td class="t">《退了3张床垫！过来人忠告》长文避坑</td>
+          <td class="a">麻辣potato</td>
+          <td class="num">34</td>
+          <td class="num">32</td>
+          <td class="date">2026-08-20 17:09…</td>
+          <td class="body">装修进度慢慢推进到80%，终于闲下来好好复盘一下！ 当初网购床垫真的狠狠踩坑，被卷包床垫坑到自闭😭 睡一晚起来腰酸背痛，腰像断了一样，而且床边特别容易打滑，坐一点都不稳！ 家里有小…</td>
+        </tr>
+        <tr>
+          <td class="mono">69d792ba000000001d01b6d6</td>
+          <td class="t">我退了3张了，才知道……</td>
+          <td class="a">。。。</td>
+          <td class="num">356</td>
+          <td class="num">131</td>
+          <td class="date">2026-04-09 19:51…</td>
+          <td class="body">买张床垫真的所有商家都吻了上来，全部的消息都是店家真的快崩溃了，说的只有优点没有缺点。。。。还说刚好有优会，我这个人很怕被骗，研究了好久终于研究清楚了 1.不买卷包床垫，卷包一点儿…</td>
+        </tr>
+        <tr>
+          <td class="mono">69c5c446000000001d01ceab</td>
+          <td class="t">(无标题)</td>
+          <td class="a">🐰</td>
+          <td class="num">297</td>
+          <td class="num">131</td>
+          <td class="date">2026-03-27 07:41…</td>
+          <td class="body">看了一堆床垫评论，成功避雷所有床垫[失望R]</td>
+        </tr>
+        <tr>
+          <td class="mono">6a7ae402000000002201201d</td>
+          <td class="t">救命！！！买了三张床垫全退了！真的气炸了……</td>
+          <td class="a">李发发的home</td>
+          <td class="num">2</td>
+          <td class="num">0</td>
+          <td class="date">2026-08-11 16:57…</td>
+          <td class="body">真是九敏🆘了！！买个床垫一度踩坑，真不能光听商家说什么就是什么，还是得了解材料才好，毕竟是自己家用的，退货这么多床垫，我都感觉自己成床垫半个内行了... 	 1、舒适层是踩雷的重点…</td>
+        </tr>
+        <tr>
+          <td class="mono">6a6c7741000000002402efc8</td>
+          <td class="t">(无标题)</td>
+          <td class="a">朱菲菲</td>
+          <td class="num">2322</td>
+          <td class="num">145</td>
+          <td class="date">2026-07-31 18:21…</td>
+          <td class="body">几百块买个缺斤少两的破海绵？宿舍床垫全方位测评！#床垫[话题] #宿舍床垫[话题] #宿舍毫无[话题] #准大一[话题] #大学季[话题] 标签：床垫、宿舍床垫、宿舍毫无、准大一、…</td>
+        </tr>
+        <tr>
+          <td class="mono">6a830c60000000003302e7d2</td>
+          <td class="t">研究生plog｜宿舍挖到舒服的可拆洗床垫✨</td>
+          <td class="a">旗隅</td>
+          <td class="num">104</td>
+          <td class="num">10</td>
+          <td class="date">2026-08-17 21:28…</td>
+          <td class="body">谁懂宿舍原版床板硬到睡不好😭 买到心水床垫！！睡起来真的好舒服，它不是单纯一层海绵。感觉商家很老实是三层的垫子组合起来的那种。 	 厚度感觉是一个手掌高度，不会很高，刚好在床价的保…</td>
+        </tr>
+        <tr>
+          <td class="mono">6a7ed3b60000000032021edc</td>
+          <td class="t">开学平价床垫新生必看</td>
+          <td class="a">不吃巧克力</td>
+          <td class="num">52</td>
+          <td class="num">3</td>
+          <td class="date">2026-08-14 16:37…</td>
+          <td class="body">#床垫推荐大学生[话题]#平价床垫[话题]#宿舍床垫[话题]#新生必备宿舍床垫推荐[话题]#床垫[话题]#宿舍必备[话题]#床垫推荐性价比高的[话题]#床垫推荐[话题]#大一新生[…</td>
+        </tr>
+        <tr>
+          <td class="mono">69f744ca000000003701c903</td>
+          <td class="t">黄麻床垫大坑！</td>
+          <td class="a">心心（自装ing）</td>
+          <td class="num">45</td>
+          <td class="num">68</td>
+          <td class="date">2026-05-03 20:51…</td>
+          <td class="body">冲着纯黄麻床垫入手的，满心期待收货，拆开第一眼就不对劲，质感、纤维完全不是正经黄麻！ 越看越像普通环保棕、胶水棕冒充的，根本不是天然黄麻！ 找商家理论，我明确质疑材质造假，结果商家…</td>
+        </tr>
+        <tr>
+          <td class="mono">6a79addf00000000330342ce</td>
+          <td class="t">快开学了，床垫也回来了！</td>
+          <td class="a">菠萝</td>
+          <td class="num">1</td>
+          <td class="num">2</td>
+          <td class="date">2026-08-10 18:54…</td>
+          <td class="body">不愧是我，挑了整整一周才定下来的床垫，9cm的够厚实，拆开摸着质量很确实很不错，没有难闻的味道，就是有个事挺好笑的，光顾着研究质量了，拆出来看了半天，结果放不回去了#宿舍床垫推荐[…</td>
+        </tr>
+        <tr>
+          <td class="mono">69ce2faa0000000022001c0b</td>
+          <td class="t">想买张床垫全是托。。。</td>
+          <td class="a">金豆豆小猪咪</td>
+          <td class="num">67</td>
+          <td class="num">103</td>
+          <td class="date">2026-04-02 16:58…</td>
+          <td class="body">想入手一张床垫，结果翻遍评论全是托，看得我头都大了！ 清一色夸上天，真实体验没几个，根本分不清是真心推荐还是营销套路。 不想交智商税，也不想踩坑，就想要睡感实在、不塌陷、没异味的正…</td>
+        </tr>
+        </tbody>
+      </table></div>
+    </details>
+    <details class="grp" open>
+      <summary><span class="cnt">8</span> <span class="kw">麻大师儿童护脊床垫</span></summary>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>noteId</th><th>标题</th><th>作者</th><th>赞</th><th>评</th><th>发布时间</th><th>正文摘要（无"麻大师"）</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="mono">6a82b36c0000000024027d8f</td>
+          <td class="t">挑了半个月儿童床垫🖐️真的没让我失望！！</td>
+          <td class="a">😘燕子😜</td>
+          <td class="num">5</td>
+          <td class="num">2</td>
+          <td class="date">2026-08-17 15:08…</td>
+          <td class="body">拆开一点味道都没有，给娃用，环保这块直接安心很多！✨ 我家在大床旁边铺了个物流垫板打底 我买的1.5m*2.0m大小的厚 8cm，放进去刚刚好，弄成一个地铺床 ✅A 类华夫格面料摸…</td>
+        </tr>
+        <tr>
+          <td class="mono">6a3231af000000001603e0f4</td>
+          <td class="t">冒黑烟的儿童床垫！千万别给孩子用😭</td>
+          <td class="a">🐈快乐汽水猫</td>
+          <td class="num">9</td>
+          <td class="num">33</td>
+          <td class="date">2026-06-17 13:33…</td>
+          <td class="body">因为换了定制的大床，需要新的床垫。购买之前反复确认有没有胶水，的确没有胶水，但是加了胶质材料，打开就很大味道。 一共定了3个打开就是很大一股味道，拆开塑料包装脱线，缝合粗制滥造（内…</td>
+        </tr>
+        <tr>
+          <td class="mono">6a5d8d7f00000000050390c0</td>
+          <td class="t">避雷！山姆喜临门儿童黄麻护脊床垫</td>
+          <td class="a">十六六</td>
+          <td class="num">22</td>
+          <td class="num">60</td>
+          <td class="date">2026-07-20 10:52…</td>
+          <td class="body">今年3月在山姆购入这款喜临门儿童黄麻床垫，谁知踩了大坑。四个月来全天开窗通风，但只要关上房门密闭片刻，床垫异味立刻充斥房间，自行检测TVOC接近超标，一千多的床垫只有当废品。 家里…</td>
+        </tr>
+        <tr>
+          <td class="mono">69f744ca000000003701c903</td>
+          <td class="t">黄麻床垫大坑！</td>
+          <td class="a">心心（自装ing）</td>
+          <td class="num">45</td>
+          <td class="num">68</td>
+          <td class="date">2026-05-03 20:51…</td>
+          <td class="body">冲着纯黄麻床垫入手的，满心期待收货，拆开第一眼就不对劲，质感、纤维完全不是正经黄麻！ 越看越像普通环保棕、胶水棕冒充的，根本不是天然黄麻！ 找商家理论，我明确质疑材质造假，结果商家…</td>
+        </tr>
+        <tr>
+          <td class="mono">6a86c4440000000033031be9</td>
+          <td class="t">《退了3张床垫！过来人忠告》长文避坑</td>
+          <td class="a">麻辣potato</td>
+          <td class="num">34</td>
+          <td class="num">32</td>
+          <td class="date">2026-08-20 17:09…</td>
+          <td class="body">装修进度慢慢推进到80%，终于闲下来好好复盘一下！ 当初网购床垫真的狠狠踩坑，被卷包床垫坑到自闭😭 睡一晚起来腰酸背痛，腰像断了一样，而且床边特别容易打滑，坐一点都不稳！ 家里有小…</td>
+        </tr>
+        <tr>
+          <td class="mono">6a2eada500000000080271f4</td>
+          <td class="t">大无语！新买的黄麻床垫含量直接造假😭</td>
+          <td class="a">unfinished，</td>
+          <td class="num">22</td>
+          <td class="num">48</td>
+          <td class="date">2026-06-14 21:33…</td>
+          <td class="body">真心被气到！网购床垫最怕的事还是遇上了 冲着商家真黄麻床垫、高密度黄麻的宣传入手，详情页、主图、直播都说天然黄麻材质，主打透气护脊、无胶水零掺杂，性价比拉满。满心期待新家床垫，拆开…</td>
+        </tr>
+        <tr>
+          <td class="mono">6a328a0e0000000022009152</td>
+          <td class="t">挑了大半个月的儿童床垫，还可以没失望</td>
+          <td class="a">風.</td>
+          <td class="num">3</td>
+          <td class="num">4</td>
+          <td class="date">2026-06-17 19:50…</td>
+          <td class="body">自家房子房间空间挺大，能选的款式特别多，挑来挑去看花了眼 最后敲定这款，躺上去软硬适中，选的护脊款，孩子很喜欢 #儿童房布置[话题] #养娃碎碎念[话题] #儿童床垫[话题] #儿…</td>
+        </tr>
+        <tr>
+          <td class="mono">6a7ae402000000002201201d</td>
+          <td class="t">救命！！！买了三张床垫全退了！真的气炸了……</td>
+          <td class="a">李发发的home</td>
+          <td class="num">2</td>
+          <td class="num">0</td>
+          <td class="date">2026-08-11 16:57…</td>
+          <td class="body">真是九敏🆘了！！买个床垫一度踩坑，真不能光听商家说什么就是什么，还是得了解材料才好，毕竟是自己家用的，退货这么多床垫，我都感觉自己成床垫半个内行了... 	 1、舒适层是踩雷的重点…</td>
+        </tr>
+        </tbody>
+      </table></div>
+    </details>
+    <details class="grp" open>
+      <summary><span class="cnt">8</span> <span class="kw">麻大师儿童床垫怎么样</span></summary>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>noteId</th><th>标题</th><th>作者</th><th>赞</th><th>评</th><th>发布时间</th><th>正文摘要（无"麻大师"）</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="mono">6a82b36c0000000024027d8f</td>
+          <td class="t">挑了半个月儿童床垫🖐️真的没让我失望！！</td>
+          <td class="a">😘燕子😜</td>
+          <td class="num">5</td>
+          <td class="num">2</td>
+          <td class="date">2026-08-17 15:08…</td>
+          <td class="body">拆开一点味道都没有，给娃用，环保这块直接安心很多！✨ 我家在大床旁边铺了个物流垫板打底 我买的1.5m*2.0m大小的厚 8cm，放进去刚刚好，弄成一个地铺床 ✅A 类华夫格面料摸…</td>
+        </tr>
+        <tr>
+          <td class="mono">6a3231af000000001603e0f4</td>
+          <td class="t">冒黑烟的儿童床垫！千万别给孩子用😭</td>
+          <td class="a">🐈快乐汽水猫</td>
+          <td class="num">9</td>
+          <td class="num">33</td>
+          <td class="date">2026-06-17 13:33…</td>
+          <td class="body">因为换了定制的大床，需要新的床垫。购买之前反复确认有没有胶水，的确没有胶水，但是加了胶质材料，打开就很大味道。 一共定了3个打开就是很大一股味道，拆开塑料包装脱线，缝合粗制滥造（内…</td>
+        </tr>
+        <tr>
+          <td class="mono">69d792ba000000001d01b6d6</td>
+          <td class="t">我退了3张了，才知道……</td>
+          <td class="a">。。。</td>
+          <td class="num">356</td>
+          <td class="num">131</td>
+          <td class="date">2026-04-09 19:51…</td>
+          <td class="body">买张床垫真的所有商家都吻了上来，全部的消息都是店家真的快崩溃了，说的只有优点没有缺点。。。。还说刚好有优会，我这个人很怕被骗，研究了好久终于研究清楚了 1.不买卷包床垫，卷包一点儿…</td>
+        </tr>
+        <tr>
+          <td class="mono">6a86c4440000000033031be9</td>
+          <td class="t">《退了3张床垫！过来人忠告》长文避坑</td>
+          <td class="a">麻辣potato</td>
+          <td class="num">34</td>
+          <td class="num">32</td>
+          <td class="date">2026-08-20 17:09…</td>
+          <td class="body">装修进度慢慢推进到80%，终于闲下来好好复盘一下！ 当初网购床垫真的狠狠踩坑，被卷包床垫坑到自闭😭 睡一晚起来腰酸背痛，腰像断了一样，而且床边特别容易打滑，坐一点都不稳！ 家里有小…</td>
+        </tr>
+        <tr>
+          <td class="mono">6a3e252100000000110064fc</td>
+          <td class="t">更新后续-源氏木语黄麻床垫鉴定</td>
+          <td class="a">陈钇彤</td>
+          <td class="num">95</td>
+          <td class="num">132</td>
+          <td class="date">2026-06-26 15:07…</td>
+          <td class="body">在源氏定制了黄麻床垫，说是无胶热压的 S 型黄麻，怎么和我理解的 S 型不太一样，有没有懂行的朋友帮忙看下👀 	 后续来了，另一侧是 S，图 7-9。</td>
+        </tr>
+        <tr>
+          <td class="mono">6a6c1b26000000000502227a</td>
+          <td class="t">(无标题)</td>
+          <td class="a">@说情</td>
+          <td class="num">8</td>
+          <td class="num">1</td>
+          <td class="date">2026-07-31 11:48…</td>
+          <td class="body">最新曝光，这些工业劣质床垫，大家千万别再乱买了！ #宿舍床垫#床垫#大学生#学生床垫#鲸臣床垫</td>
+        </tr>
+        <tr>
+          <td class="mono">6a3e9993000000000f0296ea</td>
+          <td class="t">幼儿床垫选择</td>
+          <td class="a">ㅤ嘉嘉不说话</td>
+          <td class="num">56</td>
+          <td class="num">10</td>
+          <td class="date">2026-06-26 23:24…</td>
+          <td class="body">最近托班通知陆续下来，就开始认真做了一下儿童床垫的功课 🧸 	 一开始其实没想这么复杂，但后来刷到一个小红书上热度很高的商家，发现报关单和检测报告存在一些问题 ⚠️（真的很不可思议…</td>
+        </tr>
+        <tr>
+          <td class="mono">6a5d8d7f00000000050390c0</td>
+          <td class="t">避雷！山姆喜临门儿童黄麻护脊床垫</td>
+          <td class="a">十六六</td>
+          <td class="num">22</td>
+          <td class="num">60</td>
+          <td class="date">2026-07-20 10:52…</td>
+          <td class="body">今年3月在山姆购入这款喜临门儿童黄麻床垫，谁知踩了大坑。四个月来全天开窗通风，但只要关上房门密闭片刻，床垫异味立刻充斥房间，自行检测TVOC接近超标，一千多的床垫只有当废品。 家里…</td>
+        </tr>
+        </tbody>
+      </table></div>
+    </details>
+    <details class="grp" open>
+      <summary><span class="cnt">7</span> <span class="kw">麻大师床垫怎么买优惠</span></summary>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>noteId</th><th>标题</th><th>作者</th><th>赞</th><th>评</th><th>发布时间</th><th>正文摘要（无"麻大师"）</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="mono">6a76eba2000000002202f899</td>
+          <td class="t">严查劣质产品</td>
+          <td class="a">缪慧婷</td>
+          <td class="num">289</td>
+          <td class="num">9</td>
+          <td class="date">2026-08-08 16:41…</td>
+          <td class="body">严查劣质产品，不要再让更多的消费者受到欺骗与侵害 我没有很多粉丝，但是我还是想把这件事情原本的还原出来让更多的网友知道怎样一件事，也避免网友们踩雷。 我于2026年3月26日在淘宝…</td>
+        </tr>
+        <tr>
+          <td class="mono">6a7ae402000000002201201d</td>
+          <td class="t">救命！！！买了三张床垫全退了！真的气炸了……</td>
+          <td class="a">李发发的home</td>
+          <td class="num">2</td>
+          <td class="num">0</td>
+          <td class="date">2026-08-11 16:57…</td>
+          <td class="body">真是九敏🆘了！！买个床垫一度踩坑，真不能光听商家说什么就是什么，还是得了解材料才好，毕竟是自己家用的，退货这么多床垫，我都感觉自己成床垫半个内行了... 	 1、舒适层是踩雷的重点…</td>
+        </tr>
+        <tr>
+          <td class="mono">6a82c3d2000000002903334b</td>
+          <td class="t">体会过喜临门售后，你就知道你有多绝望了😩</td>
+          <td class="a">co</td>
+          <td class="num">13</td>
+          <td class="num">37</td>
+          <td class="date">2026-08-17 16:18…</td>
+          <td class="body">两年前淘宝天猫喜临门旗舰店买的喜临门白骑士plus床垫，一开始很好舒服很舒服这个不得不承认。中途一年后有一边坐上去，弹簧弹的响，晚上翻身起来也能听到弹簧蹦的声音。反馈给天猫店后，安…</td>
+        </tr>
+        <tr>
+          <td class="mono">6a781924000000002800bdbe</td>
+          <td class="t">争议很大的装修项目——床垫怎么买？</td>
+          <td class="a">武汉炮哥</td>
+          <td class="num">33</td>
+          <td class="num">26</td>
+          <td class="date">2026-08-09 14:07…</td>
+          <td class="body">躺着买！ 多给炮哥点点赞 #床垫怎么买[话题] 标签：床垫怎么买</td>
+        </tr>
+        <tr>
+          <td class="mono">6a7dc9c900000000220338b7</td>
+          <td class="t">想睡硬的，家里的软床睡着腰疼，来个经销商报</td>
+          <td class="a">Jeffery</td>
+          <td class="num">0</td>
+          <td class="num">0</td>
+          <td class="date">2026-08-13 21:42…</td>
+          <td class="body">#健康的生活从睡眠开始[话题] #大自然床垫推荐[话题] 标签：健康的生活从睡眠开始、大自然床垫推荐</td>
+        </tr>
+        <tr>
+          <td class="mono">6a81661b000000002403d57c</td>
+          <td class="t">我宣布🙋本人网购最最成功的一次！！</td>
+          <td class="a">请喝林檬汽水🥤</td>
+          <td class="num">101</td>
+          <td class="num">94</td>
+          <td class="date">2026-08-16 15:26…</td>
+          <td class="body">说下本人选床垫的心路历程吧，本来想着，去实体店一口气把家里的三个房间都搞定的，😭无奈计划赶不上变化，脚底都打出泡了，也没有看到满意的，实在是太太太太贵了吧！ 配置、预算一对比，都挑…</td>
+        </tr>
+        <tr>
+          <td class="mono">6a27f915000000002202f182</td>
+          <td class="t">李老头啵啵间床垫哪家强？</td>
+          <td class="a">奶油蘑菇汤</td>
+          <td class="num">104</td>
+          <td class="num">102</td>
+          <td class="date">2026-06-09 19:29…</td>
+          <td class="body">感觉这四个里面蓝盒子和梦百合很多人都推荐，实际睡起来感觉咋样？求真路人现身说法！[抓狂R]想趁着现在6l8李老头那还可以叠➕啕的卷，抓紧换掉家里床垫，求真实评价！广勿扰 #李佳琦[…</td>
+        </tr>
+        </tbody>
+      </table></div>
+    </details>
+    <details class="grp" open>
+      <summary><span class="cnt">6</span> <span class="kw">麻大师床垫共床垫推荐</span></summary>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>noteId</th><th>标题</th><th>作者</th><th>赞</th><th>评</th><th>发布时间</th><th>正文摘要（无"麻大师"）</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="mono">6a340a460000000022019860</td>
+          <td class="t">这床真的太舒服了</td>
+          <td class="a">太阳不大</td>
+          <td class="num">105</td>
+          <td class="num">26</td>
+          <td class="date">2026-06-18 23:09…</td>
+          <td class="body">花了200自制了一张床垫，真的太舒服了。原来老的床垫睡得腰疼，加了一个3cm厚小弹簧➕1450密的空气纤维，再用床笠一包，真的太舒服了，真的不比那种贵的差，支撑很好，腰再也不疼了[…</td>
+        </tr>
+        <tr>
+          <td class="mono">6a55a40700000000210211a0</td>
+          <td class="t">大家能推荐一张好睡的床垫吗</td>
+          <td class="a">牛奶不加糖（装修中）</td>
+          <td class="num">146</td>
+          <td class="num">180</td>
+          <td class="date">2026-07-14 10:50…</td>
+          <td class="body">目前看了金可儿 慕思 栖作 金可儿深坑心选软硬合适 都不知道怎么了#床垫[话题] #健康的生活从睡眠开始[话题] #儿童床垫[话题] #舒适睡眠环境[话题] #护脊床垫[话题] #…</td>
+        </tr>
+        <tr>
+          <td class="mono">6a7ae402000000002201201d</td>
+          <td class="t">救命！！！买了三张床垫全退了！真的气炸了……</td>
+          <td class="a">李发发的home</td>
+          <td class="num">2</td>
+          <td class="num">0</td>
+          <td class="date">2026-08-11 16:57…</td>
+          <td class="body">真是九敏🆘了！！买个床垫一度踩坑，真不能光听商家说什么就是什么，还是得了解材料才好，毕竟是自己家用的，退货这么多床垫，我都感觉自己成床垫半个内行了... 	 1、舒适层是踩雷的重点…</td>
+        </tr>
+        <tr>
+          <td class="mono">6a4f6ecc000000002103dca1</td>
+          <td class="t">我发誓这是我今年最后的冲动消费🙈</td>
+          <td class="a">uncrion日落</td>
+          <td class="num">13</td>
+          <td class="num">10</td>
+          <td class="date">2026-07-09 17:50…</td>
+          <td class="body">好吧，年初就说今年不乱花钱 结果年中就破了戒😅，买了一张手工床垫 	 但是！但是！真的太舒服了！！ 全是羊毛、马尾毛一些天然材料，躺上去软软的很有包裹感，但腰那块又是挺的，不会塌 …</td>
+        </tr>
+        <tr>
+          <td class="mono">6a1e4371000000002202d28e</td>
+          <td class="t">几千与上万床垫的差距  90%的人被蒙在鼓里</td>
+          <td class="a">床垫大明白</td>
+          <td class="num">48</td>
+          <td class="num">4</td>
+          <td class="date">2026-06-02 17:44…</td>
+          <td class="body">1️⃣几千块的床垫和上万的床垫，实际成本差距没那么大。高端填充物（如马尾毛）价格高是因为稀缺，普通人一般用不到。进口渠道和工艺上的差距也没有想象中那么大，很多都是品牌溢价。 	 2…</td>
+        </tr>
+        <tr>
+          <td class="mono">6a857fe90000000028031d1e</td>
+          <td class="t">20秒教会你怎么选床垫</td>
+          <td class="a">蕾蕾</td>
+          <td class="num">19</td>
+          <td class="num">1</td>
+          <td class="date">2026-08-19 18:05…</td>
+          <td class="body">#宿舍床垫[话题] #学生床垫[话题] #宿舍床垫推荐大学生[话题] #董宇辉[话题]#床垫推荐性价比高的品牌[话题] #床垫[话题]#开学必备[话题]#准大一[话题]#开学[话题…</td>
+        </tr>
+        </tbody>
+      </table></div>
+    </details>
+    <details class="grp" open>
+      <summary><span class="cnt">5</span> <span class="kw">麻大师专卖红星美凯龙二楼</span></summary>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>noteId</th><th>标题</th><th>作者</th><th>赞</th><th>评</th><th>发布时间</th><th>正文摘要（无"麻大师"）</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="mono">69bfc17800000000230072d6</td>
+          <td class="t">(无标题)</td>
+          <td class="a">小红薯68C7469B</td>
+          <td class="num">0</td>
+          <td class="num">0</td>
+          <td class="date">2026-03-22 18:16…</td>
+          <td class="body">今天来乐从红星美凯龙，有咖啡喝，沙发好看</td>
+        </tr>
+        <tr>
+          <td class="mono">69e87f210000000021004868</td>
+          <td class="t">线下店买的床垫的血泪教训</td>
+          <td class="a">蔡老师</td>
+          <td class="num">9</td>
+          <td class="num">17</td>
+          <td class="date">2026-04-22 15:56…</td>
+          <td class="body">买床垫，还是线上买吧，不少品牌都能退换，或者免费试睡。线下买不仅不行，要退还要这么高的费用。在红星美凯龙的一家号称全球限量第一的品牌买的，退货来回运费都要出，厦门岛内来回收500，…</td>
+        </tr>
+        <tr>
+          <td class="mono">6a883fa100000000290252f7</td>
+          <td class="t">红星美凯龙心动音乐节！</td>
+          <td class="a">大漂亮吴莫愁</td>
+          <td class="num">7</td>
+          <td class="num">3</td>
+          <td class="date">2026-08-21 20:08…</td>
+          <td class="body">红星美凯龙·心动音乐节[红色心形R] 就在红星美凯龙上海全球家居1号店，热力开唱~ 8月22日，来现场和@吴莫愁Momo 不见不散！ 	 #音乐节[话题] #演出[话题] #上海[…</td>
+        </tr>
+        <tr>
+          <td class="mono">6a3661910000000021016100</td>
+          <td class="t">看到了不一样</td>
+          <td class="a">秀</td>
+          <td class="num">1</td>
+          <td class="num">0</td>
+          <td class="date">2026-06-20 17:46…</td>
+          <td class="body">周末来红星美凯龙北京东五环转了一圈，主要看家具和家居，顺带逛了下电器、卫浴区。 沙发和床品款式还挺多的，床垫可以躺着试，躺了好几个，软硬度差别挺明显，店员也不一直跟着，给我自己慢慢…</td>
+        </tr>
+        <tr>
+          <td class="mono">6a7df29b0000000022031ad0</td>
+          <td class="t">避雷！红XMKl，店大欺客</td>
+          <td class="a">和田墨玉</td>
+          <td class="num">0</td>
+          <td class="num">0</td>
+          <td class="date">2026-08-14 00:36…</td>
+          <td class="body">沙发从出厂就脱线，反复维修反复脱线，（实际就没修，因为修不好）红星店大欺客，明知质量问题需要退货，就是折腾你，赌你能不能耗的起精力和时间，让你走诉讼，让你拿法律文书，嘿，这操作真是…</td>
+        </tr>
+        </tbody>
+      </table></div>
+    </details>
+    <details class="grp" open>
+      <summary><span class="cnt">5</span> <span class="kw">麻大师甲醛</span></summary>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>noteId</th><th>标题</th><th>作者</th><th>赞</th><th>评</th><th>发布时间</th><th>正文摘要（无"麻大师"）</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="mono">696c9c6b000000000c035505</td>
+          <td class="t">哪些床垫不能买</td>
+          <td class="a">小卫 小卫</td>
+          <td class="num">343</td>
+          <td class="num">10</td>
+          <td class="date">2026-01-22 09:08…</td>
+          <td class="body">#床垫[话题] 标签：床垫</td>
+        </tr>
+        <tr>
+          <td class="mono">69d792ba000000001d01b6d6</td>
+          <td class="t">我退了3张了，才知道……</td>
+          <td class="a">。。。</td>
+          <td class="num">355</td>
+          <td class="num">131</td>
+          <td class="date">2026-04-09 19:51…</td>
+          <td class="body">买张床垫真的所有商家都吻了上来，全部的消息都是店家真的快崩溃了，说的只有优点没有缺点。。。。还说刚好有优会，我这个人很怕被骗，研究了好久终于研究清楚了 1.不买卷包床垫，卷包一点儿…</td>
+        </tr>
+        <tr>
+          <td class="mono">6a022230000000000702cf93</td>
+          <td class="t">(无标题)</td>
+          <td class="a">冰言冰语的号</td>
+          <td class="num">5405</td>
+          <td class="num">173</td>
+          <td class="date">2026-05-12 02:38…</td>
+          <td class="body">甲醛释放是很长的一个过程，要么源头阻断，要么控制在一定量即可，冰哥给大家说了一些小妙招大家可以试试#大冰[话题]  @大冰 标签：大冰</td>
+        </tr>
+        <tr>
+          <td class="mono">6a86c4440000000033031be9</td>
+          <td class="t">《退了3张床垫！过来人忠告》长文避坑</td>
+          <td class="a">麻辣potato</td>
+          <td class="num">34</td>
+          <td class="num">32</td>
+          <td class="date">2026-08-20 17:09…</td>
+          <td class="body">装修进度慢慢推进到80%，终于闲下来好好复盘一下！ 当初网购床垫真的狠狠踩坑，被卷包床垫坑到自闭😭 睡一晚起来腰酸背痛，腰像断了一样，而且床边特别容易打滑，坐一点都不稳！ 家里有小…</td>
+        </tr>
+        <tr>
+          <td class="mono">69eb3fa60000000011023004</td>
+          <td class="t">除甲醛一定要小心❗️这些竟暗藏致命风险</td>
+          <td class="a">老爸评测</td>
+          <td class="num">25120</td>
+          <td class="num">943</td>
+          <td class="date">2026-04-25 09:18…</td>
+          <td class="body">#除甲醛[话题] #甲醛治理[话题] #甲醛[话题] #新房装修[话题] #新房[话题] #甲醛果冻[话题] #老爸评测[话题] #甲醛果冻有用吗[话题] 标签：除甲醛、甲醛治理、…</td>
+        </tr>
+        </tbody>
+      </table></div>
+    </details>
+    <details class="grp" open>
+      <summary><span class="cnt">3</span> <span class="kw">新买的硬床垫麻大师</span></summary>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>noteId</th><th>标题</th><th>作者</th><th>赞</th><th>评</th><th>发布时间</th><th>正文摘要（无"麻大师"）</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="mono">6a7ae402000000002201201d</td>
+          <td class="t">救命！！！买了三张床垫全退了！真的气炸了……</td>
+          <td class="a">李发发的home</td>
+          <td class="num">2</td>
+          <td class="num">0</td>
+          <td class="date">2026-08-11 16:57…</td>
+          <td class="body">真是九敏🆘了！！买个床垫一度踩坑，真不能光听商家说什么就是什么，还是得了解材料才好，毕竟是自己家用的，退货这么多床垫，我都感觉自己成床垫半个内行了... 	 1、舒适层是踩雷的重点…</td>
+        </tr>
+        <tr>
+          <td class="mono">6a82c3d2000000002903334b</td>
+          <td class="t">体会过喜临门售后，你就知道你有多绝望了😩</td>
+          <td class="a">co</td>
+          <td class="num">13</td>
+          <td class="num">37</td>
+          <td class="date">2026-08-17 16:18…</td>
+          <td class="body">两年前淘宝天猫喜临门旗舰店买的喜临门白骑士plus床垫，一开始很好舒服很舒服这个不得不承认。中途一年后有一边坐上去，弹簧弹的响，晚上翻身起来也能听到弹簧蹦的声音。反馈给天猫店后，安…</td>
+        </tr>
+        <tr>
+          <td class="mono">6a77e976000000002403d3e7</td>
+          <td class="t">床垫里的黄麻板容易塌吗</td>
+          <td class="a">平凡小日子</td>
+          <td class="num">1</td>
+          <td class="num">5</td>
+          <td class="date">2026-08-09 10:44…</td>
+          <td class="body">买的某品牌的热销黄麻床垫，主要配置是3分区独立袋+进口黄麻+乳胶。睡得没有想象的那种感觉，而且刷到有博主说，独立袋弹簧和黄麻搭配，很容易导致黄麻塌陷，弹簧失效</td>
+        </tr>
+        </tbody>
+      </table></div>
+    </details>
+    <details class="grp" open>
+      <summary><span class="cnt">3</span> <span class="kw">麻大师0胶水床垫</span></summary>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>noteId</th><th>标题</th><th>作者</th><th>赞</th><th>评</th><th>发布时间</th><th>正文摘要（无"麻大师"）</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="mono">69c36f6000000000220025fc</td>
+          <td class="t">暴力拆解床垫，哦豁，胶水棕</td>
+          <td class="a">momo</td>
+          <td class="num">144</td>
+          <td class="num">215</td>
+          <td class="date">2026-03-25 13:15…</td>
+          <td class="body">入住三个月了，总觉得哪里不对劲。 1.小朋友和我一直鼻炎，皮肤过敏，眼睛酸胀，流鼻血。白天缓解，晚上严重。 2.但是卧室并没有味道。 3.实时开窗通风，甲醛试纸也正常。 	 最开始…</td>
+        </tr>
+        <tr>
+          <td class="mono">6a340a460000000022019860</td>
+          <td class="t">这床真的太舒服了</td>
+          <td class="a">太阳不大</td>
+          <td class="num">105</td>
+          <td class="num">26</td>
+          <td class="date">2026-06-18 23:09…</td>
+          <td class="body">花了200自制了一张床垫，真的太舒服了。原来老的床垫睡得腰疼，加了一个3cm厚小弹簧➕1450密的空气纤维，再用床笠一包，真的太舒服了，真的不比那种贵的差，支撑很好，腰再也不疼了[…</td>
+        </tr>
+        <tr>
+          <td class="mono">6a7ae402000000002201201d</td>
+          <td class="t">救命！！！买了三张床垫全退了！真的气炸了……</td>
+          <td class="a">李发发的home</td>
+          <td class="num">2</td>
+          <td class="num">0</td>
+          <td class="date">2026-08-11 16:57…</td>
+          <td class="body">真是九敏🆘了！！买个床垫一度踩坑，真不能光听商家说什么就是什么，还是得了解材料才好，毕竟是自己家用的，退货这么多床垫，我都感觉自己成床垫半个内行了... 	 1、舒适层是踩雷的重点…</td>
+        </tr>
+        </tbody>
+      </table></div>
+    </details>
+    <details class="grp" open>
+      <summary><span class="cnt">3</span> <span class="kw">麻大师豆芽</span></summary>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>noteId</th><th>标题</th><th>作者</th><th>赞</th><th>评</th><th>发布时间</th><th>正文摘要（无"麻大师"）</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="mono">69e1f6b20000000022028a6c</td>
+          <td class="t">我妈说我睡这么高 是要登基吗？😢</td>
+          <td class="a">X喜哈哈</td>
+          <td class="num">6</td>
+          <td class="num">7</td>
+          <td class="date">2026-04-17 17:00…</td>
+          <td class="body">没有量尺寸这床垫也太高了 每晚睡觉像是要爬上龙床… 没有一米九的腿怕是下不来 不过有一说一这床垫睡起来挺舒服的… #床垫[话题] #睡觉的最高境界[话题] #卧室[话题] #家具[…</td>
+        </tr>
+        <tr>
+          <td class="mono">69fae50a00000000350223e2</td>
+          <td class="t">烧了床垫才发现买到了假黄麻～避雷！</td>
+          <td class="a">文轩</td>
+          <td class="num">2</td>
+          <td class="num">46</td>
+          <td class="date">2026-05-06 14:51…</td>
+          <td class="body">以为买到了黄麻中的精品，没想到烧了一些发现是化纤！！！[哭惹R] 	 一股塑料味，也没有黄麻的灰烬，真是一言难尽！ 	 避雷“沐山春”品牌的黄麻床垫呀 	 #黄麻床垫[话题] 标签…</td>
+        </tr>
+        <tr>
+          <td class="mono">6a522b950000000011012808</td>
+          <td class="t">(无标题)</td>
+          <td class="a">田漂亮的中古小家</td>
+          <td class="num">0</td>
+          <td class="num">0</td>
+          <td class="date">2026-07-11 19:40…</td>
+          <td class="body">你们的也这样吗 之前喜临门家的没问题 后来搬次卧了😂😂</td>
+        </tr>
+        </tbody>
+      </table></div>
+    </details>
+    <details class="grp" open>
+      <summary><span class="cnt">2</span> <span class="kw">麻大师儿童床垫</span></summary>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>noteId</th><th>标题</th><th>作者</th><th>赞</th><th>评</th><th>发布时间</th><th>正文摘要（无"麻大师"）</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="mono">6a3231af000000001603e0f4</td>
+          <td class="t">冒黑烟的儿童床垫！千万别给孩子用😭</td>
+          <td class="a">🐈快乐汽水猫</td>
+          <td class="num">9</td>
+          <td class="num">33</td>
+          <td class="date">2026-06-17 13:33…</td>
+          <td class="body">因为换了定制的大床，需要新的床垫。购买之前反复确认有没有胶水，的确没有胶水，但是加了胶质材料，打开就很大味道。 一共定了3个打开就是很大一股味道，拆开塑料包装脱线，缝合粗制滥造（内…</td>
+        </tr>
+        <tr>
+          <td class="mono">69d792ba000000001d01b6d6</td>
+          <td class="t">我退了3张了，才知道……</td>
+          <td class="a">。。。</td>
+          <td class="num">355</td>
+          <td class="num">131</td>
+          <td class="date">2026-04-09 19:51…</td>
+          <td class="body">买张床垫真的所有商家都吻了上来，全部的消息都是店家真的快崩溃了，说的只有优点没有缺点。。。。还说刚好有优会，我这个人很怕被骗，研究了好久终于研究清楚了 1.不买卷包床垫，卷包一点儿…</td>
+        </tr>
+        </tbody>
+      </table></div>
+    </details>
+    <details class="grp" open>
+      <summary><span class="cnt">2</span> <span class="kw">麻大师异味</span></summary>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>noteId</th><th>标题</th><th>作者</th><th>赞</th><th>评</th><th>发布时间</th><th>正文摘要（无"麻大师"）</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="mono">69e1e37f000000001d019e6f</td>
+          <td class="t">装修日记106｜无语了，床垫竟然。。。</td>
+          <td class="a">A小Q的装修日记（散味ing）</td>
+          <td class="num">12</td>
+          <td class="num">43</td>
+          <td class="date">2026-04-17 15:38…</td>
+          <td class="body">想刚买了大品牌，棕榈的床垫，都是纯天然的，味道吹了一个多月了，味道还那么大，联系客服，他说这个是他们正常的味道。 就算你是纯天然也不能有味道呀，房间里的家具电视柜都没有什么味道，反…</td>
+        </tr>
+        <tr>
+          <td class="mono">69c36f6000000000220025fc</td>
+          <td class="t">暴力拆解床垫，哦豁，胶水棕</td>
+          <td class="a">momo</td>
+          <td class="num">143</td>
+          <td class="num">214</td>
+          <td class="date">2026-03-25 13:15…</td>
+          <td class="body">入住三个月了，总觉得哪里不对劲。 1.小朋友和我一直鼻炎，皮肤过敏，眼睛酸胀，流鼻血。白天缓解，晚上严重。 2.但是卧室并没有味道。 3.实时开窗通风，甲醛试纸也正常。 	 最开始…</td>
+        </tr>
+        </tbody>
+      </table></div>
+    </details>
+    <details class="grp" open>
+      <summary><span class="cnt">2</span> <span class="kw">麻大师床垫避雷</span></summary>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>noteId</th><th>标题</th><th>作者</th><th>赞</th><th>评</th><th>发布时间</th><th>正文摘要（无"麻大师"）</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="mono">6a81995300000000280063cd</td>
+          <td class="t">某大师的黄麻床垫有懂的吗帮忙看看</td>
+          <td class="a">一口冰淇淋</td>
+          <td class="num">4</td>
+          <td class="num">21</td>
+          <td class="date">2026-08-16 19:04…</td>
+          <td class="body">收到感觉和宣传图不一样，我也不懂，有懂的麻烦帮忙看看，这个是S精细黄麻吗？客服说是S精细黄麻，今天找客服要黄麻含量也拿不出来#黄麻床垫[话题] #环保床垫[话题] 找客服掰扯一番不…</td>
+        </tr>
+        <tr>
+          <td class="mono">6a6c081f0000000033030052</td>
+          <td class="t">黄麻床垫睡一段时间还会变软？</td>
+          <td class="a">李老板的红薯</td>
+          <td class="num">2</td>
+          <td class="num">3</td>
+          <td class="date">2026-07-31 10:27…</td>
+          <td class="body">看小红书上很多推荐这个的，后面看有没有避坑的就发现问题了，黄麻床垫作为硬床垫，睡一段时间还会变软吗？还是说商家的品控有问题。</td>
+        </tr>
+        </tbody>
+      </table></div>
+    </details>
+    <details class="grp" open>
+      <summary><span class="cnt">1</span> <span class="kw">护脊床垫推荐麻大师</span></summary>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>noteId</th><th>标题</th><th>作者</th><th>赞</th><th>评</th><th>发布时间</th><th>正文摘要（无"麻大师"）</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="mono">6a55a40700000000210211a0</td>
+          <td class="t">大家能推荐一张好睡的床垫吗</td>
+          <td class="a">牛奶不加糖（装修中）</td>
+          <td class="num">146</td>
+          <td class="num">180</td>
+          <td class="date">2026-07-14 10:50…</td>
+          <td class="body">目前看了金可儿 慕思 栖作 金可儿深坑心选软硬合适 都不知道怎么了#床垫[话题] #健康的生活从睡眠开始[话题] #儿童床垫[话题] #舒适睡眠环境[话题] #护脊床垫[话题] #…</td>
+        </tr>
+        </tbody>
+      </table></div>
+    </details>
+    <details class="grp" open>
+      <summary><span class="cnt">1</span> <span class="kw">给小孩子买的麻大师床垫</span></summary>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>noteId</th><th>标题</th><th>作者</th><th>赞</th><th>评</th><th>发布时间</th><th>正文摘要（无"麻大师"）</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="mono">6a82b36c0000000024027d8f</td>
+          <td class="t">挑了半个月儿童床垫🖐️真的没让我失望！！</td>
+          <td class="a">😘燕子😜</td>
+          <td class="num">5</td>
+          <td class="num">2</td>
+          <td class="date">2026-08-17 15:08…</td>
+          <td class="body">拆开一点味道都没有，给娃用，环保这块直接安心很多！✨ 我家在大床旁边铺了个物流垫板打底 我买的1.5m*2.0m大小的厚 8cm，放进去刚刚好，弄成一个地铺床 ✅A 类华夫格面料摸…</td>
+        </tr>
+        </tbody>
+      </table></div>
+    </details>
+    <details class="grp" open>
+      <summary><span class="cnt">1</span> <span class="kw">淮南红星麻大师床垫</span></summary>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>noteId</th><th>标题</th><th>作者</th><th>赞</th><th>评</th><th>发布时间</th><th>正文摘要（无"麻大师"）</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="mono">69e87f210000000021004868</td>
+          <td class="t">线下店买的床垫的血泪教训</td>
+          <td class="a">蔡老师</td>
+          <td class="num">9</td>
+          <td class="num">17</td>
+          <td class="date">2026-04-22 15:56…</td>
+          <td class="body">买床垫，还是线上买吧，不少品牌都能退换，或者免费试睡。线下买不仅不行，要退还要这么高的费用。在红星美凯龙的一家号称全球限量第一的品牌买的，退货来回运费都要出，厦门岛内来回收500，…</td>
+        </tr>
+        </tbody>
+      </table></div>
+    </details>
+    <details class="grp" open>
+      <summary><span class="cnt">1</span> <span class="kw">麻大师南京线下体验店</span></summary>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>noteId</th><th>标题</th><th>作者</th><th>赞</th><th>评</th><th>发布时间</th><th>正文摘要（无"麻大师"）</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="mono">69c1e37f00000000230123f8</td>
+          <td class="t">如何选择适合自己的床垫？</td>
+          <td class="a">脊尽所能-沈大夫</td>
+          <td class="num">8</td>
+          <td class="num">0</td>
+          <td class="date">2026-03-24 09:06…</td>
+          <td class="body">#腰痛[话题] #床垫[话题] 标签：腰痛、床垫</td>
+        </tr>
+        </tbody>
+      </table></div>
+    </details>
+    <details class="grp" open>
+      <summary><span class="cnt">1</span> <span class="kw">麻大师软床加硬床神器</span></summary>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>noteId</th><th>标题</th><th>作者</th><th>赞</th><th>评</th><th>发布时间</th><th>正文摘要（无"麻大师"）</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="mono">69cf86520000000023010f34</td>
+          <td class="t">床垫加硬</td>
+          <td class="a">石榴崽崽</td>
+          <td class="num">196</td>
+          <td class="num">93</td>
+          <td class="date">2026-04-03 17:20…</td>
+          <td class="body">床垫太软睡的腰疼 在网上学到这种方法 把床垫拆开， 买了块173x190的床板塞进去 	 完美 	 #床垫加硬[话题] 标签：床垫加硬</td>
+        </tr>
+        </tbody>
+      </table></div>
+    </details>
+    <details class="grp" open>
+      <summary><span class="cnt">1</span> <span class="kw">麻大师可折叠床垫</span></summary>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>noteId</th><th>标题</th><th>作者</th><th>赞</th><th>评</th><th>发布时间</th><th>正文摘要（无"麻大师"）</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="mono">6a7ae402000000002201201d</td>
+          <td class="t">救命！！！买了三张床垫全退了！真的气炸了……</td>
+          <td class="a">李发发的home</td>
+          <td class="num">2</td>
+          <td class="num">0</td>
+          <td class="date">2026-08-11 16:57…</td>
+          <td class="body">真是九敏🆘了！！买个床垫一度踩坑，真不能光听商家说什么就是什么，还是得了解材料才好，毕竟是自己家用的，退货这么多床垫，我都感觉自己成床垫半个内行了... 	 1、舒适层是踩雷的重点…</td>
+        </tr>
+        </tbody>
+      </table></div>
+    </details>
+    <details class="grp" open>
+      <summary><span class="cnt">1</span> <span class="kw">麻大师儿童床垫垫</span></summary>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>noteId</th><th>标题</th><th>作者</th><th>赞</th><th>评</th><th>发布时间</th><th>正文摘要（无"麻大师"）</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="mono">6a82b36c0000000024027d8f</td>
+          <td class="t">挑了半个月儿童床垫🖐️真的没让我失望！！</td>
+          <td class="a">😘燕子😜</td>
+          <td class="num">5</td>
+          <td class="num">2</td>
+          <td class="date">2026-08-17 15:08…</td>
+          <td class="body">拆开一点味道都没有，给娃用，环保这块直接安心很多！✨ 我家在大床旁边铺了个物流垫板打底 我买的1.5m*2.0m大小的厚 8cm，放进去刚刚好，弄成一个地铺床 ✅A 类华夫格面料摸…</td>
+        </tr>
+        </tbody>
+      </table></div>
+    </details>
+    <details class="grp" open>
+      <summary><span class="cnt">1</span> <span class="kw">麻大师豆芽4</span></summary>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>noteId</th><th>标题</th><th>作者</th><th>赞</th><th>评</th><th>发布时间</th><th>正文摘要（无"麻大师"）</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="mono">69d3deb80000000021006e61</td>
+          <td class="t">老床垫改造</td>
+          <td class="a">祝你开心^_^</td>
+          <td class="num">235</td>
+          <td class="num">57</td>
+          <td class="date">2026-04-07 00:26…</td>
+          <td class="body">传承弹簧床垫睡了几十年有点塌了 睡得浑身疼 在小红书学习博采众长 因为不想太硬买的50D 3cm海绵垫 3cm酷布小弹簧 2cm空气纤维 加上原来的床垫一共高26cm 	 我的床是…</td>
+        </tr>
+        </tbody>
+      </table></div>
+    </details>
+    <details class="grp" open>
+      <summary><span class="cnt">1</span> <span class="kw">麻大师</span></summary>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>noteId</th><th>标题</th><th>作者</th><th>赞</th><th>评</th><th>发布时间</th><th>正文摘要（无"麻大师"）</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="mono">69fae50a00000000350223e2</td>
+          <td class="t">烧了床垫才发现买到了假黄麻～避雷！</td>
+          <td class="a">文轩</td>
+          <td class="num">2</td>
+          <td class="num">46</td>
+          <td class="date">2026-05-06 14:51…</td>
+          <td class="body">以为买到了黄麻中的精品，没想到烧了一些发现是化纤！！！[哭惹R] 	 一股塑料味，也没有黄麻的灰烬，真是一言难尽！ 	 避雷“沐山春”品牌的黄麻床垫呀 	 #黄麻床垫[话题] 标签…</td>
+        </tr>
+        </tbody>
+      </table></div>
+    </details>
+    <details class="grp" open>
+      <summary><span class="cnt">1</span> <span class="kw">麻大师虚假宣传</span></summary>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>noteId</th><th>标题</th><th>作者</th><th>赞</th><th>评</th><th>发布时间</th><th>正文摘要（无"麻大师"）</th></tr></thead>
+        <tbody>
+        <tr>
+          <td class="mono">6a280dd700000000150265f6</td>
+          <td class="t">床垫不应该只是材料简单搭配！</td>
+          <td class="a">小陈的床垫日记</td>
+          <td class="num">109</td>
+          <td class="num">8</td>
+          <td class="date">2026-06-09 20:57…</td>
+          <td class="body">要遵守最基本的人体睡眠工学#小陈床垫[话题] #床垫[话题] #测评[话题] #拆床垫[话题] 标签：小陈床垫、床垫、测评、拆床垫</td>
+        </tr>
+        </tbody>
+      </table></div>
+    </details>
+
+<div class="foot">
+  <p>清理操作已完成。<b>页面刷新</b> http://100.113.194.123:5174/ 即可看到「监控笔记明细」仅剩与麻大师品牌相关的 510 条笔记。如需重新纳入某些被移除的笔记，从备份文件恢复即可。</p>
+</div>
+</div></body></html>

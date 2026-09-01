@@ -1,0 +1,379 @@
+table 辅5-床类编码
+	excludeFromModelRefresh
+	lineageTag: 5c3230a2-abd2-4ab2-815b-20ce730dfa62
+
+	column 商家规编（后台）
+		dataType: string
+		lineageTag: 6e4f36ff-5b9f-4da4-b21f-a887582c433e
+		summarizeBy: none
+		sourceColumn: 商家规编（后台）
+
+		annotation SummarizationSetBy = Automatic
+
+	column sku名称（后台）
+		dataType: string
+		lineageTag: 525e09c7-941c-43f9-8eaa-7e4e4b0ad60f
+		summarizeBy: none
+		sourceColumn: sku名称（后台）
+
+		annotation SummarizationSetBy = Automatic
+
+	column 产品名称
+		dataType: string
+		lineageTag: 64dd0fbc-39f2-416e-9072-baf7e066a606
+		summarizeBy: none
+		sourceColumn: 产品名称
+
+		annotation SummarizationSetBy = Automatic
+
+	column SPU产品商编
+		dataType: string
+		lineageTag: b22d1e6e-3a18-4fca-9067-c48f686b5d06
+		summarizeBy: none
+		sourceColumn: SPU产品商编
+
+		annotation SummarizationSetBy = Automatic
+
+	column 规格
+		dataType: string
+		lineageTag: b893cff6-a01a-44df-9768-c3cfcb870f0c
+		summarizeBy: none
+		sourceColumn: 规格
+
+		annotation SummarizationSetBy = Automatic
+
+	column 图片
+		dataType: string
+		lineageTag: 8c49c082-2f07-4018-a26c-0a04c1881f05
+		summarizeBy: none
+		sourceColumn: 图片
+
+		annotation SummarizationSetBy = Automatic
+
+	column 商品ID
+		dataType: string
+		lineageTag: 997f3a0a-913b-4772-abbe-7bc30c6a184d
+		summarizeBy: none
+		sourceColumn: 商品ID
+
+		annotation SummarizationSetBy = Automatic
+
+	column 类目
+		dataType: string
+		lineageTag: 66ebdabb-9e88-419a-abac-e23f794dc120
+		summarizeBy: none
+		sourceColumn: 类目
+
+		annotation SummarizationSetBy = Automatic
+
+	column 床头
+		dataType: string
+		lineageTag: 9df5d156-e08b-4c6e-9608-185e3e28db21
+		summarizeBy: none
+		sourceColumn: 床头
+
+		annotation SummarizationSetBy = Automatic
+
+	column 床帮
+		dataType: string
+		lineageTag: 19df7ef5-8136-4b9f-8381-7219c8e74e09
+		summarizeBy: none
+		sourceColumn: 床帮
+
+		annotation SummarizationSetBy = Automatic
+
+	column 系列2
+		dataType: string
+		lineageTag: 9f6844ab-3683-45af-8d02-90803396930d
+		summarizeBy: none
+		sourceColumn: 系列2
+
+		annotation SummarizationSetBy = Automatic
+
+	column 序号
+		dataType: string
+		lineageTag: 8b6e944e-d7aa-42d2-98dd-1eb6ef08ebbe
+		summarizeBy: none
+		sourceColumn: 序号
+
+		annotation SummarizationSetBy = Automatic
+
+	column 做货工厂
+		dataType: string
+		lineageTag: 5827d574-931b-4c85-901b-6a307ae65e12
+		summarizeBy: none
+		sourceColumn: 做货工厂
+
+		annotation SummarizationSetBy = Automatic
+
+	column 规格名称（工厂看）
+		dataType: string
+		lineageTag: 74c2738e-949a-466b-8fff-425246afcd5a
+		summarizeBy: none
+		sourceColumn: 规格名称（工厂看）
+
+		annotation SummarizationSetBy = Automatic
+
+	column 尺寸
+		dataType: string
+		lineageTag: 64d094c8-0315-405d-a910-1478d4b93677
+		summarizeBy: none
+		sourceColumn: 尺寸
+
+		annotation SummarizationSetBy = Automatic
+
+	column 颜色
+		dataType: string
+		lineageTag: 46737dd0-be8a-4f6b-918b-09d32a03feaa
+		summarizeBy: none
+		sourceColumn: 颜色
+
+		annotation SummarizationSetBy = Automatic
+
+	column 床头面料
+		dataType: string
+		lineageTag: d7dd9ff5-d157-47d8-b9fe-0bb02fd37ccc
+		summarizeBy: none
+		sourceColumn: 床头面料
+
+		annotation SummarizationSetBy = Automatic
+
+	column 床头皮样
+		dataType: string
+		lineageTag: f99a675f-a588-4117-935f-5acb0a9e0dad
+		summarizeBy: none
+		sourceColumn: 床头皮样
+
+		annotation SummarizationSetBy = Automatic
+
+	column 填充
+		dataType: string
+		lineageTag: eb626dbb-3a03-46f3-bfcb-2cf98884baec
+		summarizeBy: none
+		sourceColumn: 填充
+
+		annotation SummarizationSetBy = Automatic
+
+	column 床帮床尾
+		dataType: string
+		lineageTag: ef01b196-fb45-4930-99c6-31f97ec46743
+		summarizeBy: none
+		sourceColumn: 床帮床尾
+
+		annotation SummarizationSetBy = Automatic
+
+	column 排骨架
+		dataType: string
+		lineageTag: 63807934-aece-40ce-bfec-8347abfa4cc9
+		summarizeBy: none
+		sourceColumn: 排骨架
+
+		annotation SummarizationSetBy = Automatic
+
+	column 结构
+		dataType: string
+		lineageTag: 34ab73ee-4afb-4515-af3a-0ad6a95ba2ab
+		summarizeBy: none
+		sourceColumn: 结构
+
+		annotation SummarizationSetBy = Automatic
+
+	column 床脚
+		dataType: string
+		lineageTag: da75d752-cf37-453d-9337-04f21732d78c
+		summarizeBy: none
+		sourceColumn: 床脚
+
+		annotation SummarizationSetBy = Automatic
+
+	column 床脚高度
+		dataType: string
+		lineageTag: 4e5f3e0a-e29c-44a2-b3a1-14f2c14803dd
+		summarizeBy: none
+		sourceColumn: 床脚高度
+
+		annotation SummarizationSetBy = Automatic
+
+	column 尺寸_1
+		dataType: string
+		lineageTag: 378b003b-557a-47ee-9e97-1746c8e67b69
+		summarizeBy: none
+		sourceColumn: 尺寸_1
+
+		annotation SummarizationSetBy = Automatic
+
+	column 床帮到地面距离
+		dataType: string
+		lineageTag: dc34a691-1aae-4e16-a4a9-1e03de3954df
+		summarizeBy: none
+		sourceColumn: 床帮到地面距离
+
+		annotation SummarizationSetBy = Automatic
+
+	column 床垫编码（后续改进为简单的）
+		dataType: string
+		lineageTag: e4cab6f1-a845-4e60-8242-7dd4960d2e42
+		summarizeBy: none
+		sourceColumn: 床垫编码（后续改进为简单的）
+
+		annotation SummarizationSetBy = Automatic
+
+	column 数量
+		dataType: string
+		lineageTag: a52ae932-071c-4bd6-b473-5180ef31a123
+		summarizeBy: none
+		sourceColumn: 数量
+
+		annotation SummarizationSetBy = Automatic
+
+	column 床垫主型号
+		dataType: string
+		lineageTag: daac7c71-24d6-42d4-94d8-50a00b84773d
+		summarizeBy: none
+		sourceColumn: 床垫主型号
+
+		annotation SummarizationSetBy = Automatic
+
+	column 床垫规格
+		dataType: string
+		lineageTag: a2cf8241-6355-46bf-8252-5863b1510b5b
+		summarizeBy: none
+		sourceColumn: 床垫规格
+
+		annotation SummarizationSetBy = Automatic
+
+	column 单床编码（手动匹配）
+		dataType: string
+		lineageTag: f1b0535f-4d17-4109-825d-2117273a90d2
+		summarizeBy: none
+		sourceColumn: 单床编码（手动匹配）
+
+		annotation SummarizationSetBy = Automatic
+
+	column 床成本
+		dataType: string
+		lineageTag: f5b401bc-cdfc-4186-a3ec-8c05ba418c80
+		summarizeBy: none
+		sourceColumn: 床成本
+
+		annotation SummarizationSetBy = Automatic
+
+	column 床垫成本
+		dataType: string
+		lineageTag: 580c6844-05fe-49e9-8158-b8910eed5bcb
+		summarizeBy: none
+		sourceColumn: 床垫成本
+
+		annotation SummarizationSetBy = Automatic
+
+	column 合计成本
+		dataType: string
+		lineageTag: fb31cf36-6bc4-47d6-9c69-db7c6542e7cf
+		summarizeBy: none
+		sourceColumn: 合计成本
+
+		annotation SummarizationSetBy = Automatic
+
+	column 床常规
+		dataType: string
+		lineageTag: 11d82498-4891-416b-89f1-9325048aca78
+		summarizeBy: none
+		sourceColumn: 床常规
+
+		annotation SummarizationSetBy = Automatic
+
+	column 床垫常规
+		dataType: string
+		lineageTag: c9cb5692-5b02-4c8a-b92f-47ea98745c2b
+		summarizeBy: none
+		sourceColumn: 床垫常规
+
+		annotation SummarizationSetBy = Automatic
+
+	column 毛利
+		dataType: string
+		lineageTag: 533a2c9e-6d3c-444e-b741-119d78ba0ee6
+		summarizeBy: none
+		sourceColumn: 毛利
+
+		annotation SummarizationSetBy = Automatic
+
+	column 宜洛到手
+		dataType: string
+		lineageTag: fd66e5c7-0bd6-4728-ab01-074cb4127e49
+		summarizeBy: none
+		sourceColumn: 宜洛到手
+
+		annotation SummarizationSetBy = Automatic
+
+	column 价差
+		dataType: string
+		lineageTag: 75cbe5c0-0b90-4f0e-9855-be2359ea4a24
+		summarizeBy: none
+		sourceColumn: 价差
+
+		annotation SummarizationSetBy = Automatic
+
+	column 备注
+		dataType: string
+		lineageTag: ef1e0176-5938-452a-803f-79e05285a1e2
+		summarizeBy: none
+		sourceColumn: 备注
+
+		annotation SummarizationSetBy = Automatic
+
+	column 主卖
+		dataType: string
+		lineageTag: 0cb85cf0-a0c6-4247-82a0-b2686aed3263
+		summarizeBy: none
+		sourceColumn: 主卖
+
+		annotation SummarizationSetBy = Automatic
+
+	column 合计常规价（天猫）
+		dataType: string
+		lineageTag: a391f6ea-b2da-4345-8f72-2dd8506c6e10
+		summarizeBy: none
+		sourceColumn: 合计常规价（天猫）
+
+		annotation SummarizationSetBy = Automatic
+
+	column 组合到手价（天猫）
+		dataType: string
+		lineageTag: cbccf7cc-9fa1-4012-a7fe-99b5546836c4
+		summarizeBy: none
+		sourceColumn: 组合到手价（天猫）
+
+		annotation SummarizationSetBy = Automatic
+
+	column 合计常规价（抖音）
+		dataType: string
+		lineageTag: 00cbb40d-394c-4316-b422-b57f2637cf1a
+		summarizeBy: none
+		sourceColumn: 合计常规价（抖音）
+
+		annotation SummarizationSetBy = Automatic
+
+	column 组合到手价（抖音）
+		dataType: string
+		lineageTag: 4d4e506f-3732-4697-93c3-ce83ee56907f
+		summarizeBy: none
+		sourceColumn: 组合到手价（抖音）
+
+		annotation SummarizationSetBy = Automatic
+
+	partition 辅5-床类编码 = m
+		mode: import
+		source =
+				let
+				    源 = Excel.Workbook(File.Contents("D:\麻大师\日更数据\天猫旗舰店\商品信息文件\床类编码.xlsx"), null, true),
+				    Sheet1_Sheet = 源{[Item="Sheet1",Kind="Sheet"]}[Data],
+				    提升的标题 = Table.PromoteHeaders(Sheet1_Sheet, [PromoteAllScalars=true]),
+				    重命名的列 = Table.RenameColumns(提升的标题,{{"主型号", "SPU产品商编"}, {"id", "商品ID"}, {"商家编码（后台）", "商家规编（后台）"}})
+				in
+				    重命名的列
+
+	annotation PBI_NavigationStepName = 导航
+
+	annotation PBI_ResultType = Table
+

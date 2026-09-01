@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 500" role="img" font-family="-apple-system, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif">
+<title>画册卡片解剖线稿</title>
+<desc>单张画册卡片的结构与规格标注：1:1 主图、排名与趋势 pill、名称、商家实收大数字、销量毛利率双格，右侧列出字号色值规范，底部为无图占位符变体</desc>
+<rect width="680" height="500" fill="#071014"/>
+<defs>
+<pattern id="imgfill2" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+<rect width="10" height="10" fill="#122126"/>
+<line x1="0" y1="0" x2="0" y2="10" stroke="#1d333a" stroke-width="3"/>
+</pattern>
+</defs>
+<text x="24" y="24" font-size="13" font-weight="500" fill="#edf3ef">单卡解剖 · 网格列宽约 300-360px</text>
+<rect x="24" y="40" width="250" height="392" rx="8" fill="#0d1a1f" stroke="#9db3ad" stroke-width="1"/>
+<rect x="25" y="41" width="248" height="248" rx="7" fill="url(#imgfill2)"/>
+<rect x="37" y="53" width="34" height="20" rx="4" fill="#1a2b30"/>
+<text x="46" y="67" font-size="11" font-weight="500" fill="#edf3ef">#1</text>
+<rect x="185" y="53" width="76" height="20" rx="4" fill="#16301c"/>
+<text x="195" y="67" font-size="11" font-weight="500" fill="#85d83f">↗ +12.3%</text>
+<text x="37" y="318" font-size="13.5" font-weight="500" fill="#edf3ef">零压记忆棉床垫</text>
+<text x="37" y="336" font-size="13.5" font-weight="500" fill="#edf3ef">· 深睡 Pro 系列</text>
+<text x="37" y="360" font-size="11" fill="#7a8b85">商家实收</text>
+<text x="37" y="388" font-size="26" font-weight="500" fill="#a6e536">¥12.3万</text>
+<rect x="37" y="398" width="108" height="26" rx="5" fill="#101f24" stroke="#3a4a46" stroke-width="0.8"/>
+<text x="45" y="408" font-size="11" fill="#7a8b85">销量</text>
+<text x="45" y="420" font-size="12" font-weight="500" fill="#edf3ef">1.2万件</text>
+<rect x="153" y="398" width="108" height="26" rx="5" fill="#101f24" stroke="#3a4a46" stroke-width="0.8"/>
+<text x="161" y="408" font-size="11" fill="#7a8b85">毛利率</text>
+<text x="161" y="420" font-size="12" font-weight="500" fill="#edf3ef">34.5%</text>
+<line x1="274" y1="150" x2="330" y2="150" stroke="#5f6b66" stroke-width="0.8" stroke-dasharray="3 3"/>
+<line x1="274" y1="325" x2="330" y2="325" stroke="#5f6b66" stroke-width="0.8" stroke-dasharray="3 3"/>
+<line x1="274" y1="375" x2="330" y2="375" stroke="#5f6b66" stroke-width="0.8" stroke-dasharray="3 3"/>
+<line x1="274" y1="411" x2="330" y2="411" stroke="#5f6b66" stroke-width="0.8" stroke-dasharray="3 3"/>
+<text x="336" y="70" font-size="12" font-weight="500" fill="#edf3ef">规格标注</text>
+<text x="336" y="100" font-size="11" font-weight="500" fill="#9db3ad">主图区</text>
+<text x="336" y="116" font-size="11" fill="#7a8b85">aspect-ratio 1:1 · cover · 占卡高约 55%</text>
+<text x="336" y="132" font-size="11" fill="#7a8b85">移动端降为 4:3，避免首屏占满</text>
+<text x="336" y="158" font-size="11" font-weight="500" fill="#9db3ad">排名 tag / 趋势 pill</text>
+<text x="336" y="174" font-size="11" fill="#7a8b85">11px · radius 4 · 实心底（去毛玻璃）</text>
+<text x="336" y="190" font-size="11" fill="#7a8b85">涨 success-soft 底 · 跌 danger-soft 底 · 带箭头图标</text>
+<text x="336" y="216" font-size="11" font-weight="500" fill="#9db3ad">产品名称</text>
+<text x="336" y="232" font-size="11" fill="#7a8b85">13.5px / 500 · #edf3ef · 两行截断 · 行高 1.35</text>
+<text x="336" y="258" font-size="11" font-weight="500" fill="#9db3ad">商家实收（唯一 accent 元素）</text>
+<text x="336" y="274" font-size="11" fill="#7a8b85">label 11px #7a8b85 · 值 26px display 字体</text>
+<text x="336" y="290" font-size="11" fill="#7a8b85">#a6e536 · tabular-nums · clamp(22, 1.8vw, 26)</text>
+<text x="336" y="316" font-size="11" font-weight="500" fill="#9db3ad">销量 / 毛利率双格</text>
+<text x="336" y="332" font-size="11" fill="#7a8b85">中性描边小格 · label 11px / 值 13.5px</text>
+<text x="336" y="348" font-size="11" fill="#7a8b85">值统一 text-primary，不再染橙蓝语义色</text>
+<text x="336" y="374" font-size="11" font-weight="500" fill="#9db3ad">容器与交互</text>
+<text x="336" y="390" font-size="11" fill="#7a8b85">卡 radius 8 · 1px border-default · surface 底</text>
+<text x="336" y="406" font-size="11" fill="#7a8b85">hover 上移 2px + accent 描边 · 图 scale 1.02</text>
+<text x="336" y="422" font-size="11" fill="#7a8b85">focus-visible 2px accent 环 · 入场 stagger 24ms</text>
+<text x="336" y="438" font-size="11" fill="#7a8b85">卡内 padding 12 · 元素间距 12</text>
+<text x="24" y="462" font-size="12" font-weight="500" fill="#9db3ad">无图占位符（替代 5 色渐变 + 首字大字母 + 双圆环）</text>
+<rect x="290" y="462" width="120" height="30" rx="5" fill="#0d1a1f" stroke="#3a4a46" stroke-width="0.8"/>
+<rect x="300" y="469" width="14" height="14" rx="2" fill="none" stroke="#7a8b85" stroke-width="1"/>
+<line x1="302" y1="481" x2="312" y2="471" stroke="#7a8b85" stroke-width="1"/>
+<text x="322" y="481" font-size="11" fill="#7a8b85">暂无可信主图</text>
+<text x="424" y="481" font-size="11" fill="#7a8b85">底 bg-elevated · ImageOff 24px · 提示 11px muted</text>
+</svg>

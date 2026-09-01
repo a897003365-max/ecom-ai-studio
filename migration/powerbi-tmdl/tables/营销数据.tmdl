@@ -1,0 +1,172 @@
+table 营销数据
+	isHidden
+	lineageTag: 5a46c87b-4418-44e2-ae57-0132fc5a67fd
+
+	column 'Source.Name'
+		dataType: string
+		isHidden
+		lineageTag: d200b485-6cfc-43b7-a05a-a61874df5b9b
+		summarizeBy: none
+		sourceColumn: Source.Name
+
+		changedProperty = IsHidden
+
+		annotation SummarizationSetBy = Automatic
+
+	column 客服
+		dataType: string
+		isHidden
+		lineageTag: 7eee47aa-4ac9-4ca1-90e6-3bc245e20bf6
+		summarizeBy: none
+		sourceColumn: 客服
+
+		changedProperty = IsHidden
+
+		annotation SummarizationSetBy = Automatic
+
+	column 售前接待人数
+		dataType: int64
+		isHidden
+		formatString: 0
+		lineageTag: ea5451ec-d972-4fed-ae6c-477e0acba48f
+		summarizeBy: sum
+		sourceColumn: 售前接待人数
+
+		changedProperty = IsHidden
+
+		annotation SummarizationSetBy = Automatic
+
+	column 推荐人数
+		dataType: int64
+		isHidden
+		formatString: 0
+		lineageTag: 4fde9778-d81f-4f22-97c8-089b77d2948b
+		summarizeBy: sum
+		sourceColumn: 推荐人数
+
+		changedProperty = IsHidden
+
+		annotation SummarizationSetBy = Automatic
+
+	column 促成下单人数
+		dataType: int64
+		isHidden
+		formatString: 0
+		lineageTag: 0dd0d3ca-bd50-4136-aa89-ad1ecfb52bad
+		summarizeBy: sum
+		sourceColumn: 促成下单人数
+
+		changedProperty = IsHidden
+
+		annotation SummarizationSetBy = Automatic
+
+	column 促成下单订单数
+		dataType: int64
+		isHidden
+		formatString: 0
+		lineageTag: 65945568-621b-4b75-8a52-26766ea6d3cf
+		summarizeBy: sum
+		sourceColumn: 促成下单订单数
+
+		changedProperty = IsHidden
+
+		annotation SummarizationSetBy = Automatic
+
+	column 促成下单商品数
+		dataType: int64
+		isHidden
+		formatString: 0
+		lineageTag: b94ded4f-2f2e-4ad4-bdaa-d633f6f9b18a
+		summarizeBy: sum
+		sourceColumn: 促成下单商品数
+
+		changedProperty = IsHidden
+
+		annotation SummarizationSetBy = Automatic
+
+	column 促成下单商品金额
+		dataType: double
+		isHidden
+		lineageTag: 4e5006b8-6380-4de2-9c5f-bc1c258ca9b7
+		summarizeBy: sum
+		sourceColumn: 促成下单商品金额
+
+		changedProperty = IsHidden
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 促成下单商品均价
+		dataType: double
+		isHidden
+		lineageTag: dc5968e3-0907-4540-8a80-9b1d81326149
+		summarizeBy: sum
+		sourceColumn: 促成下单商品均价
+
+		changedProperty = IsHidden
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 促成下单客单价（元/人）
+		dataType: double
+		isHidden
+		lineageTag: 1275265d-ce82-419d-aa82-f051f4e24c6e
+		summarizeBy: sum
+		sourceColumn: 促成下单客单价（元/人）
+
+		changedProperty = IsHidden
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 促成下单客件数（件/人）
+		dataType: double
+		isHidden
+		lineageTag: 16d6a317-d2f4-4571-aac9-68ae552d04af
+		summarizeBy: sum
+		sourceColumn: 促成下单客件数（件/人）
+
+		changedProperty = IsHidden
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 售前下单转化率
+		dataType: double
+		isHidden
+		lineageTag: 52a11ea2-8c8e-4579-a60a-7d357775e869
+		summarizeBy: sum
+		sourceColumn: 售前下单转化率
+
+		changedProperty = IsHidden
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	partition 营销数据 = m
+		mode: import
+		source =
+				let
+				    源 = Folder.Files("D:\麻大师\日更数据\天猫旗舰店\10-2京东客服绩效明细\营销数据"),
+				    筛选的隐藏文件1 = Table.SelectRows(源, each [Attributes]?[Hidden]? <> true),
+				    调用自定义函数1 = Table.AddColumn(筛选的隐藏文件1, "转换文件 (46)", each #"转换文件 (46)"([Content])),
+				    重命名的列1 = Table.RenameColumns(调用自定义函数1, {"Name", "Source.Name"}),
+				    删除的其他列1 = Table.SelectColumns(重命名的列1, {"Source.Name", "转换文件 (46)"}),
+				    扩展的表格列1 = Table.ExpandTableColumn(删除的其他列1, "转换文件 (46)", Table.ColumnNames(#"转换文件 (46)"(#"示例文件 (46)"))),
+				    更改的类型 = Table.TransformColumnTypes(扩展的表格列1,{{"Source.Name", type text}, {"客服", type text}, {"售前接待人数", Int64.Type}, {"推荐人数", Int64.Type}, {"促成下单人数", Int64.Type}, {"促成下单订单数", Int64.Type}, {"促成下单商品数", Int64.Type}, {"促成下单商品金额", type number}, {"售前下单转化率", Percentage.Type}, {"促成下单商品均价", type number}, {"促成下单客单价（元/人）", type number}, {"促成下单客件数（件/人）", type number}}),
+				    筛选的行 = Table.SelectRows(更改的类型, each ([客服] <> "均值" and [客服] <> "总值"))
+				in
+				    筛选的行
+
+	changedProperty = IsHidden
+
+	annotation PBI_NavigationStepName = 导航
+
+	annotation PBI_ResultType = Table
+

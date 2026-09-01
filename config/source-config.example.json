@@ -1,0 +1,9 @@
+{
+  "feishu": {
+    "prSheetUrl": "",
+    "contentSheetUrl": ""
+  },
+  "dingtalk": {
+    "operationsSheetUrl": ""
+  }
+}

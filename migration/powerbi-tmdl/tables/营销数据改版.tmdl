@@ -1,0 +1,283 @@
+table 营销数据改版
+	lineageTag: 60bde85d-1c0e-483a-8278-d0abf471c8c0
+
+	column 客服
+		dataType: string
+		lineageTag: aba36b04-0d65-4734-b19f-a262cedce4e8
+		summarizeBy: none
+		sourceColumn: 客服
+
+		annotation SummarizationSetBy = Automatic
+
+	column 售前接待人数
+		dataType: int64
+		formatString: 0
+		lineageTag: 2d03e4fd-a725-4931-b344-ffff3db162d1
+		summarizeBy: sum
+		sourceColumn: 售前接待人数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 推荐人数
+		dataType: int64
+		formatString: 0
+		lineageTag: 10e20636-ffb3-47e5-8708-e1b1e9b6b2a8
+		summarizeBy: sum
+		sourceColumn: 推荐人数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 24H下单人数
+		dataType: int64
+		formatString: 0
+		lineageTag: 71a1e377-f9e4-4908-b533-76c0fea266eb
+		summarizeBy: sum
+		sourceColumn: 24H下单人数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 24H下单未取消人数
+		dataType: int64
+		formatString: 0
+		lineageTag: 45e67a81-2ddd-4fda-bfdd-6878c57d5f3e
+		summarizeBy: sum
+		sourceColumn: 24H下单未取消人数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 24H下单金额
+		dataType: double
+		lineageTag: 2cd26cb3-64ef-4010-a954-1523f9faae1a
+		summarizeBy: sum
+		sourceColumn: 24H下单金额
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 24H下单未取消金额
+		dataType: double
+		lineageTag: a03701ee-7034-44af-8100-93bb65c5413d
+		summarizeBy: sum
+		sourceColumn: 24H下单未取消金额
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 24H下单转化率
+		dataType: double
+		lineageTag: 94adb434-651a-4939-8f59-4a80dcd30662
+		summarizeBy: sum
+		sourceColumn: 24H下单转化率
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 24H未取消转化率
+		dataType: double
+		lineageTag: b7ac20e3-9999-4fe9-b799-1e1df40e8302
+		summarizeBy: sum
+		sourceColumn: 24H未取消转化率
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 促成下单人数
+		dataType: int64
+		formatString: 0
+		lineageTag: 81bdc635-3e42-4cd4-8c3f-565b3f1ff604
+		summarizeBy: sum
+		sourceColumn: 促成下单人数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 促成下单订单数
+		dataType: int64
+		formatString: 0
+		lineageTag: 8d4a89ea-8fd2-46bb-8d62-a77b22c6c6ae
+		summarizeBy: sum
+		sourceColumn: 促成下单订单数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 促成下单商品数
+		dataType: int64
+		formatString: 0
+		lineageTag: a57ba787-cafe-43c5-98d4-c0a5ef904ab1
+		summarizeBy: sum
+		sourceColumn: 促成下单商品数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 促成下单商品金额
+		dataType: double
+		lineageTag: 85ae0c13-f009-41e3-b108-3e61e8455594
+		summarizeBy: sum
+		sourceColumn: 促成下单商品金额
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 售前下单转化率
+		dataType: double
+		lineageTag: f4563f7a-afd4-4b60-9eb5-619e2e4e49cb
+		summarizeBy: sum
+		sourceColumn: 售前下单转化率
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 促成下单商品均价
+		dataType: double
+		lineageTag: 1453a985-befd-49d1-b9aa-bc9ab9fb522e
+		summarizeBy: sum
+		sourceColumn: 促成下单商品均价
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 促成下单客单价（元/人）
+		dataType: double
+		lineageTag: 2f35df4b-173a-414a-b4a7-7bd433e86e0c
+		summarizeBy: sum
+		sourceColumn: 促成下单客单价（元/人）
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 促成下单客件数（件/人）
+		dataType: double
+		lineageTag: 2447dcf4-62af-4613-bdc1-829bcbafe1c2
+		summarizeBy: sum
+		sourceColumn: 促成下单客件数（件/人）
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 促成出库人数
+		dataType: int64
+		formatString: 0
+		lineageTag: a722df59-cf84-49bb-ae13-e6537c885cab
+		summarizeBy: sum
+		sourceColumn: 促成出库人数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 促成出库订单数
+		dataType: int64
+		formatString: 0
+		lineageTag: 18e5d787-1e18-4751-b03f-69d0ed7dbc47
+		summarizeBy: sum
+		sourceColumn: 促成出库订单数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 促成出库商品数
+		dataType: int64
+		formatString: 0
+		lineageTag: 48090073-d48f-4cb0-a3d7-d6a8fc3cdecc
+		summarizeBy: sum
+		sourceColumn: 促成出库商品数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 促成出库商品金额
+		dataType: double
+		lineageTag: 8174cc95-dc16-43f0-a361-b0b5527fb8fd
+		summarizeBy: sum
+		sourceColumn: 促成出库商品金额
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 售前出库转化率
+		dataType: double
+		lineageTag: f20e8d71-242b-4e00-9bbe-22648ccc5855
+		summarizeBy: sum
+		sourceColumn: 售前出库转化率
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 下单出库转化率
+		dataType: double
+		lineageTag: 0d9e4365-4142-4df5-b5de-c2f4e59008d4
+		summarizeBy: sum
+		sourceColumn: 下单出库转化率
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 促成出库商品均价
+		dataType: double
+		lineageTag: 62c56ddf-4bd9-49ee-9c3e-56811377cdcb
+		summarizeBy: sum
+		sourceColumn: 促成出库商品均价
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 促成出库客单价（元/人）
+		dataType: double
+		lineageTag: 0a83fd6f-3113-4a0b-8d82-f0d6e76cc7e2
+		summarizeBy: sum
+		sourceColumn: 促成出库客单价（元/人）
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 促成出库客件数（件/人）
+		dataType: double
+		lineageTag: 93bd7657-4f52-469f-8175-fefd13035439
+		summarizeBy: sum
+		sourceColumn: 促成出库客件数（件/人）
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 'Source.Name'
+		dataType: string
+		lineageTag: 1fc8cb16-d80c-4947-a101-76f65cd21489
+		summarizeBy: none
+		sourceColumn: Source.Name
+
+		annotation SummarizationSetBy = Automatic
+
+	partition 营销数据改版 = m
+		mode: import
+		source =
+				let
+				    源 = Folder.Files("D:\麻大师\日更数据\天猫旗舰店\10-2京东客服绩效明细\营销数据改版"),
+				    筛选的隐藏文件1 = Table.SelectRows(源, each [Attributes]?[Hidden]? <> true),
+				    调用自定义函数1 = Table.AddColumn(筛选的隐藏文件1, "转换文件 (10)", each #"转换文件 (10)"([Content])),
+				    重命名的列1 = Table.RenameColumns(调用自定义函数1, {"Name", "Source.Name"}),
+				    删除的其他列1 = Table.SelectColumns(重命名的列1, {"Source.Name", "转换文件 (10)"}),
+				    扩展的表格列1 = Table.ExpandTableColumn(删除的其他列1, "转换文件 (10)", Table.ColumnNames(#"转换文件 (10)"(#"示例文件 (10)"))),
+				    更改的类型 = Table.TransformColumnTypes(扩展的表格列1,{{"Source.Name", type text}, {"Column1", type text}, {"Column2", type text}, {"Column3", type text}, {"Column4", type text}, {"Column5", type text}, {"Column6", type text}, {"Column7", type text}, {"Column8", type text}, {"Column9", type text}, {"Column10", type text}, {"Column11", type text}, {"Column12", type text}, {"Column13", type text}, {"Column14", type text}, {"Column15", type text}, {"Column16", type text}, {"Column17", type text}, {"Column18", type text}, {"Column19", type text}, {"Column20", type text}, {"Column21", type text}, {"Column22", type text}, {"Column23", type text}, {"Column24", type text}, {"Column25", type text}, {"Column26", type text}}),
+				    筛选的行 = Table.SelectRows(更改的类型, each ([Column1] <> null and [Column1] <> "均值" and [Column1] <> "总值")),
+				    删除的副本 = Table.Distinct(筛选的行, {"Column1", "Column2", "Column3", "Column4", "Column5", "Column6"}),
+				    提升的标题 = Table.PromoteHeaders(删除的副本, [PromoteAllScalars=true]),
+				    复制的列 = Table.DuplicateColumn(提升的标题, "SalesPerformanceDataJimgmai_Fri Apr 03 00_00_00 CST 2026_Fri Apr 03 00_00_00 CST 2026_1633190228.xls", "Source.Name"),
+				    删除的列 = Table.RemoveColumns(复制的列,{"SalesPerformanceDataJimgmai_Fri Apr 03 00_00_00 CST 2026_Fri Apr 03 00_00_00 CST 2026_1633190228.xls"}),
+				    更改的类型1 = Table.TransformColumnTypes(删除的列,{{"Source.Name", type text}, {"客服", type text}, {"售前接待人数", Int64.Type}, {"推荐人数", Int64.Type}, {"24H下单人数", Int64.Type}, {"24H下单未取消人数", Int64.Type}, {"24H下单金额", type number}, {"24H下单未取消金额", type number}, {"24H下单转化率", Percentage.Type}, {"24H未取消转化率", Percentage.Type}, {"促成下单人数", Int64.Type}, {"促成下单订单数", Int64.Type}, {"促成下单商品数", Int64.Type}, {"促成下单商品金额", type number}, {"售前下单转化率", Percentage.Type}, {"促成下单商品均价", type number}, {"促成下单客单价（元/人）", type number}, {"促成下单客件数（件/人）", type number}, {"促成出库人数", Int64.Type}, {"促成出库订单数", Int64.Type}, {"促成出库商品数", Int64.Type}, {"促成出库商品金额", type number}, {"售前出库转化率", Percentage.Type}, {"下单出库转化率", Percentage.Type}, {"促成出库商品均价", type number}, {"促成出库客单价（元/人）", type number}, {"促成出库客件数（件/人）", type number}})
+				in
+				    更改的类型1
+
+	annotation PBI_NavigationStepName = 导航
+
+	annotation PBI_ResultType = Table
+

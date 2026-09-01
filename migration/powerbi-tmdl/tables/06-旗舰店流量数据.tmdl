@@ -1,0 +1,508 @@
+table 06-旗舰店流量数据
+	excludeFromModelRefresh
+	lineageTag: 240f6f8d-8bf5-46c0-ac84-c2dba4bb2194
+
+	measure 支付金额（万） = divide(SUM('06-旗舰店流量数据'[支付金额]),10000)
+		lineageTag: 9da0ce88-2764-4486-908f-80477d30bc8b
+
+		formatStringDefinition = "0.00万"
+
+	measure 商品流量转化率 = CALCULATE( divide(sum('06-旗舰店流量数据'[支付买家数]),sum('06-旗舰店流量数据'[访客数])),'06-旗舰店流量数据'[流量载体]="商品流量")
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: 7603a0a9-568d-4fdf-912a-1678e40e2ae1
+
+	measure 商品流量金额(总和) = ```
+			divide( CALCULATE( SUM('06-旗舰店流量数据'[支付金额]) , 
+			   '06-旗舰店流量数据'[流量载体]="商品流量"),10000)
+			```
+		lineageTag: 10bddccf-8a8d-4757-bfa8-e360bafea187
+
+		formatStringDefinition = "0.00万"
+
+	measure 商品金额占比 = divide([商品流量金额(总和)],CALCULATE('06-旗舰店流量数据'[支付金额（万）],ALL('06-旗舰店流量数据'[流量载体])))
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: b50c0558-72f1-4f81-b116-44f1475b29f3
+
+	measure 商品流量金额环比 = ```
+			
+			VAR CurrentValue = '06-旗舰店流量数据'[商品流量金额(总和)]
+			VAR PreviousValue = CALCULATE('06-旗舰店流量数据'[商品流量金额(总和)], DATEADD('01-店铺数据辅助表'[日期].[Date], -1 , DAY ))
+			RETURN
+			DIVIDE(CurrentValue - PreviousValue, PreviousValue, 0) 
+			```
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: 30177922-2f5b-4186-8889-e4c059b7d20a
+
+	measure 商品流量转化率环比 =
+			
+			VAR CurrentValue = '06-旗舰店流量数据'[商品流量转化率]
+			VAR PreviousValue = CALCULATE('06-旗舰店流量数据'[商品流量转化率], DATEADD('01-店铺数据辅助表'[日期].[Date], -1 , DAY ))
+			RETURN
+			DIVIDE(CurrentValue - PreviousValue, PreviousValue, 0)
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: ab990d63-487c-4ca6-baa5-992fb2880fe9
+
+	measure 店铺流量金额(总和) = ```
+			divide( CALCULATE( SUM('06-旗舰店流量数据'[支付金额]) , 
+			   '06-旗舰店流量数据'[流量载体]="店铺流量"),10000)
+			```
+		lineageTag: f7cfbd66-7ec3-4ce8-b53d-0b50ab8ed705
+
+		formatStringDefinition = "0.00万"
+
+	measure 店铺流量转化率 = CALCULATE( divide(sum('06-旗舰店流量数据'[支付买家数]),sum('06-旗舰店流量数据'[访客数])),'06-旗舰店流量数据'[流量载体]="店铺流量")
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: 73b430fc-7336-418a-b87f-6f9a05ad3011
+
+	measure 店铺金额占比 = divide([店铺流量金额(总和)],CALCULATE('06-旗舰店流量数据'[支付金额（万）],ALL('06-旗舰店流量数据'[流量载体])))
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: 9012ca9f-c292-4f16-a197-fede24dbe6af
+
+	measure 店铺流量金额环比 =
+			
+			VAR CurrentValue = '06-旗舰店流量数据'[店铺流量金额(总和)]
+			VAR PreviousValue = CALCULATE('06-旗舰店流量数据'[店铺流量金额(总和)], DATEADD('01-店铺数据辅助表'[日期].[Date], -1 , DAY ))
+			RETURN
+			DIVIDE(CurrentValue - PreviousValue, PreviousValue, 0)
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: 56c7b466-a9b4-470f-ab68-4349b0615ba0
+
+	measure 直播流量金额(总和) = ```
+			divide( CALCULATE( SUM('06-旗舰店流量数据'[支付金额]) , 
+			   '06-旗舰店流量数据'[流量载体]="直播流量"),10000)
+			```
+		lineageTag: 476617bb-51e2-486d-8dc0-91ec4baa58e1
+
+		formatStringDefinition = "0.00万"
+
+	measure 直播流量金额环比 =
+			
+			VAR CurrentValue = '06-旗舰店流量数据'[直播流量金额(总和)]
+			VAR PreviousValue = CALCULATE('06-旗舰店流量数据'[直播流量金额(总和)], DATEADD('01-店铺数据辅助表'[日期].[Date], -1 , DAY ))
+			RETURN
+			DIVIDE(CurrentValue - PreviousValue, PreviousValue, 0)
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: 722885c8-bef3-48ae-bcef-d5df8e207276
+
+	measure 直播流量转化率 = CALCULATE( divide(sum('06-旗舰店流量数据'[支付买家数]),sum('06-旗舰店流量数据'[访客数])),'06-旗舰店流量数据'[流量载体]="直播流量")
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: 50a09b22-07ee-428d-a483-122958186a48
+
+	measure 内容流量金额(总和) = ```
+			divide( CALCULATE( SUM('06-旗舰店流量数据'[支付金额]) , 
+			   '06-旗舰店流量数据'[流量载体]="内容流量"),10000)
+			```
+		lineageTag: 73901a3d-8426-441b-9272-2b121a2faf97
+
+		formatStringDefinition = "0.00万"
+
+	measure 直播金额占比 = divide([直播流量金额(总和)],CALCULATE('06-旗舰店流量数据'[支付金额（万）],ALL('06-旗舰店流量数据'[流量载体])))
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: 70f5be0d-3234-4c5c-b028-2a5b797cdb7c
+
+	measure 内容流量金额环比 =
+			
+			VAR CurrentValue = '06-旗舰店流量数据'[内容流量金额(总和)]
+			VAR PreviousValue = CALCULATE('06-旗舰店流量数据'[内容流量金额(总和)], DATEADD('01-店铺数据辅助表'[日期].[Date], -1 , DAY ))
+			RETURN
+			DIVIDE(CurrentValue - PreviousValue, PreviousValue, 0)
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: 901b9448-2f31-4413-9bf3-bb7a347482d1
+
+	measure 内容流量转化率 = CALCULATE( divide(sum('06-旗舰店流量数据'[支付买家数]),sum('06-旗舰店流量数据'[访客数])),'06-旗舰店流量数据'[流量载体]="内容流量")
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: e4807df4-314f-4117-89b4-9b05091c75bf
+
+	measure 内容金额占比 = divide([内容流量金额(总和)],CALCULATE('06-旗舰店流量数据'[支付金额（万）],ALL('06-旗舰店流量数据'[流量载体])))
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: 1e13aae3-d1a6-4f00-ac47-67d3430f6476
+
+	measure 店铺流量转化率环比 =
+			
+			VAR CurrentValue = '06-旗舰店流量数据'[店铺流量转化率]
+			VAR PreviousValue = CALCULATE('06-旗舰店流量数据'[店铺流量转化率], DATEADD('01-店铺数据辅助表'[日期].[Date], -1 , DAY ))
+			RETURN
+			DIVIDE(CurrentValue - PreviousValue, PreviousValue, 0)
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: 286adc36-a650-4455-aa62-4ee6dbc1b7aa
+
+	measure 商品流量金额（万） = '04-旗舰店基础数据'[支付金额（万元）]*'06-旗舰店流量数据'[商品金额占比]
+		lineageTag: c97f8f8d-9f58-4bbe-a420-3b92bb25e90b
+
+		formatStringDefinition = "0.00万"
+
+	measure 店铺流量金额（万） = '04-旗舰店基础数据'[支付金额（万元）]*'06-旗舰店流量数据'[店铺金额占比]
+		lineageTag: 73b5e7df-eadc-4a96-b252-4c7eb3d13ab4
+
+		formatStringDefinition = "0.00万"
+
+	measure 直播流量金额（万） = '04-旗舰店基础数据'[支付金额（万元）]*'06-旗舰店流量数据'[直播金额占比]
+		lineageTag: 6fb58bd5-d3ef-4bf1-a541-06050e5db978
+
+		formatStringDefinition = "0.00万"
+
+	measure 内容流量金额（万） = '04-旗舰店基础数据'[支付金额（万元）]*'06-旗舰店流量数据'[内容金额占比]
+		lineageTag: 4d3ebdd9-4e47-4d39-9f02-2843eb24e4d8
+
+		formatStringDefinition = "0.00万"
+
+	measure 直播转化率环比 =
+			
+			VAR CurrentValue = '06-旗舰店流量数据'[直播流量转化率]
+			VAR PreviousValue = CALCULATE('06-旗舰店流量数据'[直播流量转化率], DATEADD('01-店铺数据辅助表'[日期].[Date], -1 , DAY ))
+			RETURN
+			DIVIDE(CurrentValue - PreviousValue, PreviousValue, 0)
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: 41745737-da54-41b1-a8f8-6d719565f1d0
+
+	measure 内容转化率环比 =
+			
+			VAR CurrentValue = '06-旗舰店流量数据'[内容流量转化率]
+			VAR PreviousValue = CALCULATE('06-旗舰店流量数据'[内容流量转化率], DATEADD('01-店铺数据辅助表'[日期].[Date], -1 , DAY ))
+			RETURN
+			DIVIDE(CurrentValue - PreviousValue, PreviousValue, 0)
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: 06cf2038-510c-469c-a4dd-753f73999129
+
+	column 'Source.Name'
+		dataType: string
+		lineageTag: ecac3eab-2457-44c6-9de3-6b2b7822cc7f
+		summarizeBy: none
+		sourceColumn: Source.Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 流量载体
+		dataType: string
+		lineageTag: 672ee753-6248-45d8-8fd4-47c7d59b2685
+		summarizeBy: none
+		sourceColumn: 流量载体
+
+		annotation SummarizationSetBy = Automatic
+
+	column 一级来源
+		dataType: string
+		lineageTag: 4064b852-f6ce-43ae-9c04-195d517740f1
+		summarizeBy: none
+		sourceColumn: 一级来源
+
+		annotation SummarizationSetBy = Automatic
+
+	column 二级来源
+		dataType: string
+		lineageTag: 81d159b9-66c8-48c2-b988-5aea464f1b1e
+		summarizeBy: none
+		sourceColumn: 二级来源
+
+		annotation SummarizationSetBy = Automatic
+
+	column 三级来源
+		dataType: string
+		lineageTag: ca1c8a69-1a90-4f31-9f9c-e144bb14760b
+		summarizeBy: none
+		sourceColumn: 三级来源
+
+		annotation SummarizationSetBy = Automatic
+
+	column 访客数
+		dataType: int64
+		formatString: 0
+		lineageTag: 53fc18ca-d990-44a5-ac2b-02e97cb4be4c
+		summarizeBy: sum
+		sourceColumn: 访客数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 访客数环比
+		dataType: double
+		lineageTag: 25061dc0-8955-4b4d-b663-6870961cc34d
+		summarizeBy: sum
+		sourceColumn: 访客数环比
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 新访客
+		dataType: int64
+		formatString: 0
+		lineageTag: 43a9af83-000a-4d18-bc9e-d27b4f7c5f43
+		summarizeBy: sum
+		sourceColumn: 新访客
+
+		annotation SummarizationSetBy = Automatic
+
+	column 新访客环比
+		dataType: double
+		lineageTag: e61e1b99-9bc8-436f-adee-da0de572ce7f
+		summarizeBy: sum
+		sourceColumn: 新访客环比
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 平均停留时长
+		dataType: double
+		lineageTag: 47726d5d-99ca-4d7b-b038-044d202da3f2
+		summarizeBy: sum
+		sourceColumn: 平均停留时长
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 平均停留时长环比
+		dataType: string
+		lineageTag: 9cea10ed-305a-463d-bfcf-619bf4d18c44
+		summarizeBy: none
+		sourceColumn: 平均停留时长环比
+
+		annotation SummarizationSetBy = Automatic
+
+	column 3s查看人数
+		dataType: int64
+		formatString: 0
+		lineageTag: d98eba1c-e370-480e-a0b8-ee06307595bc
+		summarizeBy: sum
+		sourceColumn: 3s查看人数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 3s查看人数环比
+		dataType: string
+		lineageTag: d11332b0-d80d-4dff-bceb-ddde9d5a5f30
+		summarizeBy: none
+		sourceColumn: 3s查看人数环比
+
+		annotation SummarizationSetBy = Automatic
+
+	column 商品点击人数
+		dataType: int64
+		formatString: 0
+		lineageTag: 8c2d01aa-4145-470c-8bef-4329e4c8ff97
+		summarizeBy: sum
+		sourceColumn: 商品点击人数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 商品点击人数环比
+		dataType: string
+		lineageTag: 79902444-63e1-4333-b473-b0c74409e608
+		summarizeBy: none
+		sourceColumn: 商品点击人数环比
+
+		annotation SummarizationSetBy = Automatic
+
+	column 加购人数
+		dataType: int64
+		formatString: 0
+		lineageTag: 7f859e34-3bed-43fd-bb07-a87909eb5e48
+		summarizeBy: sum
+		sourceColumn: 加购人数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 加购人数环比
+		dataType: double
+		lineageTag: 23fd2fa5-605f-4ea9-b000-0c109e58631f
+		summarizeBy: sum
+		sourceColumn: 加购人数环比
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 商品收藏人数
+		dataType: int64
+		formatString: 0
+		lineageTag: 73156479-358d-4ae3-956e-f4c54a1d8a0a
+		summarizeBy: sum
+		sourceColumn: 商品收藏人数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 商品收藏人数环比
+		dataType: double
+		lineageTag: a5ed93d4-3d8a-4570-bac0-b3ad4cde6db3
+		summarizeBy: sum
+		sourceColumn: 商品收藏人数环比
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 加购件数
+		dataType: string
+		lineageTag: 757e5de2-bba8-4ba3-bab5-2aaa7d49cfdd
+		summarizeBy: none
+		sourceColumn: 加购件数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 加购件数环比
+		dataType: double
+		lineageTag: ceb60293-1cfa-4eb2-b96f-1772eff28e1c
+		summarizeBy: sum
+		sourceColumn: 加购件数环比
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 关注店铺人数
+		dataType: int64
+		formatString: 0
+		lineageTag: 06a95e9b-84cc-4d72-8bcb-2a5496d2a70b
+		summarizeBy: sum
+		sourceColumn: 关注店铺人数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 关注店铺人数环比
+		dataType: string
+		lineageTag: 889b9d04-3a0b-4b41-a1db-5c4d3e22b37e
+		summarizeBy: none
+		sourceColumn: 关注店铺人数环比
+
+		annotation SummarizationSetBy = Automatic
+
+	column 支付买家数
+		dataType: int64
+		formatString: 0
+		lineageTag: 86eca049-9673-4e8d-9214-9d6c18192040
+		summarizeBy: sum
+		sourceColumn: 支付买家数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 支付买家数环比
+		dataType: double
+		lineageTag: bdd55ef7-57ea-4de1-b72c-a83816cff74f
+		summarizeBy: sum
+		sourceColumn: 支付买家数环比
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 支付转化率
+		dataType: double
+		lineageTag: 980a435a-b3e3-432b-894b-38d8f6472e29
+		summarizeBy: sum
+		sourceColumn: 支付转化率
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 支付转化率环比
+		dataType: double
+		lineageTag: 766873ff-5ef4-429a-9192-63ebb9e3a064
+		summarizeBy: sum
+		sourceColumn: 支付转化率环比
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 支付金额
+		dataType: double
+		lineageTag: 436114b4-f64a-45b2-ba36-c73be7e32efd
+		summarizeBy: sum
+		sourceColumn: 支付金额
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 支付金额环比
+		dataType: double
+		lineageTag: e693e94b-6f7f-4587-828b-9c335bc6862a
+		summarizeBy: sum
+		sourceColumn: 支付金额环比
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 客单价
+		dataType: double
+		lineageTag: 93e4be7a-fade-4cb7-8432-7f15cdcc829f
+		summarizeBy: sum
+		sourceColumn: 客单价
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 客单价环比
+		dataType: double
+		lineageTag: ea172999-d29e-4b1c-9dd6-7f1f7e4d70b1
+		summarizeBy: sum
+		sourceColumn: 客单价环比
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column UV价值
+		dataType: double
+		lineageTag: 8f7b3389-186e-49c7-8ee6-1003bde8f889
+		summarizeBy: sum
+		sourceColumn: UV价值
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column uv价值环比
+		dataType: double
+		lineageTag: d9491598-5864-48d8-877a-150a9fdafae6
+		summarizeBy: sum
+		sourceColumn: uv价值环比
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 日期
+		dataType: dateTime
+		formatString: Long Date
+		lineageTag: 76a8738a-2d8f-4f87-b80e-4f3397d44354
+		summarizeBy: none
+		sourceColumn: 日期
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation UnderlyingDateTimeDataType = Date
+
+	column 全站推广期
+		dataType: string
+		lineageTag: d3a259df-f2de-4472-9565-7b04d36dec22
+		summarizeBy: none
+		sourceColumn: 全站推广期
+
+		annotation SummarizationSetBy = Automatic
+
+	partition 06-旗舰店流量数据 = m
+		mode: import
+		source =
+				let
+				    源 = Folder.Files("D:\麻大师\日更数据\天猫旗舰店\06-旗舰店流量数据"),
+				    筛选的隐藏文件1 = Table.SelectRows(源, each [Attributes]?[Hidden]? <> true),
+				    调用自定义函数1 = Table.AddColumn(筛选的隐藏文件1, "转换文件 (21)", each #"转换文件 (21)"([Content])),
+				    重命名的列1 = Table.RenameColumns(调用自定义函数1, {"Name", "Source.Name"}),
+				    删除的其他列1 = Table.SelectColumns(重命名的列1, {"Source.Name", "转换文件 (21)"}),
+				    扩展的表格列1 = Table.ExpandTableColumn(删除的其他列1, "转换文件 (21)", Table.ColumnNames(#"转换文件 (21)"(#"示例文件 (21)"))),
+				    更改的类型 = Table.TransformColumnTypes(扩展的表格列1,{{"Source.Name", type text}, {"流量载体", type text}, {"一级来源", type text}, {"二级来源", type text}, {"三级来源", type text}, {"访客数", Int64.Type}, {"访客数环比", Percentage.Type}, {"新访客", Int64.Type}, {"新访客环比", Percentage.Type}, {"平均停留时长", type number}, {"平均停留时长环比", type text}, {"3s查看人数", Int64.Type}, {"3s查看人数环比", type text}, {"商品点击人数", Int64.Type}, {"商品点击人数环比", type text}, {"加购人数", Int64.Type}, {"加购人数环比", Percentage.Type}, {"商品收藏人数", Int64.Type}, {"商品收藏人数环比", Percentage.Type}, {"加购件数", type text}, {"加购件数环比", Percentage.Type}, {"关注店铺人数", Int64.Type}, {"关注店铺人数环比", type text}, {"支付买家数", Int64.Type}, {"支付买家数环比", Percentage.Type}, {"支付转化率", Percentage.Type}, {"支付转化率环比", Percentage.Type}, {"支付金额", type number}, {"支付金额环比", Percentage.Type}, {"客单价", type number}, {"客单价环比", Percentage.Type}, {"UV价值", type number}, {"uv价值环比", Percentage.Type}, {"数据日期", type date}}),
+				    已替换的错误1 = Table.ReplaceErrorValues(更改的类型, {{"Source.Name", 0}, {"流量载体", 0}, {"一级来源", 0}, {"二级来源", 0}, {"三级来源", 0}, {"访客数", 0}, {"访客数环比", 0}, {"新访客", 0}, {"新访客环比", 0}, {"平均停留时长", 0}, {"平均停留时长环比", 0}, {"3s查看人数", 0}, {"3s查看人数环比", 0}, {"商品点击人数", 0}, {"商品点击人数环比", 0}, {"加购人数", 0}, {"加购人数环比", 0}, {"商品收藏人数", 0}, {"商品收藏人数环比", 0}, {"加购件数", 0}, {"加购件数环比", 0}, {"关注店铺人数", 0}, {"关注店铺人数环比", 0}, {"支付买家数", 0}, {"支付买家数环比", 0}, {"支付转化率", 0}, {"支付转化率环比", 0}, {"支付金额", 0}, {"支付金额环比", 0}, {"客单价", 0}, {"客单价环比", 0}, {"UV价值", 0}, {"uv价值环比", 0}, {"数据日期", 0}}),
+				    重命名的列 = Table.RenameColumns(已替换的错误1,{{"数据日期", "日期"}}),
+				    筛选的行 = Table.SelectRows(重命名的列, each ([三级来源] <> "汇总"))
+				in
+				    筛选的行
+
+	annotation PBI_NavigationStepName = 导航
+
+	annotation PBI_ResultType = Table
+

@@ -1,0 +1,121 @@
+table 01-店铺数据辅助表
+	excludeFromModelRefresh
+	lineageTag: 3b0613f0-28a9-4af6-b8c3-61f048565eaf
+
+	measure MTD时间进度 =
+			
+			VAR CurrentDate = MAX('01-店铺数据辅助表'[日期]) // 获取筛选上下文中的日期
+			VAR FirstDayOfMonth = STARTOFMONTH('01-店铺数据辅助表'[日期]) // 本月第一天
+			VAR DaysInMonth = DATEDIFF(FirstDayOfMonth, EOMONTH(CurrentDate, 0), DAY) + 1 // 本月总天数
+			VAR DaysPassed = DATEDIFF(FirstDayOfMonth, CurrentDate, DAY) + 1 // 已过天数
+			RETURN
+			DIVIDE(DaysPassed, DaysInMonth, 0)
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: 29235315-5238-4813-96f1-eba28c430de1
+
+	column 日期
+		dataType: dateTime
+		formatString: Long Date
+		lineageTag: 113ce73b-d7d4-4355-9d5e-e8b5fcaad34f
+		summarizeBy: none
+		sourceColumn: 日期
+
+		variation 变体
+			isDefault
+			relationship: 752b0bb4-9f22-48cf-b13d-8aa7c26725dd
+			defaultHierarchy: LocalDateTable_06e2fae1-ec84-4d0b-9baf-3c7bf7d7dca8.日期层次结构
+
+		changedProperty = IsHidden
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation UnderlyingDateTimeDataType = Date
+
+	column 年度
+		dataType: string
+		lineageTag: 34f60f2e-e3d0-4c8b-81b5-955e35bdf769
+		summarizeBy: none
+		sourceColumn: 年度
+
+		changedProperty = IsHidden
+
+		annotation SummarizationSetBy = Automatic
+
+	column 季度
+		dataType: string
+		lineageTag: 87f841e9-02df-4471-9e96-7c38c59f5e35
+		summarizeBy: none
+		sourceColumn: 季度
+
+		changedProperty = IsHidden
+
+		annotation SummarizationSetBy = Automatic
+
+	column 月份
+		dataType: string
+		lineageTag: 1fb2c0cf-cea6-429a-b08a-4b2636751aed
+		summarizeBy: none
+		sourceColumn: 月份
+
+		changedProperty = IsHidden
+
+		annotation SummarizationSetBy = Automatic
+
+	column 日
+		dataType: string
+		lineageTag: aa08da59-4388-4ec7-afc5-684e3a40ad6b
+		summarizeBy: none
+		sourceColumn: 日
+
+		changedProperty = IsHidden
+
+		annotation SummarizationSetBy = Automatic
+
+	column 年度季度
+		dataType: string
+		lineageTag: 5e037e86-d34f-4a4d-83d5-092cbaa93995
+		summarizeBy: none
+		sourceColumn: 年度季度
+
+		changedProperty = IsHidden
+
+		annotation SummarizationSetBy = Automatic
+
+	column 年度月份
+		dataType: string
+		lineageTag: c236c39e-72c3-46e8-ba03-39adbfeb628b
+		summarizeBy: none
+		sourceColumn: 年度月份
+
+		changedProperty = IsHidden
+
+		annotation SummarizationSetBy = Automatic
+
+	column 星期几
+		dataType: string
+		lineageTag: 3f1f0b8f-7151-4323-a001-e254278843d4
+		summarizeBy: none
+		sourceColumn: 星期几
+
+		changedProperty = IsHidden
+
+		annotation SummarizationSetBy = Automatic
+
+	partition 01-店铺数据辅助表-6538b147-b406-42dc-a0f4-398ec7f3a90e = m
+		mode: import
+		source =
+				let
+				    源 = Folder.Files("D:\麻大师\日更数据\天猫旗舰店\01-店铺数据辅助表"),
+				    删除的其他列 = Table.SelectColumns(源,{"Content"}),
+				    筛选的隐藏文件1 = Table.SelectRows(删除的其他列, each [Attributes]?[Hidden]? <> true),
+				    调用自定义函数1 = Table.AddColumn(筛选的隐藏文件1, "转换文件 (3)", each #"转换文件 (3)"([Content])),
+				    删除的其他列1 = Table.SelectColumns(调用自定义函数1, {"转换文件 (3)"}),
+				    扩展的表格列1 = Table.ExpandTableColumn(删除的其他列1, "转换文件 (3)", Table.ColumnNames(#"转换文件 (3)"(#"示例文件 (3)"))),
+				    更改的类型 = Table.TransformColumnTypes(扩展的表格列1,{{"日期", type date}, {"年度", type text}, {"月份", type text}, {"日", type text}})
+				in
+				    更改的类型
+
+	annotation PBI_ResultType = Table
+
+	annotation PBI_NavigationStepName = 导航
+

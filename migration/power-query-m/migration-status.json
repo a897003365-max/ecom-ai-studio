@@ -1,0 +1,237 @@
+{
+  "generatedAt": "2026-09-01T16:04:26.771397+08:00",
+  "queryCount": 25,
+  "completedQueries": 24,
+  "sourceFileCount": 4424,
+  "parquetPartitionCount": 4423,
+  "rowCount": 3332106,
+  "scope": "powerbi_unique_only",
+  "excludedQueryCount": 2,
+  "excludedQueries": [
+    {
+      "query": "00-月表汇总",
+      "authority": "钉钉：全渠道数据表",
+      "grain": "日期 × 渠道 × 店铺",
+      "overlap": [
+        "GMV",
+        "回款额",
+        "退款额",
+        "站内费",
+        "总费用",
+        "加购人数"
+      ],
+      "reason": "与钉钉日经营明细同粒度、同口径，网站不应重复同步。"
+    },
+    {
+      "query": "03-1-各渠道目标金额",
+      "authority": "钉钉：销售目标",
+      "grain": "月份 × 渠道/店铺",
+      "overlap": [
+        "月度销售目标"
+      ],
+      "reason": "月度目标已由钉钉销售目标表维护，避免双来源冲突。"
+    }
+  ],
+  "queries": [
+    {
+      "query": "01-店铺数据辅助表",
+      "files": 1,
+      "partitions": 1,
+      "rows": 1154,
+      "failedFiles": 0,
+      "status": "migrated"
+    },
+    {
+      "query": "03-2店铺每天销售目标",
+      "files": 1,
+      "partitions": 1,
+      "rows": 3325,
+      "failedFiles": 0,
+      "status": "migrated"
+    },
+    {
+      "query": "04-旗舰店基础数据",
+      "files": 284,
+      "partitions": 284,
+      "rows": 8382,
+      "failedFiles": 0,
+      "status": "migrated"
+    },
+    {
+      "query": "05-旗舰店ID对照表",
+      "files": 2,
+      "partitions": 2,
+      "rows": 228,
+      "failedFiles": 0,
+      "status": "migrated"
+    },
+    {
+      "query": "06-旗舰店流量数据",
+      "files": 120,
+      "partitions": 120,
+      "rows": 11002,
+      "failedFiles": 0,
+      "status": "migrated"
+    },
+    {
+      "query": "07-旗舰店商品销售数据",
+      "files": 703,
+      "partitions": 703,
+      "rows": 72863,
+      "failedFiles": 0,
+      "status": "migrated"
+    },
+    {
+      "query": "08-1关键词报表数据",
+      "files": 175,
+      "partitions": 175,
+      "rows": 1474514,
+      "failedFiles": 0,
+      "status": "migrated"
+    },
+    {
+      "query": "08-2人群报表数据",
+      "files": 177,
+      "partitions": 177,
+      "rows": 290824,
+      "failedFiles": 0,
+      "status": "migrated"
+    },
+    {
+      "query": "08-旗舰店推广花费",
+      "files": 523,
+      "partitions": 523,
+      "rows": 1230105,
+      "failedFiles": 0,
+      "status": "migrated"
+    },
+    {
+      "query": "10-1淘宝客服绩效明细",
+      "files": 646,
+      "partitions": 646,
+      "rows": 11092,
+      "failedFiles": 0,
+      "status": "migrated"
+    },
+    {
+      "query": "10-2京东客服营销明细",
+      "files": 300,
+      "partitions": 300,
+      "rows": 2390,
+      "failedFiles": 0,
+      "status": "migrated"
+    },
+    {
+      "query": "10-3京东客服绩效数据",
+      "files": 299,
+      "partitions": 299,
+      "rows": 2387,
+      "failedFiles": 0,
+      "status": "migrated"
+    },
+    {
+      "query": "10-4客服员工日报统计",
+      "files": 310,
+      "partitions": 310,
+      "rows": 3967,
+      "failedFiles": 0,
+      "status": "migrated"
+    },
+    {
+      "query": "11-旗舰店UD推广计划",
+      "files": 102,
+      "partitions": 102,
+      "rows": 421,
+      "failedFiles": 0,
+      "status": "migrated"
+    },
+    {
+      "query": "14-推广竞品数据",
+      "files": 52,
+      "partitions": 52,
+      "rows": 1456,
+      "failedFiles": 0,
+      "status": "migrated"
+    },
+    {
+      "query": "辅4-床垫编码",
+      "files": 1,
+      "partitions": 0,
+      "rows": 0,
+      "failedFiles": 0,
+      "status": "partial"
+    },
+    {
+      "query": "辅5-床类编码",
+      "files": 1,
+      "partitions": 1,
+      "rows": 507,
+      "failedFiles": 0,
+      "status": "migrated"
+    },
+    {
+      "query": "接待数据",
+      "files": 258,
+      "partitions": 258,
+      "rows": 2073,
+      "failedFiles": 0,
+      "status": "migrated"
+    },
+    {
+      "query": "京东客服分组表",
+      "files": 1,
+      "partitions": 1,
+      "rows": 61,
+      "failedFiles": 0,
+      "status": "migrated"
+    },
+    {
+      "query": "考勤数据",
+      "files": 229,
+      "partitions": 229,
+      "rows": 1765,
+      "failedFiles": 0,
+      "status": "migrated"
+    },
+    {
+      "query": "淘宝客服排班表",
+      "files": 1,
+      "partitions": 1,
+      "rows": 398,
+      "failedFiles": 0,
+      "status": "migrated"
+    },
+    {
+      "query": "营销数据",
+      "files": 27,
+      "partitions": 27,
+      "rows": 202,
+      "failedFiles": 0,
+      "status": "migrated"
+    },
+    {
+      "query": "营销数据改版",
+      "files": 205,
+      "partitions": 205,
+      "rows": 1619,
+      "failedFiles": 0,
+      "status": "migrated"
+    },
+    {
+      "query": "15-聚水潭商品数据",
+      "files": 1,
+      "partitions": 1,
+      "rows": 191435,
+      "failedFiles": 0,
+      "status": "migrated"
+    },
+    {
+      "query": "product-master",
+      "files": 5,
+      "partitions": 5,
+      "rows": 19936,
+      "failedFiles": 0,
+      "status": "migrated"
+    }
+  ]
+}

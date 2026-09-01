@@ -1,13 +1,86 @@
 node_modules/
 dist/
+local-data/
+.git_disabled/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.log
+*.bak
+*.bak-*
 .vite/
-.env
-.env.*
+.env*
 !.env.example
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-*.local
-Thumbs.db
-.DS_Store
+
+# Local DingTalk operating guide may contain credentials; never publish it.
+钉钉表格读写指南.md
+
+# Local verification artifacts and licensed/raw reference workbooks stay outside Git.
+.playwright-cli/
+.playwright-mcp/
+output/
+参考文件/
+
+# === 真实业务数据 / 客户对话（绝不能进 Git）===
+# 客服对话原始数据（含真实顾客 PII，绝不入 Git）
+agent_data.json
+agent_data.pkl
+agent_data_7d.json
+chat_log_raw.json
+chat_sessions.json
+chat_sessions_7d.json
+# 分析/抓取结果
+analytics-res.json
+console-before-tests.json
+# 客户话术分析报告（含真实客服数据）
+客服话术*.html
+客服话术*_7天*.html
+客服话术*7天.html
+!docs/**/客服话术*.html
+客服话术*_7天*.html
+客服话术*7天.html
+
+# === 本机运行时 / 配置（不跨机共享）===
+# Claude Code 本地配置（settings.local.json / *.local.md 含本机路径）
+.claude/
+.workbuddy/
+.build/
+
+# 名字容易引起警觉的临时脚本（实际只是 playwright 路径检查，但避免误传）
+check-pw.cjs
+
+# === 测试 / 验收产物（开发过程截图，不入仓）===
+# 根目录散落的 test-*.png 截图
+test-*.png
+# 验收测试输出
+test-results/
+# 临时截图目录
+screenshots/
+
+# === 根目录散落的一次性工件（按需 git add -f）===
+# 各类 before/after 截图、cockpit、workbench-light-after 等
+01-cockpit.png
+cockpit.png
+workbench-light-after.png
+tmall-detail-light-scrollbar.png
+tmall-detail-scrolled-right.png
+tmall-detail-tables.png
+# 一次性生成的报告/演示脚本（内容可能含敏感数据，谨慎 add）
+report.html
+review-screenshots.cjs
+generate_ppt.py
+
+
+# === 敏感/临时数据与一次性工件（2026-08-24 安全检查后补充）===
+# 生产数据临时文件，可能含真实业务数据
+prod-products-tmp.json
+# 归档的真实商品/目录数据
+archive/
+# 第三方 skill 完整仓库副本，不属于本项目源码
+.agents/
+# 根目录散落的开发验收截图（含看板真实数据画面）
+/*.png
+# 本机构建备份目录
+dist_bak_*/
+# 本机启动脚本（含本机绝对路径）
+start-server.bat

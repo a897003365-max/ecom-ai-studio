@@ -1,0 +1,137 @@
+relationship 752b0bb4-9f22-48cf-b13d-8aa7c26725dd
+	joinOnDateBehavior: datePartOnly
+	fromColumn: 01-店铺数据辅助表.日期
+	toColumn: LocalDateTable_06e2fae1-ec84-4d0b-9baf-3c7bf7d7dca8.Date
+
+relationship 4679aa9b-b7cf-da65-9761-d498e1d378a0
+	fromColumn: 07-旗舰店商品销售数据.日期
+	toColumn: 01-店铺数据辅助表.日期
+
+relationship 614fbbfe-4ef3-433c-6f2c-bcfef335c23c
+	fromColumn: 08-旗舰店推广花费.日期
+	toColumn: 01-店铺数据辅助表.日期
+
+relationship c846c651-8234-224e-d31a-9bbcfc3ad17d
+	fromColumn: 04-旗舰店基础数据.统计日期
+	toColumn: 01-店铺数据辅助表.日期
+
+relationship a71cb7a8-6ad2-8949-22e4-446f5bdd3ae2
+	fromColumn: 03-2店铺每天销售目标.日期
+	toColumn: 01-店铺数据辅助表.日期
+
+relationship 18f02b4b-1bda-b032-6295-e03addb4a661
+	fromColumn: 06-旗舰店流量数据.日期
+	toColumn: 01-店铺数据辅助表.日期
+
+relationship 670153fe-3599-823e-81b9-3c6db1870b65
+	crossFilteringBehavior: bothDirections
+	fromColumn: 00-月表汇总.日期
+	toColumn: 01-店铺数据辅助表.日期
+
+relationship b8fa367c-8412-55d6-2bb2-ae8a0eba1081
+	fromColumn: 03-1-各渠道目标金额.日期
+	toColumn: 01-店铺数据辅助表.日期
+
+relationship f5f12eb2-a937-5e34-d03f-ce3373b64962
+	crossFilteringBehavior: bothDirections
+	toCardinality: many
+	fromColumn: 03-1-各渠道目标金额.渠道
+	toColumn: 00-月表汇总.渠道
+
+relationship c6fdd627-c2a6-0330-c7d5-5a540749c0bd
+	fromColumn: 10-1淘宝客服绩效明细.日期
+	toColumn: 01-店铺数据辅助表.日期
+
+relationship AutoDetected_45df4a5b-d2be-4b07-8f5e-7a217235dcc8
+	fromColumn: 07-旗舰店商品销售数据.商品ID
+	toColumn: 05-旗舰店ID对照表.商品ID
+
+relationship 91af956e-2d8b-c192-48b3-cc0f7da8fb71
+	fromColumn: 10-4客服员工日报统计.日期
+	toColumn: 01-店铺数据辅助表.日期
+
+relationship AutoDetected_033e429f-762f-4c82-b983-08e877aaf549
+	toCardinality: many
+	fromColumn: 京东客服分组表.昵称
+	toColumn: 淘宝客服排班表.昵称
+
+relationship 8ce3b21e-8f7e-82ae-5481-266f1798dcff
+	toCardinality: many
+	fromColumn: 10-2京东客服营销明细.客服
+	toColumn: 京东客服分组表.客服账号
+
+relationship e7f4371f-dc63-65d6-2a82-52b8680e9f83
+	toCardinality: many
+	fromColumn: 10-3京东客服绩效数据.客服
+	toColumn: 京东客服分组表.客服账号
+
+relationship ae877d5a-9844-8b21-fa74-eeab36dfdbc4
+	toCardinality: many
+	fromColumn: 10-4客服员工日报统计.UID
+	toColumn: 京东客服分组表.客服账号
+
+relationship de7fd95b-9233-75c7-a485-71402dfeb5f5
+	fromColumn: 10-3京东客服绩效数据.日期
+	toColumn: 01-店铺数据辅助表.日期
+
+relationship 79ebe40a-f653-4ad0-994f-d0696b007673
+	joinOnDateBehavior: datePartOnly
+	fromColumn: 淘宝客服排班表.开始时间
+	toColumn: LocalDateTable_a14edd28-e245-4816-92b5-f75d0784466b.Date
+
+relationship d0c3aa08-9342-472c-af93-ad2eab4fcac8
+	joinOnDateBehavior: datePartOnly
+	fromColumn: 淘宝客服排班表.结束时间
+	toColumn: LocalDateTable_ee832b9e-1a6c-43a9-97b5-c11eb130180a.Date
+
+relationship 42441abf-ea52-4175-a251-2e69be4caa87
+	joinOnDateBehavior: datePartOnly
+	fromColumn: 14-推广竞品数据.时间
+	toColumn: LocalDateTable_33431a32-8820-467d-9052-384d6c9e1632.Date
+
+relationship cee3aa29-d751-9025-320b-85b71eb94777
+	fromColumn: 10-2京东客服营销明细.日期
+	toColumn: 01-店铺数据辅助表.日期
+
+relationship e354566e-6a87-490b-8031-367c405a63e3
+	joinOnDateBehavior: datePartOnly
+	fromColumn: 11-旗舰店UD推广计划.日期
+	toColumn: LocalDateTable_759fd802-a71a-4418-94d6-abf867206ba8.Date
+
+relationship b9d12664-bc5c-4480-930d-48e038dea48a
+	joinOnDateBehavior: datePartOnly
+	fromColumn: 05-旗舰店ID对照表.创建时间
+	toColumn: LocalDateTable_703b6f7e-2085-400b-8ede-d676f2786224.Date
+
+relationship 9b5872b2-0cac-b1e9-91f9-bd3b09bc963c
+	fromColumn: 08-旗舰店推广花费.商品ID
+	toColumn: 05-旗舰店ID对照表.商品ID
+
+relationship 2efae8f6-c637-09e8-4112-68994f1290bd
+	fromColumn: 08-1关键词报表数据.日期
+	toColumn: 01-店铺数据辅助表.日期
+
+relationship 811cce3a-9d9c-1457-7a23-7e015d054cc0
+	fromColumn: 08-1关键词报表数据.宝贝ID
+	toColumn: 05-旗舰店ID对照表.商品ID
+
+relationship 85b1669a-7c58-6e31-587c-16666f43f62a
+	crossFilteringBehavior: bothDirections
+	toCardinality: many
+	fromColumn: 08-1关键词报表数据.计划ID
+	toColumn: 08-旗舰店推广花费.计划ID
+
+relationship 6b0e244b-066e-6bad-3b15-409f4f0c3741
+	fromColumn: 08-2人群报表数据.日期
+	toColumn: 01-店铺数据辅助表.日期
+
+relationship ab79e46e-c74a-7d13-1bdd-bef8a8bc24a3
+	crossFilteringBehavior: bothDirections
+	toCardinality: many
+	fromColumn: 08-2人群报表数据.计划ID
+	toColumn: 08-1关键词报表数据.计划ID
+
+relationship cc5bc418-f7a9-c1b5-4f72-e6b308937160
+	fromColumn: 08-2人群报表数据.主体ID
+	toColumn: 05-旗舰店ID对照表.商品ID
+

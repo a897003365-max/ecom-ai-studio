@@ -1,0 +1,384 @@
+table 10-3京东客服绩效数据
+	lineageTag: aa7b6532-8182-448d-80d5-234e3fef4c5f
+
+	measure 客单价（客服） = DIVIDE(sum('10-3京东客服绩效数据'[促成下单商品金额]),sum('10-3京东客服绩效数据'[促成下单人数]))
+		formatString: 0
+		lineageTag: de814bbc-d89e-4c6a-862b-80d5474e2efe
+
+	measure 转化率京东客服 = DIVIDE(SUM('10-3京东客服绩效数据'[促成下单人数]), SUM('10-3京东客服绩效数据'[售前接待人数]))
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: b4bd12aa-1a98-4826-979b-02b5d5911285
+
+	measure 促成金额环比 =
+			
+			VAR CurrentValue = sum('10-3京东客服绩效数据'[促成下单商品金额])
+			VAR PreviousValue = CALCULATE(sum('10-3京东客服绩效数据'[促成下单商品金额]), DATEADD('01-店铺数据辅助表'[日期].[Date], -1 , DAY ))
+			RETURN
+			DIVIDE(CurrentValue - PreviousValue, PreviousValue, 0)
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: 290abc3f-773e-4b0b-99b0-14c235266664
+
+	measure 客单价客服环比 =
+			
+			VAR CurrentValue = [客单价（客服）]
+			VAR PreviousValue = CALCULATE( [客单价（客服）], DATEADD('01-店铺数据辅助表'[日期].[Date], -1 , DAY ))
+			RETURN
+			DIVIDE(CurrentValue - PreviousValue, PreviousValue, 0)
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: a52f3612-4fec-4c88-9ed2-60bc8958f8f1
+
+	measure 转化率客服环比 =
+			
+			VAR CurrentValue =[转化率京东客服]
+			VAR PreviousValue = CALCULATE([转化率京东客服], DATEADD('01-店铺数据辅助表'[日期].[Date], -1 , DAY ))
+			RETURN
+			DIVIDE(CurrentValue - PreviousValue, PreviousValue, 0)
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: 4f9fb710-c44d-412d-9751-6f5b8a19ad1d
+
+	measure 促成下单金额（万） = divide(SUM('10-3京东客服绩效数据'[促成下单商品金额]),10000)
+		lineageTag: 7af25aa8-90cc-4e5a-b487-ae9ef92fac58
+
+		formatStringDefinition = "0.00万"
+
+	column 'Source.Name'
+		dataType: string
+		lineageTag: 6e8f5bc0-a76c-4753-83cc-785465e98cdb
+		summarizeBy: none
+		sourceColumn: Source.Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 客服
+		dataType: string
+		lineageTag: e0ff54c2-fdf0-4868-b204-7bf821bfde0c
+		summarizeBy: none
+		sourceColumn: 客服
+
+		annotation SummarizationSetBy = Automatic
+
+	column 售前接待人数
+		dataType: double
+		lineageTag: ffd69054-5d9b-47cc-a206-ca5176e013de
+		summarizeBy: sum
+		sourceColumn: 售前接待人数
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 促成下单人数
+		dataType: int64
+		formatString: 0
+		lineageTag: c80cb0c8-0a27-4f8f-a076-3f4c7612934a
+		summarizeBy: sum
+		sourceColumn: 促成下单人数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 促成出库人数
+		dataType: string
+		lineageTag: dd9ba22a-2f8a-4509-9a77-52ce0944bc1a
+		summarizeBy: none
+		sourceColumn: 促成出库人数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 促成下单订单数
+		dataType: string
+		lineageTag: 69776fa0-08f7-4ccd-8153-3bb0f836d2f2
+		summarizeBy: none
+		sourceColumn: 促成下单订单数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 促成出库订单数
+		dataType: string
+		lineageTag: 6d8e6008-70be-4015-ae1e-ed1acbd33fd3
+		summarizeBy: none
+		sourceColumn: 促成出库订单数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 促成下单商品数
+		dataType: string
+		lineageTag: 58e4768a-db0a-4084-811f-a9ca37459ec2
+		summarizeBy: none
+		sourceColumn: 促成下单商品数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 促成出库商品数
+		dataType: string
+		lineageTag: 3e4287ba-2d01-4f23-9c42-0691a7410a58
+		summarizeBy: none
+		sourceColumn: 促成出库商品数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 促成下单商品金额
+		dataType: double
+		formatString: #,0
+		lineageTag: 5134f656-f9d8-4905-9dac-774f7682c478
+		summarizeBy: sum
+		sourceColumn: 促成下单商品金额
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isDecimal":true}
+
+	column 促成出库商品金额
+		dataType: string
+		lineageTag: f5a882dc-ef2a-437e-bd97-ca4010bc4924
+		summarizeBy: none
+		sourceColumn: 促成出库商品金额
+
+		annotation SummarizationSetBy = Automatic
+
+	column 日期
+		dataType: dateTime
+		formatString: Long Date
+		lineageTag: 97e4192f-b663-435c-b9a7-f0fbd3d683a6
+		summarizeBy: none
+		sourceColumn: 日期
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation UnderlyingDateTimeDataType = Date
+
+	column 售前咨询-下单转化率
+		dataType: double
+		lineageTag: c486ee82-e5d7-4e5a-99ed-b75792fe43c8
+		summarizeBy: sum
+		sourceColumn: 售前咨询-下单转化率
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 推荐人数
+		dataType: int64
+		formatString: 0
+		lineageTag: 0111096b-dce8-4f1e-8f74-9bddf33f8a09
+		summarizeBy: sum
+		sourceColumn: 推荐人数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 促成下单商品均价
+		dataType: double
+		lineageTag: 48fdd223-60ff-4546-95e4-654e700207c8
+		summarizeBy: sum
+		sourceColumn: 促成下单商品均价
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 促成下单客单价（元/人）
+		dataType: double
+		lineageTag: dfb3e058-7663-4992-a087-cd69de893664
+		summarizeBy: sum
+		sourceColumn: 促成下单客单价（元/人）
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 促成下单客件数（件/人）
+		dataType: double
+		lineageTag: 55479937-c20d-450b-a639-f4593a759c1d
+		summarizeBy: sum
+		sourceColumn: 促成下单客件数（件/人）
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 售前下单转化率
+		dataType: double
+		lineageTag: ff5ae7a0-452c-4edd-bf1c-1c7960641984
+		summarizeBy: sum
+		sourceColumn: 售前下单转化率
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 24H下单人数
+		dataType: int64
+		formatString: 0
+		lineageTag: 685890b7-7561-4d3e-aaf7-b1ad8232ae9b
+		summarizeBy: sum
+		sourceColumn: 24H下单人数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 24H下单未取消人数
+		dataType: int64
+		formatString: 0
+		lineageTag: 25624f7c-365e-403e-b47b-edc922365a3d
+		summarizeBy: sum
+		sourceColumn: 24H下单未取消人数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 24H下单金额
+		dataType: double
+		lineageTag: 25db0654-310f-4eae-bc86-8474533025e9
+		summarizeBy: sum
+		sourceColumn: 24H下单金额
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 24H下单未取消金额
+		dataType: double
+		lineageTag: 1e236e70-5aa8-4910-b156-0da74a06be41
+		summarizeBy: sum
+		sourceColumn: 24H下单未取消金额
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 24H下单转化率
+		dataType: double
+		lineageTag: 4d2689ab-f7c4-4c06-9756-e0afc4710954
+		summarizeBy: sum
+		sourceColumn: 24H下单转化率
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 24H未取消转化率
+		dataType: double
+		lineageTag: ad139d0c-30bb-416c-9bc5-13d7ea16f040
+		summarizeBy: sum
+		sourceColumn: 24H未取消转化率
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 售前出库转化率
+		dataType: double
+		lineageTag: d76da1a6-7d2f-4a7e-ac34-ff5c38ab29d9
+		summarizeBy: sum
+		sourceColumn: 售前出库转化率
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 下单出库转化率
+		dataType: double
+		lineageTag: 39ffc557-8fff-489b-87e7-03aa807204b7
+		summarizeBy: sum
+		sourceColumn: 下单出库转化率
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 促成出库商品均价
+		dataType: double
+		lineageTag: 523761f1-fd6d-43c2-9b8c-e22f25a5b2f2
+		summarizeBy: sum
+		sourceColumn: 促成出库商品均价
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 促成出库客单价（元/人）
+		dataType: double
+		lineageTag: d0c1787a-6fab-4059-b869-9400f33d63aa
+		summarizeBy: sum
+		sourceColumn: 促成出库客单价（元/人）
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 促成出库客件数（件/人）
+		dataType: double
+		lineageTag: c81b465e-2e05-4d8e-ae70-87160a17ca84
+		summarizeBy: sum
+		sourceColumn: 促成出库客件数（件/人）
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	partition 10-3京东客服绩效数据 = m
+		mode: import
+		source = ```
+				let
+				    源 = Folder.Files("D:\麻大师\日更数据\天猫旗舰店\10-2京东客服绩效明细\绩效数据"),
+				    筛选的隐藏文件2 = Table.SelectRows(源, each [Attributes]?[Hidden]? <> true),
+				    调用自定义函数2 = Table.AddColumn(筛选的隐藏文件2, "转换文件 (42)", each #"转换文件 (42)"([Content])),
+				    重命名的列2 = Table.RenameColumns(调用自定义函数2, {"Name", "Source.Name"}),
+				    删除的其他列2 = Table.SelectColumns(重命名的列2, {"Source.Name", "转换文件 (42)"}),
+				    扩展的表格列2 = Table.ExpandTableColumn(删除的其他列2, "转换文件 (42)", Table.ColumnNames(#"转换文件 (42)"(#"示例文件 (42)"))),
+				    更改的类型1 = Table.TransformColumnTypes(扩展的表格列2,{{"Source.Name", type text}, {"客服", type any}, {"售前接待人数", type number}, {"促成下单人数", type number}, {"促成出库人数", type any}, {"促成下单订单数", type any}, {"促成出库订单数", type any}, {"促成下单商品数", type any}, {"促成出库商品数", type any}, {"促成下单商品金额", type any}, {"促成出库商品金额", type any}}),
+				    筛选的行 = Table.SelectRows(更改的类型1, each ([客服] <> "均值" and [客服] <> "总值")),
+				    已添加自定义 = Table.AddColumn(筛选的行, "售前咨询-下单转化率", each [促成下单人数]/[售前接待人数]),
+				    追加的查询 = Table.Combine({已添加自定义, 营销数据, 营销数据改版}),
+				    ExtractDate = Table.AddColumn(追加的查询, "日期", each 
+				 let
+				    FullText = [Source.Name],
+				    
+				    // 使用正则表达式思路提取日期（日） - 保持不变
+				    DateMatch = Text.Select(Text.BetweenDelimiters(FullText, " ", " ", 1), {"0".."9"}),
+				    Day = if DateMatch <> "" then Number.FromText(DateMatch) else null,
+				    
+				    // 月份查找 - 保持不变
+				    Month = List.First(List.RemoveNulls(List.Transform(
+				        {"Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"},
+				        (m) => if Text.Contains(FullText, m) then 
+				            List.PositionOf({"Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"}, m) + 1 
+				            else null
+				    )), null),
+				    
+				    // 提取年份 - 简化版直接查找4位数字
+				    YearMatch = 
+				        let
+				            // 直接在整个文本中查找4位连续数字
+				            // 方法1: 使用Text.PositionOf和Text.Middle
+				            YearPattern = " " & Text.Combine(List.Transform({0..9}, Text.From)) & " ",
+				            YearStart = Text.PositionOf(FullText, " CST ", Occurrence.First) + 5, // 找到第一个"CST "之后的位置
+				            YearText = if YearStart > 4 then 
+				                Text.Middle(FullText, YearStart, 4) else null,
+				            Year = if YearText <> null and 
+				                    Text.Length(Text.Select(YearText, {"0".."9"})) = 4 then 
+				                Number.FromText(YearText) else null
+				        in
+				            Year,
+				    
+				    // 创建日期值
+				    DateValue = try 
+				        if Month <> null and Day <> null then 
+				            if YearMatch <> null then 
+				                #date(YearMatch, Month, Day)
+				            else 
+				                #date(2025, Month, Day)
+				        else 
+				            null 
+				    otherwise null
+				    
+				in
+				    DateValue)
+				    ,
+				    更改的类型 = Table.TransformColumnTypes(ExtractDate,{{"促成下单商品金额", type number}, {"促成下单人数", Int64.Type}, {"售前接待人数", type number}, {"日期", type date}, {"售前咨询-下单转化率", Percentage.Type}}),
+				    删除的副本 = Table.Distinct(更改的类型, {"客服", "日期"})
+				in
+				    删除的副本
+				```
+
+	annotation PBI_NavigationStepName = 导航
+
+	annotation PBI_ResultType = Table
+

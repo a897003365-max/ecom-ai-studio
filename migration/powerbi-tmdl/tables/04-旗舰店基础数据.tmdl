@@ -1,0 +1,1487 @@
+table 04-旗舰店基础数据
+	lineageTag: bd45d374-dd61-4e7d-9ada-d06d6c011a73
+
+	measure 负面评价率 =
+			
+			DIVIDE(SUM('04-旗舰店基础数据'[负面评价数]), SUM('04-旗舰店基础数据'[评价数]))
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: c72d01ae-bf27-4c35-9a15-df9f9a4a5dce
+
+	measure 关键词推广费比 =
+			
+			DIVIDE(SUM('04-旗舰店基础数据'[关键词推广花费]), [国补后金额(店铺)]*10000)
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: ba80a31b-1199-4e66-be30-7148d5de83a2
+
+	measure 会员金额占比 =
+			
+			DIVIDE(SUM('04-旗舰店基础数据'[会员成交金额]), SUM('04-旗舰店基础数据'[支付金额]))
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: 7579d060-b812-4014-81c4-8c13508ab600
+
+	measure 客单价 =
+			
+			DIVIDE(SUM('04-旗舰店基础数据'[支付金额]), SUM('04-旗舰店基础数据'[支付买家数]))
+		lineageTag: 169788dd-6c34-4e21-a17d-b31126378591
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	measure 淘宝客费率 =
+			
+			DIVIDE(SUM('04-旗舰店基础数据'[淘宝客佣金]), '04-旗舰店基础数据'[店铺减退金额])
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: 98199c23-9241-4bc6-aac4-ecc04de93297
+
+	measure 新客率 =
+			
+			DIVIDE(SUM('04-旗舰店基础数据'[支付新买家数]), SUM('04-旗舰店基础数据'[支付买家数]))
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: 2acd749a-6aff-4a25-ada1-9b1f6c4e5fe2
+
+	measure 有图评价率 =
+			
+			DIVIDE(SUM('04-旗舰店基础数据'[有图评价数]), SUM('04-旗舰店基础数据'[评价数]))
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: 9a4317f8-684c-4a54-8236-ef7a55fa4865
+
+	measure 直播间访客占比 =
+			
+			DIVIDE(SUM('04-旗舰店基础数据'[直播间访客数]), SUM('04-旗舰店基础数据'[访客数]))
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: 67fc3293-758d-4094-9a5a-7b9d472cbd93
+
+	measure 直播间金额占比 =
+			
+			DIVIDE(SUM('09-旗舰店增长因子数据'[直播成交金额]), SUM('04-旗舰店基础数据'[支付金额]))
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: d2dae952-1d16-4c1a-9f5f-4104b6bec938
+
+	measure 智能场景费率 =
+			
+			DIVIDE(SUM('04-旗舰店基础数据'[智能场景花费]), SUM('04-旗舰店基础数据'[支付金额]))
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: 0fc19c8c-fbc6-44ea-a403-65288c7d17d1
+
+	measure UV价值 =
+			
+			DIVIDE(SUM('04-旗舰店基础数据'[支付金额]), SUM('04-旗舰店基础数据'[访客数]))
+		lineageTag: 65961ea2-4bf3-4928-8bea-22f742756365
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	measure 全站推广费比 =
+			
+			DIVIDE(SUM('04-旗舰店基础数据'[全站推广花费]), [国补后金额(店铺)]*10000)
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: 0bfcd1f8-124c-46fb-b44e-9958e9a4fe30
+
+	measure 精准人群费比 =
+			
+			DIVIDE(SUM('04-旗舰店基础数据'[精准人群推广花费]), [国补后金额(店铺)]*10000)
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: 6a69f8d0-fdb8-492f-97d7-934cc33de9d2
+
+	measure 访客支付转化率 =
+			
+			DIVIDE(SUM('04-旗舰店基础数据'[支付买家数]),SUM('04-旗舰店基础数据'[访客数]))
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: 4e528018-071c-405d-be0f-dad29a6728dd
+
+	measure 去年支付金额（万） = ```
+			divide(
+			CALCULATE( SUM('04-旗舰店基础数据'[支付金额]) , 
+			   DATEADD( '01-店铺数据辅助表'[日期].[Date], -365 , DAY ) ),10000)
+			```
+		lineageTag: bb9c21d9-eb9d-4224-b768-272dbf7291f7
+
+		formatStringDefinition = "0.00万"
+
+	measure 店铺减退金额同比 =
+			
+			DIVIDE([店铺减退金额（万）], [去年减退金额（万）])-1
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: c5cc16ba-4e18-4fef-85cc-fa2498bb60ce
+
+	measure 客件数 = DIVIDE(SUM('04-旗舰店基础数据'[支付件数]), SUM('04-旗舰店基础数据'[支付买家数]))
+		lineageTag: fb0ca3a0-e42a-43d8-8dc7-4836ec50b6a1
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	measure 去年成功退款金额(万) = ```
+			divide(
+			CALCULATE( SUM('04-旗舰店基础数据'[成功退款金额]) , 
+			   DATEADD( '01-店铺数据辅助表'[日期].[Date], -365 , DAY ) ),10000)
+			```
+		lineageTag: c76dc3a5-b2a8-4c25-b809-5f2e03333727
+
+		formatStringDefinition = "0.00万"
+
+	measure 去年减退金额（万） = [去年支付金额（万）]-[去年成功退款金额(万)]
+		lineageTag: f644297d-e46c-4725-a2ea-b8a132c2aae3
+
+		formatStringDefinition = "0.00万"
+
+	measure 店铺减退金额 = SUM('04-旗舰店基础数据'[支付金额])-SUM('04-旗舰店基础数据'[成功退款金额])
+		lineageTag: 42cd8e76-fa8b-49d4-997c-6f651f91c4d6
+
+		formatStringDefinition = "0.00万"
+
+	measure 昨天访客数 = ```
+			
+			CALCULATE( SUM('04-旗舰店基础数据'[访客数]) , 
+			   DATEADD( '01-店铺数据辅助表'[日期].[Date], -1 , DAY ) ) 
+			```
+		formatString: 0
+		lineageTag: 8fc1fc9c-4cac-4f87-8caf-d43342868ab8
+
+	measure 访客数环比 = DIVIDE(SUM('04-旗舰店基础数据'[访客数]),[昨天访客数])-1
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: c5bfb269-5a16-4dea-a1a4-91ceb327e675
+
+	measure 支付金额环比 =
+			
+			VAR CurrentValue = SUM('04-旗舰店基础数据'[支付金额])
+			VAR PreviousValue = CALCULATE(SUM('04-旗舰店基础数据'[支付金额]), DATEADD('01-店铺数据辅助表'[日期].[Date], -1 , DAY ))
+			RETURN
+			DIVIDE(CurrentValue - PreviousValue, PreviousValue, 0)
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: f53529ba-4524-464f-b635-811626859fdf
+
+	measure 访客转化率环比 =
+			
+			VAR CurrentValue = [访客支付转化率]
+			VAR PreviousValue = CALCULATE([访客支付转化率], DATEADD('01-店铺数据辅助表'[日期].[Date], -1 , DAY ))
+			RETURN
+			DIVIDE(CurrentValue - PreviousValue, PreviousValue, 0)
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: 79838f33-af5f-4906-afd3-a091cb45341e
+
+	measure 加购人数环比 =
+			
+			VAR CurrentValue = SUM('04-旗舰店基础数据'[加购人数])
+			VAR PreviousValue = CALCULATE(SUM('04-旗舰店基础数据'[加购人数]), DATEADD('01-店铺数据辅助表'[日期].[Date], -1 , DAY ))
+			RETURN
+			DIVIDE(CurrentValue - PreviousValue, PreviousValue, 0)
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: 61e95075-c2f3-4791-9fba-c69fa872a4ec
+
+	measure 支付件数环比 =
+			
+			VAR CurrentValue = SUM('04-旗舰店基础数据'[支付件数])
+			VAR PreviousValue = CALCULATE(SUM('04-旗舰店基础数据'[支付件数]), DATEADD('01-店铺数据辅助表'[日期].[Date], -1 , DAY ))
+			RETURN
+			DIVIDE(CurrentValue - PreviousValue, PreviousValue, 0)
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: fdc25efd-a6ac-47df-81fa-a793214bea02
+
+	measure 花费环比 =
+			
+			VAR CurrentValue = SUM('08-旗舰店推广花费'[花费（未含达人）])
+			VAR PreviousValue = CALCULATE(SUM('08-旗舰店推广花费'[花费（未含达人）]), DATEADD('01-店铺数据辅助表'[日期].[Date], -1 , DAY ))
+			RETURN
+			DIVIDE(CurrentValue - PreviousValue, PreviousValue, 0)
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: 63abf24a-9af9-436b-b8a3-5c57444feb18
+
+	measure 全站推广费率环比 =
+			
+			VAR CurrentValue = [全站推广费比]
+			VAR PreviousValue = CALCULATE([全站推广费比], DATEADD('01-店铺数据辅助表'[日期].[Date], -1 , DAY ))
+			RETURN
+			DIVIDE(CurrentValue - PreviousValue, PreviousValue, 0)
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: 0b189fc7-b410-432f-bd80-0964be36fd0e
+
+	measure 关键词推广费率环比 =
+			
+			VAR CurrentValue = [关键词推广费比]
+			VAR PreviousValue = CALCULATE([关键词推广费比], DATEADD('01-店铺数据辅助表'[日期].[Date], -1 , DAY ))
+			RETURN
+			DIVIDE(CurrentValue - PreviousValue, PreviousValue, 0)
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: a199db5a-04b2-46d1-8219-8e9e1c8577a1
+
+	measure 淘宝客费率环比 =
+			
+			VAR CurrentValue = [淘宝客费率]
+			VAR PreviousValue = CALCULATE([淘宝客费率], DATEADD('01-店铺数据辅助表'[日期].[Date], -1 , DAY ))
+			RETURN
+			DIVIDE(CurrentValue - PreviousValue, PreviousValue, 0)
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: 1987522d-308c-495c-9af3-b96b4b6ade48
+
+	measure 商品支付件数环比 =
+			
+			VAR CurrentValue = SUM('04-旗舰店基础数据'[支付件数])
+			VAR PreviousValue = CALCULATE(SUM('04-旗舰店基础数据'[支付件数]), DATEADD('01-店铺数据辅助表'[日期].[Date], -1 , DAY ))
+			RETURN
+			DIVIDE(CurrentValue - PreviousValue, PreviousValue, 0)
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: 41981938-7264-49fe-94e3-803c4bf7b3ab
+
+	measure 发货包裹数环比 =
+			
+			VAR CurrentValue = SUM('04-旗舰店基础数据'[发货包裹数])
+			VAR PreviousValue = CALCULATE(SUM('04-旗舰店基础数据'[发货包裹数]), DATEADD('01-店铺数据辅助表'[日期].[Date], -1 , DAY ))
+			RETURN
+			DIVIDE(CurrentValue - PreviousValue, PreviousValue, 0)
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: a66a2d9f-1937-4607-8146-86bd553c7470
+
+	measure 加购率 = DIVIDE(SUM('04-旗舰店基础数据'[加购人数]), SUM('04-旗舰店基础数据'[访客数]))
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: 50b10601-eb8a-41f5-af91-f6ab7364d9ef
+
+	measure 加购率环比 =
+			
+			VAR CurrentValue = [加购率]
+			VAR PreviousValue = CALCULATE([加购率], DATEADD('01-店铺数据辅助表'[日期].[Date], -1 , DAY ))
+			RETURN
+			DIVIDE(CurrentValue - PreviousValue, PreviousValue, 0)
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: 4d21513e-3594-4b80-9131-808a7cfea956
+
+	measure 评价数环比 =
+			
+			VAR CurrentValue = SUM('04-旗舰店基础数据'[评价数])
+			VAR PreviousValue = CALCULATE(SUM('04-旗舰店基础数据'[评价数]), DATEADD('01-店铺数据辅助表'[日期].[Date], -1 , DAY ))
+			RETURN
+			DIVIDE(CurrentValue - PreviousValue, PreviousValue, 0)
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: bcc22231-5b42-4f39-a914-bbf61a9f5b0c
+
+	measure 有图评价率环比 =
+			
+			VAR CurrentValue = [有图评价率]
+			VAR PreviousValue = CALCULATE([有图评价率], DATEADD('01-店铺数据辅助表'[日期].[Date], -1 , DAY ))
+			RETURN
+			DIVIDE(CurrentValue - PreviousValue, PreviousValue, 0)
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: dd4e5e15-7023-4288-b584-1a71a110a448
+
+	measure 负面评价率环比 =
+			
+			VAR CurrentValue = [负面评价率]
+			VAR PreviousValue = CALCULATE([负面评价率], DATEADD('01-店铺数据辅助表'[日期].[Date], -1 , DAY ))
+			RETURN
+			DIVIDE(CurrentValue - PreviousValue, PreviousValue, 0)
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: a97fff13-a074-4321-9cfb-8587a871a590
+
+	measure 支付金额（万元） = DIVIDE(SUM('04-旗舰店基础数据'[支付金额]), 10000)
+		lineageTag: 5f9eb0eb-403f-45f5-ba86-3b6d8c32dc29
+
+		formatStringDefinition = "0.00万"
+
+	measure 访客数（万） = DIVIDE(SUM('04-旗舰店基础数据'[访客数]), 10000)
+		lineageTag: f699d310-6214-45b1-ac66-b8245b2f4d73
+
+		formatStringDefinition = "0.00万"
+
+	measure 店铺减退金额（万） = divide( SUM('04-旗舰店基础数据'[支付金额])-SUM('04-旗舰店基础数据'[成功退款金额]),10000)
+		lineageTag: 06c8a7c9-79f7-43d8-b043-a613bc4111e6
+
+		formatStringDefinition = "0.00万"
+
+	measure 店铺推广费率环比 =
+			
+			VAR CurrentValue = [站内推广费比]
+			VAR PreviousValue = CALCULATE([站内推广费比], DATEADD('01-店铺数据辅助表'[日期].[Date], -1 , DAY ))
+			RETURN
+			DIVIDE(CurrentValue - PreviousValue, PreviousValue, 0)
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: 928ab5fb-cb63-4adf-9fbd-61ecf3997c40
+
+	measure 其他推广费率 =
+			
+			DIVIDE(SUM('08-旗舰店推广花费'[花费（未含达人）])-SUM('04-旗舰店基础数据'[全站推广花费])-SUM('04-旗舰店基础数据'[关键词推广花费]),'04-旗舰店基础数据'[店铺减退金额])
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: 5ec63056-246b-416e-950d-7d2da11f6330
+
+	measure 其他推广费率环比 =
+			
+			VAR CurrentValue = [其他推广费率]
+			VAR PreviousValue = CALCULATE([其他推广费率], DATEADD('01-店铺数据辅助表'[日期].[Date], -1 , DAY ))
+			RETURN
+			DIVIDE(CurrentValue - PreviousValue, PreviousValue, 0)
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: 6ea7e57d-57d6-492a-8ece-c20829785b85
+
+	measure 店铺退减金额环比 =
+			
+			VAR CurrentValue = [店铺减退金额（万）]
+			VAR PreviousValue = CALCULATE([店铺减退金额（万）], DATEADD('01-店铺数据辅助表'[日期].[Date], -1 , DAY ))
+			RETURN
+			DIVIDE(CurrentValue - PreviousValue, PreviousValue, 0)
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: 22eeb64d-c3c7-4967-a060-4f07f345dc8c
+
+	measure 派送包裹数环比 =
+			
+			VAR CurrentValue = SUM('04-旗舰店基础数据'[派送包裹数])
+			VAR PreviousValue = CALCULATE(SUM('04-旗舰店基础数据'[派送包裹数]), DATEADD('01-店铺数据辅助表'[日期].[Date], -1 , DAY ))
+			RETURN
+			DIVIDE(CurrentValue - PreviousValue, PreviousValue, 0)
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: 3fb8ee09-7fb4-4aa2-924a-dc1098c50c0e
+
+	measure 退款率 =
+			
+			DIVIDE(SUM('04-旗舰店基础数据'[成功退款金额]), SUM('04-旗舰店基础数据'[支付金额]))
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: 16bbed85-c0a2-43da-a6d5-78f14c217be6
+
+	measure 精准推广费率环比 =
+			
+			VAR CurrentValue = [精准人群费比]
+			VAR PreviousValue = CALCULATE([精准人群费比], DATEADD('01-店铺数据辅助表'[日期].[Date], -1 , DAY ))
+			RETURN
+			DIVIDE(CurrentValue - PreviousValue, PreviousValue, 0)
+		formatString: 0.00%;-0.00%;0.00%
+		lineageTag: 363cc46a-9d4b-49be-bdb3-4175043e8a94
+
+	measure 国补后金额(店铺) = DIVIDE([店铺减退金额]*0.85,10000)
+		lineageTag: d3b8dd58-c73f-4f16-b250-2547855b1878
+
+		formatStringDefinition = "0.00万"
+
+	column 'Source.Name'
+		dataType: string
+		lineageTag: 6dfa34bd-a1f1-4a88-bf46-d71b9f561549
+		summarizeBy: none
+		sourceColumn: Source.Name
+
+		annotation SummarizationSetBy = Automatic
+
+	column 统计日期
+		dataType: dateTime
+		formatString: Long Date
+		lineageTag: f44156f1-bfc8-44a8-86b5-8c6a565a261a
+		summarizeBy: none
+		sourceColumn: 统计日期
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation UnderlyingDateTimeDataType = Date
+
+	column 店铺名称
+		dataType: string
+		lineageTag: 2326e2ab-79fe-46e1-ab62-6f6ec6a1c676
+		summarizeBy: none
+		sourceColumn: 店铺名称
+
+		annotation SummarizationSetBy = Automatic
+
+	column 访客数
+		dataType: int64
+		formatString: #,0
+		lineageTag: 4128e762-c749-412a-81b0-b62174ed7d0c
+		summarizeBy: sum
+		sourceColumn: 访客数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 直播间访客数
+		dataType: int64
+		formatString: 0
+		lineageTag: ffb92c3e-0a66-440c-a02d-28c63b33c29a
+		summarizeBy: sum
+		sourceColumn: 直播间访客数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 短视频访客数
+		dataType: int64
+		formatString: 0
+		lineageTag: d7eb4f2e-0d18-4390-a893-d9f918960a64
+		summarizeBy: sum
+		sourceColumn: 短视频访客数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 图文访客数
+		dataType: int64
+		formatString: 0
+		lineageTag: de85274a-f8b6-4d18-9dc5-dc296780047a
+		summarizeBy: sum
+		sourceColumn: 图文访客数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 店铺页访客数
+		dataType: int64
+		formatString: 0
+		lineageTag: b3fe2321-7034-4d60-bad6-c494bf259573
+		summarizeBy: sum
+		sourceColumn: 店铺页访客数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 3D应用访客数
+		dataType: int64
+		formatString: 0
+		lineageTag: f440d15f-393f-4e10-bc7f-76caa60ed396
+		summarizeBy: sum
+		sourceColumn: 3D应用访客数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 无线端访客数
+		dataType: int64
+		formatString: 0
+		lineageTag: 67ea482f-f393-4ce5-b58e-d6872a25f9a0
+		summarizeBy: sum
+		sourceColumn: 无线端访客数
+
+		annotation SummarizationSetBy = Automatic
+
+	column PC端访客数
+		dataType: int64
+		formatString: 0
+		lineageTag: 1e805a3b-9ff6-41ab-9cbc-f039f11e33c4
+		summarizeBy: sum
+		sourceColumn: PC端访客数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 浏览量
+		dataType: int64
+		formatString: 0
+		lineageTag: a7241f49-e523-47c1-b5e9-d88bf3a4a19f
+		summarizeBy: sum
+		sourceColumn: 浏览量
+
+		annotation SummarizationSetBy = Automatic
+
+	column 无线端浏览量
+		dataType: int64
+		formatString: 0
+		lineageTag: 5b9c89c1-7ac0-4100-8137-8586a91e09a2
+		summarizeBy: sum
+		sourceColumn: 无线端浏览量
+
+		annotation SummarizationSetBy = Automatic
+
+	column PC端浏览量
+		dataType: int64
+		formatString: 0
+		lineageTag: b0c5c918-d8dc-4fba-aab2-7ef0b673ce05
+		summarizeBy: sum
+		sourceColumn: PC端浏览量
+
+		annotation SummarizationSetBy = Automatic
+
+	column 商品访客数
+		dataType: int64
+		formatString: 0
+		lineageTag: d0ac6dcb-a44e-414f-a36a-95ae15ab21f6
+		summarizeBy: sum
+		sourceColumn: 商品访客数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 无线端商品访客数
+		dataType: int64
+		formatString: 0
+		lineageTag: 14a50558-d7fb-40ee-93bc-132de37a53de
+		summarizeBy: sum
+		sourceColumn: 无线端商品访客数
+
+		annotation SummarizationSetBy = Automatic
+
+	column PC端商品访客数
+		dataType: int64
+		formatString: 0
+		lineageTag: 84bb16bd-2849-4453-9f63-2785f0e192fe
+		summarizeBy: sum
+		sourceColumn: PC端商品访客数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 商品浏览量
+		dataType: int64
+		formatString: 0
+		lineageTag: 3b50c373-0ab2-42d5-a38a-ec2b392ff454
+		summarizeBy: sum
+		sourceColumn: 商品浏览量
+
+		annotation SummarizationSetBy = Automatic
+
+	column 无线端商品浏览量
+		dataType: int64
+		formatString: 0
+		lineageTag: 7ad0aa2c-c586-46e5-8dfa-c137d92a4d86
+		summarizeBy: sum
+		sourceColumn: 无线端商品浏览量
+
+		annotation SummarizationSetBy = Automatic
+
+	column PC端商品浏览量
+		dataType: int64
+		formatString: 0
+		lineageTag: 5fde51b8-f953-49fe-9cc7-417f979705bd
+		summarizeBy: sum
+		sourceColumn: PC端商品浏览量
+
+		annotation SummarizationSetBy = Automatic
+
+	column 平均停留时长
+		dataType: double
+		lineageTag: d3718f54-cf76-4b94-b9f8-76012001612e
+		summarizeBy: sum
+		sourceColumn: 平均停留时长
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 无线端平均停留时长
+		dataType: double
+		lineageTag: 4114803c-a6cc-4a10-b9aa-3cdf623e475b
+		summarizeBy: sum
+		sourceColumn: 无线端平均停留时长
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column PC端平均停留时长
+		dataType: double
+		lineageTag: a92628f1-51e2-4cae-934d-dc90265e1e54
+		summarizeBy: sum
+		sourceColumn: PC端平均停留时长
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 跳失率
+		dataType: double
+		lineageTag: a6676a8a-a03c-4530-951d-4af8fc42e606
+		summarizeBy: sum
+		sourceColumn: 跳失率
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 无线端跳失率
+		dataType: double
+		lineageTag: 337d829d-426d-40f2-92cb-92f45ded2386
+		summarizeBy: sum
+		sourceColumn: 无线端跳失率
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column PC端跳失率
+		dataType: double
+		lineageTag: 5e9b478d-32df-43f8-88e4-8bf45fb2d7d3
+		summarizeBy: sum
+		sourceColumn: PC端跳失率
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 商品收藏买家数
+		dataType: int64
+		formatString: 0
+		lineageTag: 5ef31fd3-68ed-450c-8581-398ebb46e291
+		summarizeBy: sum
+		sourceColumn: 商品收藏买家数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 无线端商品收藏买家数
+		dataType: int64
+		formatString: 0
+		lineageTag: 44e0590d-8592-4bec-b3df-e920ffaae9e3
+		summarizeBy: sum
+		sourceColumn: 无线端商品收藏买家数
+
+		annotation SummarizationSetBy = Automatic
+
+	column PC端商品收藏买家数
+		dataType: int64
+		formatString: 0
+		lineageTag: 4253e23e-2ec3-4a63-a1e8-9a56f95e2347
+		summarizeBy: sum
+		sourceColumn: PC端商品收藏买家数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 商品收藏次数
+		dataType: int64
+		formatString: 0
+		lineageTag: 2ff23d16-dd52-489f-a4c8-6cd2fbfa7002
+		summarizeBy: sum
+		sourceColumn: 商品收藏次数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 无线端商品收藏次数
+		dataType: int64
+		formatString: 0
+		lineageTag: 7bb7a328-8e49-462c-99aa-7708204d4197
+		summarizeBy: sum
+		sourceColumn: 无线端商品收藏次数
+
+		annotation SummarizationSetBy = Automatic
+
+	column PC端商品收藏次数
+		dataType: int64
+		formatString: 0
+		lineageTag: 4f0a09da-1258-41b0-90d3-10251dfe9819
+		summarizeBy: sum
+		sourceColumn: PC端商品收藏次数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 加购人数
+		dataType: int64
+		formatString: #,0
+		lineageTag: af131a31-7b8c-4290-b394-c529e181e242
+		summarizeBy: sum
+		sourceColumn: 加购人数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 无线端加购人数
+		dataType: int64
+		formatString: 0
+		lineageTag: e1d75b79-5f78-426f-9e2c-6a3bc735edd2
+		summarizeBy: sum
+		sourceColumn: 无线端加购人数
+
+		annotation SummarizationSetBy = Automatic
+
+	column PC端加购人数
+		dataType: int64
+		formatString: 0
+		lineageTag: 410f6698-c722-4174-8e51-01b79f1e5521
+		summarizeBy: sum
+		sourceColumn: PC端加购人数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 支付金额
+		dataType: double
+		formatString: "¥"#,0;"¥"-#,0;"¥"#,0
+		lineageTag: c5fcd1c9-454c-4e38-a58c-19e072889185
+		summarizeBy: sum
+		sourceColumn: 支付金额
+
+		annotation SummarizationSetBy = Automatic
+
+	column 无线端支付金额
+		dataType: double
+		lineageTag: 2bf1e5fa-878e-4c63-bdd2-4d749e55fa2d
+		summarizeBy: sum
+		sourceColumn: 无线端支付金额
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column PC端支付金额
+		dataType: double
+		lineageTag: 58eab6c3-9b91-44ae-8f15-b3505098af9d
+		summarizeBy: sum
+		sourceColumn: PC端支付金额
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 支付买家数
+		dataType: int64
+		formatString: 0
+		lineageTag: 80d945ac-c7c7-40d4-863a-61ce46591f5c
+		summarizeBy: sum
+		sourceColumn: 支付买家数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 无线端支付买家数
+		dataType: int64
+		formatString: 0
+		lineageTag: d31b73ed-b246-4560-84e2-a48a8d06e55c
+		summarizeBy: sum
+		sourceColumn: 无线端支付买家数
+
+		annotation SummarizationSetBy = Automatic
+
+	column PC端支付买家数
+		dataType: int64
+		formatString: 0
+		lineageTag: f529fb24-0e31-461b-97f2-cc97799867a9
+		summarizeBy: sum
+		sourceColumn: PC端支付买家数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 支付子订单数
+		dataType: int64
+		formatString: 0
+		lineageTag: cd6dc5c4-f7fd-4c0a-895f-0f8bed45b04d
+		summarizeBy: sum
+		sourceColumn: 支付子订单数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 无线端支付子订单数
+		dataType: int64
+		formatString: 0
+		lineageTag: 531b2882-b87c-4933-bb99-ffe9cbb25c12
+		summarizeBy: sum
+		sourceColumn: 无线端支付子订单数
+
+		annotation SummarizationSetBy = Automatic
+
+	column PC端支付子订单数
+		dataType: int64
+		formatString: 0
+		lineageTag: cc4980db-9dfb-4dc6-b0f1-73ad129354ec
+		summarizeBy: sum
+		sourceColumn: PC端支付子订单数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 支付件数
+		dataType: int64
+		formatString: #,0
+		lineageTag: 8cefb58b-c538-4eee-a552-8b7bd5c4957c
+		summarizeBy: sum
+		sourceColumn: 支付件数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 无线端支付件数
+		dataType: int64
+		formatString: 0
+		lineageTag: 2af9f892-2437-4e88-ad44-6edf12ea38b2
+		summarizeBy: sum
+		sourceColumn: 无线端支付件数
+
+		annotation SummarizationSetBy = Automatic
+
+	column PC端支付件数
+		dataType: int64
+		formatString: 0
+		lineageTag: 958974ee-3695-41bd-8be9-4785b0900e92
+		summarizeBy: sum
+		sourceColumn: PC端支付件数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 下单金额
+		dataType: double
+		lineageTag: 2777ddea-39d6-4424-b510-99803ef164a1
+		summarizeBy: sum
+		sourceColumn: 下单金额
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 无线端下单金额
+		dataType: double
+		lineageTag: 1124848c-3fc0-4fef-9088-7ff94ddfeeb3
+		summarizeBy: sum
+		sourceColumn: 无线端下单金额
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column PC端下单金额
+		dataType: double
+		lineageTag: fa14758a-8cae-4d8b-b369-e4e319fb2c68
+		summarizeBy: sum
+		sourceColumn: PC端下单金额
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 下单买家数
+		dataType: int64
+		formatString: 0
+		lineageTag: a076a1bd-d579-42f5-a460-e510d4165d41
+		summarizeBy: sum
+		sourceColumn: 下单买家数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 无线端下单买家数
+		dataType: int64
+		formatString: 0
+		lineageTag: e9ef7948-4452-4733-9ce9-7b781c1731f5
+		summarizeBy: sum
+		sourceColumn: 无线端下单买家数
+
+		annotation SummarizationSetBy = Automatic
+
+	column PC端下单买家数
+		dataType: int64
+		formatString: 0
+		lineageTag: edd20112-7144-4bd5-9ee4-708becd7ad7d
+		summarizeBy: sum
+		sourceColumn: PC端下单买家数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 下单件数
+		dataType: int64
+		formatString: 0
+		lineageTag: 088bfeaf-d5a6-4529-8e8c-455fb454b7e2
+		summarizeBy: sum
+		sourceColumn: 下单件数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 无线端下单件数
+		dataType: int64
+		formatString: 0
+		lineageTag: 1131c538-37bc-4942-8ba0-efcd8f76dcdc
+		summarizeBy: sum
+		sourceColumn: 无线端下单件数
+
+		annotation SummarizationSetBy = Automatic
+
+	column PC端下单件数
+		dataType: int64
+		formatString: 0
+		lineageTag: aa6398b5-d769-4370-a986-6674b0da546d
+		summarizeBy: sum
+		sourceColumn: PC端下单件数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 人均浏览量
+		dataType: double
+		lineageTag: eceb9ef3-8993-4032-a9a1-f6f409fd15d9
+		summarizeBy: sum
+		sourceColumn: 人均浏览量
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 无线端人均浏览量
+		dataType: double
+		lineageTag: 6c096f23-48eb-4cb1-b1e2-5562c7f2cfe5
+		summarizeBy: sum
+		sourceColumn: 无线端人均浏览量
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column PC端人均浏览量
+		dataType: double
+		lineageTag: 9bf97e41-6147-4d69-a2ed-c7bb4aab5f6e
+		summarizeBy: sum
+		sourceColumn: PC端人均浏览量
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 下单转化率
+		dataType: double
+		lineageTag: ac905572-f3f4-4c7b-bb74-d0855f855c04
+		summarizeBy: sum
+		sourceColumn: 下单转化率
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 无线端下单转化率
+		dataType: double
+		lineageTag: 22186903-2c5e-4500-8ef6-70b434ad3a03
+		summarizeBy: sum
+		sourceColumn: 无线端下单转化率
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column PC端下单转化率
+		dataType: double
+		lineageTag: df160241-94e7-48b8-b166-08c05794682a
+		summarizeBy: sum
+		sourceColumn: PC端下单转化率
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 支付转化率（固数）
+		dataType: double
+		lineageTag: c24a598b-cb72-4104-9ee6-c6c6dcc70f23
+		summarizeBy: sum
+		sourceColumn: 支付转化率（固数）
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 无线端支付转化率
+		dataType: double
+		lineageTag: 2a6b7c25-fc8b-4c6a-91ef-2423bb3823b4
+		summarizeBy: sum
+		sourceColumn: 无线端支付转化率
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column PC端支付转化率
+		dataType: double
+		lineageTag: 5ef9dcc8-ebfe-4ab6-bb91-c8a5a0d34b57
+		summarizeBy: sum
+		sourceColumn: PC端支付转化率
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 客单价（固数））
+		dataType: double
+		lineageTag: 26d59cc6-f6b4-4d5e-9d62-793a70ab39ac
+		summarizeBy: sum
+		sourceColumn: 客单价（固数））
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 无线端客单价
+		dataType: double
+		lineageTag: 7373fcdf-9a01-4433-932d-b0a2dcebf3ac
+		summarizeBy: sum
+		sourceColumn: 无线端客单价
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column PC端客单价
+		dataType: double
+		lineageTag: d6481302-1c63-4c01-86ff-416cfbfc8481
+		summarizeBy: sum
+		sourceColumn: PC端客单价
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column UV价值（固数）
+		dataType: double
+		lineageTag: cf60ae39-a379-404f-9462-f81bf500821c
+		summarizeBy: sum
+		sourceColumn: UV价值（固数）
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 无线端UV价值
+		dataType: double
+		lineageTag: c2162045-8d31-4bf0-872a-aa49b679414c
+		summarizeBy: sum
+		sourceColumn: 无线端UV价值
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column PC端UV价值
+		dataType: string
+		lineageTag: 5c9ba3ed-da3b-416a-bf0d-6d22271b0fdb
+		summarizeBy: none
+		sourceColumn: PC端UV价值
+
+		annotation SummarizationSetBy = Automatic
+
+	column 老访客数
+		dataType: int64
+		formatString: 0
+		lineageTag: 20b94cce-93c6-4c1e-909f-d0419c69bdac
+		summarizeBy: sum
+		sourceColumn: 老访客数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 无线端老访客数
+		dataType: int64
+		formatString: 0
+		lineageTag: a43cf6ea-6161-45e3-8ba6-24bdde3088b4
+		summarizeBy: sum
+		sourceColumn: 无线端老访客数
+
+		annotation SummarizationSetBy = Automatic
+
+	column PC端老访客数
+		dataType: int64
+		formatString: 0
+		lineageTag: 93a8129d-13b9-485d-814b-3ac2b210eda3
+		summarizeBy: sum
+		sourceColumn: PC端老访客数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 新访客数
+		dataType: int64
+		formatString: 0
+		lineageTag: 37a04977-368e-4bf9-9a08-026fc3834be4
+		summarizeBy: sum
+		sourceColumn: 新访客数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 无线端新访客数
+		dataType: int64
+		formatString: 0
+		lineageTag: d40d1d1e-dc2f-4d00-bf68-be869eb174d2
+		summarizeBy: sum
+		sourceColumn: 无线端新访客数
+
+		annotation SummarizationSetBy = Automatic
+
+	column PC端新访客数
+		dataType: int64
+		formatString: 0
+		lineageTag: 291c34e8-d549-40f1-a927-396d4f7e094f
+		summarizeBy: sum
+		sourceColumn: PC端新访客数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 加购件数
+		dataType: int64
+		formatString: 0
+		lineageTag: f9c1d1bc-4ccd-4474-a5fc-f1e3b626a71c
+		summarizeBy: sum
+		sourceColumn: 加购件数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 无线端加购件数
+		dataType: int64
+		formatString: 0
+		lineageTag: bafdd53a-72e0-4150-b56e-e5d9ad0baf70
+		summarizeBy: sum
+		sourceColumn: 无线端加购件数
+
+		annotation SummarizationSetBy = Automatic
+
+	column PC端加购件数
+		dataType: int64
+		formatString: 0
+		lineageTag: 1ac60c10-fde6-4fa4-9701-879a2c2c0c52
+		summarizeBy: sum
+		sourceColumn: PC端加购件数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 支付新买家数
+		dataType: int64
+		formatString: 0
+		lineageTag: f3bbc423-aec7-40a3-bef2-0152d1e6be0a
+		summarizeBy: sum
+		sourceColumn: 支付新买家数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 支付老买家数
+		dataType: int64
+		formatString: 0
+		lineageTag: c4aa8927-4884-4b25-94fc-faf3d3542e42
+		summarizeBy: sum
+		sourceColumn: 支付老买家数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 无线端支付老买家数
+		dataType: int64
+		formatString: 0
+		lineageTag: b67015b8-bd15-416f-a0b2-191d798c1ff2
+		summarizeBy: sum
+		sourceColumn: 无线端支付老买家数
+
+		annotation SummarizationSetBy = Automatic
+
+	column PC端支付老买家数
+		dataType: int64
+		formatString: 0
+		lineageTag: 00475356-885f-4c38-89cc-5ec65b3b3cf3
+		summarizeBy: sum
+		sourceColumn: PC端支付老买家数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 老买家支付金额
+		dataType: double
+		lineageTag: f256f2bb-4f6c-4701-816a-4c3574f8d1bc
+		summarizeBy: sum
+		sourceColumn: 老买家支付金额
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 全站推广花费
+		dataType: double
+		lineageTag: d57ceed7-6caf-42b7-bdd0-8ba44d2a663d
+		summarizeBy: sum
+		sourceColumn: 全站推广花费
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 关键词推广花费
+		dataType: double
+		lineageTag: 021e8809-5946-4741-b6b4-5dac1e00bc52
+		summarizeBy: sum
+		sourceColumn: 关键词推广花费
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 精准人群推广花费
+		dataType: double
+		lineageTag: f39ec153-1e96-4db0-b819-63aa18a5a2e8
+		summarizeBy: sum
+		sourceColumn: 精准人群推广花费
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 智能场景花费
+		dataType: double
+		lineageTag: c95c038f-514f-426d-9fa4-f3ac7bb0c38e
+		summarizeBy: sum
+		sourceColumn: 智能场景花费
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 淘宝客佣金
+		dataType: double
+		lineageTag: 9fda19b1-1d6d-45c2-9f5d-ef6e60de6e1f
+		summarizeBy: sum
+		sourceColumn: 淘宝客佣金
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 成功退款金额
+		dataType: double
+		formatString: #,0
+		lineageTag: bfd87f5d-1d55-4f5b-9f7d-7f6c11b8324c
+		summarizeBy: sum
+		sourceColumn: 成功退款金额
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isDecimal":true}
+
+	column 评价数
+		dataType: int64
+		formatString: 0
+		lineageTag: a77efb54-0ba6-40d0-973d-6a512227f915
+		summarizeBy: sum
+		sourceColumn: 评价数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 有图评价数
+		dataType: int64
+		formatString: 0%;-0%;0%
+		lineageTag: 9a38904c-f78b-4cc5-b48c-e6758bfbc4b3
+		summarizeBy: sum
+		sourceColumn: 有图评价数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 正面评价数
+		dataType: int64
+		formatString: 0%;-0%;0%
+		lineageTag: c20bda96-16e7-4c5a-aad6-3bc80e5ce03a
+		summarizeBy: sum
+		sourceColumn: 正面评价数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 负面评价数
+		dataType: int64
+		formatString: 0
+		lineageTag: 90ce3a46-2ca5-4f00-8d61-69a34b485c62
+		summarizeBy: sum
+		sourceColumn: 负面评价数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 老买家正面评价数
+		dataType: int64
+		formatString: 0
+		lineageTag: d106dbdf-5654-45cd-95f5-a52590edc419
+		summarizeBy: sum
+		sourceColumn: 老买家正面评价数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 老买家负面评价数
+		dataType: int64
+		formatString: 0
+		lineageTag: 5cd8715e-bb08-4e6a-9b74-d4246327f3c6
+		summarizeBy: sum
+		sourceColumn: 老买家负面评价数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 支付父订单数
+		dataType: int64
+		formatString: 0
+		lineageTag: 5b0a6002-03c3-4e33-9f07-8e5c1ed36447
+		summarizeBy: sum
+		sourceColumn: 支付父订单数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 揽收包裹数
+		dataType: int64
+		formatString: 0
+		lineageTag: c9728a3e-7412-4505-8262-8cb2f345cbb4
+		summarizeBy: sum
+		sourceColumn: 揽收包裹数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 发货包裹数
+		dataType: int64
+		formatString: #,0
+		lineageTag: 2913e734-ecb4-4695-a0f6-07a230c203a6
+		summarizeBy: sum
+		sourceColumn: 发货包裹数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 派送包裹数
+		dataType: int64
+		formatString: 0
+		lineageTag: a2eb99c9-be42-4b47-be7e-b15f59027195
+		summarizeBy: sum
+		sourceColumn: 派送包裹数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 签收成功包裹数
+		dataType: int64
+		formatString: 0
+		lineageTag: 57529aba-cfa3-491f-9e2f-f5f6b0ff8d91
+		summarizeBy: sum
+		sourceColumn: 签收成功包裹数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 平均支付_签收时长(秒)
+		dataType: double
+		lineageTag: 0d9faa06-dd2a-41a1-927b-d9fce0228e91
+		summarizeBy: sum
+		sourceColumn: 平均支付_签收时长(秒)
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 描述相符评分
+		dataType: double
+		lineageTag: eb46461b-6f44-4ddd-a553-00de43b36c4a
+		summarizeBy: sum
+		sourceColumn: 描述相符评分
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 物流服务评分
+		dataType: double
+		lineageTag: 482fa2c1-7462-4e46-b05a-69145f86134d
+		summarizeBy: sum
+		sourceColumn: 物流服务评分
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 服务态度评分
+		dataType: double
+		lineageTag: b72f1d61-a94a-4b5d-914c-7bbe49e275ac
+		summarizeBy: sum
+		sourceColumn: 服务态度评分
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 下单-支付转化率
+		dataType: double
+		lineageTag: f2811442-72c6-4733-befd-3cf1da4a92fd
+		summarizeBy: sum
+		sourceColumn: 下单-支付转化率
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 无线端下单-支付转化率
+		dataType: double
+		lineageTag: eab42c65-3d73-48ab-965a-673b8b3297f5
+		summarizeBy: sum
+		sourceColumn: 无线端下单-支付转化率
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column PC端下单-支付转化率
+		dataType: double
+		lineageTag: a856be27-053f-43ae-90e4-e46ed2620e5b
+		summarizeBy: sum
+		sourceColumn: PC端下单-支付转化率
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 支付商品数
+		dataType: int64
+		formatString: 0
+		lineageTag: 07e966b1-8c77-414e-a0ee-d21637e55ecd
+		summarizeBy: sum
+		sourceColumn: 支付商品数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 无线端支付商品数
+		dataType: int64
+		formatString: 0
+		lineageTag: c864017b-c90c-4c10-8692-2da983a35f6b
+		summarizeBy: sum
+		sourceColumn: 无线端支付商品数
+
+		annotation SummarizationSetBy = Automatic
+
+	column PC端支付商品数
+		dataType: int64
+		formatString: 0
+		lineageTag: 5d53b965-bcde-4f2d-bf2b-5f51abbc8e92
+		summarizeBy: sum
+		sourceColumn: PC端支付商品数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 关注店铺人数
+		dataType: int64
+		formatString: 0
+		lineageTag: e3a8c453-0bf8-4e89-8672-15973bd0b382
+		summarizeBy: sum
+		sourceColumn: 关注店铺人数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 无线端关注店铺人数
+		dataType: int64
+		formatString: 0
+		lineageTag: 557a529c-d787-423d-85ca-8064d2663f29
+		summarizeBy: sum
+		sourceColumn: 无线端关注店铺人数
+
+		annotation SummarizationSetBy = Automatic
+
+	column PC端关注店铺人数
+		dataType: int64
+		formatString: 0
+		lineageTag: 8ad79dc0-dde8-455f-9979-e99cef6f7fea
+		summarizeBy: sum
+		sourceColumn: PC端关注店铺人数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 会员总数
+		dataType: int64
+		formatString: 0
+		lineageTag: cbc0c2e0-3bfc-48c7-87e2-b1330bbaada3
+		summarizeBy: sum
+		sourceColumn: 会员总数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 新增会员数
+		dataType: int64
+		formatString: 0
+		lineageTag: 65ee7dff-1a1f-4e3a-9802-5ef27eb2db0f
+		summarizeBy: sum
+		sourceColumn: 新增会员数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 活跃会员数
+		dataType: int64
+		formatString: 0
+		lineageTag: ca538436-b915-46d5-ac19-2f2bbc755bf7
+		summarizeBy: sum
+		sourceColumn: 活跃会员数
+
+		annotation SummarizationSetBy = Automatic
+
+	column 会员成交金额
+		dataType: double
+		lineageTag: 4d9b6163-0a99-475a-87c0-10a50bbd01f9
+		summarizeBy: sum
+		sourceColumn: 会员成交金额
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column 会员成交人数
+		dataType: int64
+		formatString: 0
+		lineageTag: 528d890a-ebfe-4528-a713-679469c2b1b6
+		summarizeBy: sum
+		sourceColumn: 会员成交人数
+
+		annotation SummarizationSetBy = Automatic
+
+	partition 04-旗舰店基础数据 = m
+		mode: import
+		source =
+				let
+				    源 = Folder.Files("D:\麻大师\日更数据\天猫旗舰店\04-旗舰店基础数据"),
+				    筛选的隐藏文件1 = Table.SelectRows(源, each [Attributes]?[Hidden]? <> true),
+				    调用自定义函数1 = Table.AddColumn(筛选的隐藏文件1, "转换文件 (15)", each #"转换文件 (15)"([Content])),
+				    重命名的列1 = Table.RenameColumns(调用自定义函数1, {"Name", "Source.Name"}),
+				    删除的其他列1 = Table.SelectColumns(重命名的列1, {"Source.Name", "转换文件 (15)"}),
+				    扩展的表格列1 = Table.ExpandTableColumn(删除的其他列1, "转换文件 (15)", Table.ColumnNames(#"转换文件 (15)"(#"示例文件 (15)"))),
+				    更改的类型 = Table.TransformColumnTypes(扩展的表格列1,{{"Source.Name", type text}, {"统计日期", type date}, {"店铺名称", type text}, {"访客数", Int64.Type}, {"直播间访客数", Int64.Type}, {"短视频访客数", Int64.Type}, {"图文访客数", Int64.Type}, {"店铺页访客数", Int64.Type}, {"3D应用访客数", Int64.Type}, {"无线端访客数", Int64.Type}, {"PC端访客数", Int64.Type}, {"浏览量", Int64.Type}, {"无线端浏览量", Int64.Type}, {"PC端浏览量", Int64.Type}, {"商品访客数", Int64.Type}, {"无线端商品访客数", Int64.Type}, {"PC端商品访客数", Int64.Type}, {"商品浏览量", Int64.Type}, {"无线端商品浏览量", Int64.Type}, {"PC端商品浏览量", Int64.Type}, {"平均停留时长", type number}, {"无线端平均停留时长", type number}, {"PC端平均停留时长", type number}, {"跳失率", type number}, {"无线端跳失率", type number}, {"PC端跳失率", type number}, {"商品收藏买家数", Int64.Type}, {"无线端商品收藏买家数", Int64.Type}, {"PC端商品收藏买家数", Int64.Type}, {"商品收藏次数", Int64.Type}, {"无线端商品收藏次数", Int64.Type}, {"PC端商品收藏次数", Int64.Type}, {"加购人数", Int64.Type}, {"无线端加购人数", Int64.Type}, {"PC端加购人数", Int64.Type}, {"支付金额", type number}, {"无线端支付金额", type number}, {"PC端支付金额", type number}, {"支付买家数", Int64.Type}, {"无线端支付买家数", Int64.Type}, {"PC端支付买家数", Int64.Type}, {"支付子订单数", Int64.Type}, {"无线端支付子订单数", Int64.Type}, {"PC端支付子订单数", Int64.Type}, {"支付件数", Int64.Type}, {"无线端支付件数", Int64.Type}, {"PC端支付件数", Int64.Type}, {"下单金额", type number}, {"无线端下单金额", type number}, {"PC端下单金额", type number}, {"下单买家数", Int64.Type}, {"无线端下单买家数", Int64.Type}, {"PC端下单买家数", Int64.Type}, {"下单件数", Int64.Type}, {"无线端下单件数", Int64.Type}, {"PC端下单件数", Int64.Type}, {"人均浏览量", type number}, {"无线端人均浏览量", type number}, {"PC端人均浏览量", type number}, {"下单转化率", type number}, {"无线端下单转化率", type number}, {"PC端下单转化率", type number}, {"支付转化率", type number}, {"无线端支付转化率", type number}, {"PC端支付转化率", type number}, {"客单价", type number}, {"无线端客单价", type number}, {"PC端客单价", type number}, {"UV价值", type number}, {"无线端UV价值", type number}, {"PC端UV价值", type any}, {"老访客数", Int64.Type}, {"无线端老访客数", Int64.Type}, {"PC端老访客数", Int64.Type}, {"新访客数", Int64.Type}, {"无线端新访客数", Int64.Type}, {"PC端新访客数", Int64.Type}, {"加购件数", Int64.Type}, {"无线端加购件数", Int64.Type}, {"PC端加购件数", Int64.Type}, {"支付新买家数", Int64.Type}, {"支付老买家数", Int64.Type}, {"无线端支付老买家数", Int64.Type}, {"PC端支付老买家数", Int64.Type}, {"老买家支付金额", type number}, {"全站推广花费", type number}, {"关键词推广花费", type number}, {"精准人群推广花费", type number}, {"智能场景花费", type number}, {"淘宝客佣金", type number}, {"成功退款金额", type number}, {"评价数", Int64.Type}, {"有图评价数", Int64.Type}, {"正面评价数", Int64.Type}, {"负面评价数", Int64.Type}, {"老买家正面评价数", Int64.Type}, {"老买家负面评价数", Int64.Type}, {"支付父订单数", Int64.Type}, {"揽收包裹数", Int64.Type}, {"发货包裹数", Int64.Type}, {"派送包裹数", Int64.Type}, {"签收成功包裹数", Int64.Type}, {"平均支付_签收时长(秒)", type number}, {"描述相符评分", type number}, {"物流服务评分", type number}, {"服务态度评分", type number}, {"下单-支付转化率", type number}, {"无线端下单-支付转化率", type number}, {"PC端下单-支付转化率", type number}, {"支付商品数", Int64.Type}, {"无线端支付商品数", Int64.Type}, {"PC端支付商品数", Int64.Type}, {"关注店铺人数", Int64.Type}, {"无线端关注店铺人数", Int64.Type}, {"PC端关注店铺人数", Int64.Type}, {"会员总数", Int64.Type}, {"新增会员数", Int64.Type}, {"活跃会员数", Int64.Type}, {"会员成交金额", type number}, {"会员成交人数", Int64.Type}}),
+				    删除的副本 = Table.Distinct(更改的类型, {"统计日期", "店铺名称", "访客数", "直播间访客数", "短视频访客数"}),
+				    重命名的列 = Table.RenameColumns(删除的副本,{{"客单价", "客单价（固数））"}, {"UV价值", "UV价值（固数）"}, {"支付转化率", "支付转化率（固数）"}})
+				in
+				    重命名的列
+
+	annotation PBI_NavigationStepName = 导航
+
+	annotation PBI_ResultType = Table
+
