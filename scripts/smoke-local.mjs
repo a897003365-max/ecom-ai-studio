@@ -100,8 +100,16 @@ assert(analytics.feishu?.content?.processedRows > 0, "飞书内容快照为空")
 const serialized = JSON.stringify(analytics);
 assert(!serialized.includes("xsec_token="), "聚合快照包含访问令牌");
 const remoteUrls = serialized.match(/https?:\/\/[^"\s]+/g) || [];
+// 与 pipeline `_safe_product_image` 白名单保持一致（05 对照表现含拼多多/唯品会目录图）
+const ALLOWED_IMAGE_HOSTS = new Set(["img.alicdn.com", "img.pddpic.com", "h2.appsimg.com"]);
 assert(
-  remoteUrls.every((url) => /^https:\/\/img\.alicdn\.com\//i.test(url)),
+  remoteUrls.every((url) => {
+    try {
+      return ALLOWED_IMAGE_HOSTS.has(new URL(url).hostname);
+    } catch {
+      return false;
+    }
+  }),
   "聚合快照包含未允许的原始链接",
 );
 

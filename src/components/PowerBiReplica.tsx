@@ -15,6 +15,7 @@ import type {
   WarehouseSnapshot,
 } from "../types/integration";
 import type { SearchTarget } from "../types/search";
+import { getPowerbiPagesOnDemand } from "../services/localApi";
 import { clsx } from "../utils/format";
 import { buildDailyCoreHierarchy, buildDailyHierarchy, pbixDefaultDailyCoreExpansion, type DailyCoreHierarchyRow } from "./powerBiDailyCoreHierarchy";
 
@@ -1723,6 +1724,34 @@ function servicePeriodRange(csPeriod: { start: string; end: string } | null, glo
   return start <= end ? { start, end } : null;
 }
 
+type PowerBiCoverageSourceKey = "base" | "product" | "promotion";
+
+const COVERAGE_SOURCE_LABELS: Array<[PowerBiCoverageSourceKey, string]> = [
+  ["base", "店铺基础"],
+  ["product", "商品销售"],
+  ["promotion", "推广花费"],
+];
+
+// 把按需重算返回的 coverage 转成一句缺口说明：只列出与所选区间有差异的来源表，
+// 全部覆盖时返回「数仓覆盖完整」，让标签能区分「筛选了但没数据」与「数据齐全」。
+function coverageSummary(coverage: PowerBiPages["coverage"], start: string, end: string) {
+  if (!coverage) return "";
+  const notes: string[] = [];
+  for (const [key, label] of COVERAGE_SOURCE_LABELS) {
+    const entry = coverage[key];
+    if (!entry || !entry.days) {
+      notes.push(`${label}无数据`);
+      continue;
+    }
+    const parts: string[] = [];
+    if (entry.min && entry.min > start) parts.push(`自 ${entry.min} 起`);
+    if (entry.max && entry.max < end) parts.push(`截至 ${entry.max}`);
+    if (entry.missingDays > 0) parts.push(`缺 ${entry.missingDays} 天`);
+    if (parts.length) notes.push(`${label}${parts.join("、")}`);
+  }
+  return notes.length ? `数仓缺口：${notes.join("；")}` : "数仓覆盖完整";
+}
+
 function CustomerServiceWorkspace({ pages, globalPeriod }: { pages: PowerBiPages; globalPeriod?: DatePeriod | null }) {
   const cs = pages.customerService;
   const [tab, setTab] = useState<"tmall" | "jd">("tmall");
@@ -1756,23 +1785,70 @@ function GrowthDiagnosis({ warehouse, globalPeriod, searchTarget }: { warehouse:
     const monthStart = `${pages.period.end.slice(0, 8)}01`;
     return { start: pages.period.start > monthStart ? pages.period.start : monthStart, end: pages.period.end };
   }, [pages.period]);
+  const requested = globalPeriod ?? defaultPeriod;
+  const withinSnapshot = Boolean(requested && pages.period && requested.start >= pages.period.start && requested.end <= pages.period.end);
+  // 快照固定 60 天滚动窗口；全局筛选超出时走 /api/analytics/powerbi-pages 按需重算，
+  // 失败（同步锁库/查询异常）时回退快照交集数据并在标签注明
+  const [demand, setDemand] = useState<{ pages: PowerBiPages; start: string; end: string } | null>(null);
+  const [demandState, setDemandState] = useState<"idle" | "loading" | "ok" | "error">("idle");
+  const [demandError, setDemandError] = useState<string | null>(null);
+  useEffect(() => {
+    if (!requested || withinSnapshot) {
+      setDemandState("idle");
+      return;
+    }
+    let cancelled = false;
+    setDemandState("loading");
+    getPowerbiPagesOnDemand({ start: requested.start, end: requested.end })
+      .then((payload) => {
+        if (cancelled) return;
+        if (payload.powerbiPages) {
+          setDemand({ pages: payload.powerbiPages, start: requested.start, end: requested.end });
+          setDemandState("ok");
+        } else {
+          setDemand(null);
+          setDemandState("error");
+          setDemandError(payload.error ?? "按需重算失败");
+        }
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        setDemand(null);
+        setDemandState("error");
+        setDemandError(error instanceof Error ? error.message : "按需重算失败");
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [requested?.start, requested?.end, withinSnapshot, warehouse.refreshedAt]);
+  const usingDemand = demandState === "ok" && demand !== null && demand.start === requested?.start && demand.end === requested?.end;
+  const activePages = usingDemand ? demand.pages : pages;
   const period = useMemo(() => {
     if (!pages.period) return null;
-    const requested = globalPeriod ?? defaultPeriod;
     if (!requested) return null;
+    // 按需重算成功：版面区间 = 全局筛选区间，不再向快照窗口钳制
+    if (usingDemand) return { start: demand.start, end: demand.end };
     const start = requested.start > pages.period.start ? requested.start : pages.period.start;
     const end = requested.end < pages.period.end ? requested.end : pages.period.end;
     return start <= end ? { start, end } : null;
-  }, [defaultPeriod, globalPeriod, pages.period]);
+  }, [demand, pages.period, requested, usingDemand]);
   if (!pages.period) return <div className="pb-empty">本地 PowerBI 独有数据尚未生成，请先同步本地数仓。</div>;
   if (!period) return <div className="pb-empty">当前页面日期范围与 PowerBI 本地数据范围没有交集，请调整日期筛选。</div>;
+  const followLabel = usingDemand
+    ? `跟随页面日期：${period.start} 至 ${period.end} · ${coverageSummary(demand.pages.coverage, period.start, period.end)}`
+    : demandState === "loading"
+      ? `按需重算中：${requested?.start} 至 ${requested?.end}…（约 20-70 秒，当前暂显示快照窗口 ${period.start} 至 ${period.end}）`
+      : demandState === "error"
+        ? `按需重算暂不可用${demandError ? `（${demandError}）` : ""}，当前显示快照窗口 ${period.start} 至 ${period.end}`
+        : `跟随页面日期：${period.start} 至 ${period.end}`;
   return (
     <div className={clsx("pb-replica-canvas", "pb-tmall-detail-scale", `is-page-${page}`)}>
       <div className="pb-replica-toolbar">
         <nav>{([{ id: "overall", label: "旗舰店整体", icon: BarChart3 }, { id: "promotion", label: "推广费用明细", icon: Table2 }, { id: "product", label: "商品推广费用", icon: Database }, { id: "competitor", label: "竞品推广数据", icon: TrendingUp }] as const).map((item) => <button className={page === item.id ? "is-active" : ""} key={item.id} onClick={() => setPage(item.id)} type="button"><item.icon size={14} />{item.label}</button>)}</nav>
-        <span className="pb-follow-global-date">跟随页面日期：{period.start} 至 {period.end}</span>
+        <span className="pb-follow-global-date">{followLabel}</span>
       </div>
-      {page === "overall" ? <OverallPage end={period.end} pages={pages} start={period.start} /> : page === "promotion" ? <PromotionPage end={period.end} pages={pages} start={period.start} /> : page === "product" ? <ProductPromotionPage end={period.end} pages={pages} start={period.start} /> : <CompetitorPage pages={pages} refreshedAt={warehouse.refreshedAt} />}
+      {page === "overall" ? <OverallPage end={period.end} pages={activePages} start={period.start} /> : page === "promotion" ? <PromotionPage end={period.end} pages={activePages} start={period.start} /> : page === "product" ? <ProductPromotionPage end={period.end} pages={activePages} start={period.start} /> : <CompetitorPage pages={activePages} refreshedAt={warehouse.refreshedAt} />}
     </div>
   );
 }

@@ -264,6 +264,82 @@ async function runQueryProductsOnDemand({ start, end, statuses, channels, storeS
 // single-flight 防并发击穿；mtime 变化（sync 后）自动失效。
 const productQueryCache = new Map();
 
+// PowerBI 天猫明细页按需重算：快照固定 60 天滚动窗口（POWERBI_PAGE_WINDOW_DAYS），
+// 窗口外区间由前端触发本查询实时聚合（30 天 ~18s、8 个月 ~70s），响应不含客服数据
+// （客服 tab 固定读快照），服务端补齐后再返回。
+const powerbiPagesQueryCache = new Map();
+
+function runQueryPowerbiPagesOnDemand({ start, end }) {
+  const python = process.env.PYTHON || "python";
+  const args = [syncScript, "query-powerbi-pages", "--start", start, "--end", end];
+  return execFileAsync(python, args, {
+    cwd: projectRoot,
+    timeout: 300 * 1000,
+    maxBuffer: 256 * 1024 * 1024,
+    windowsHide: true,
+    env: { ...process.env, PYTHONIOENCODING: "utf-8" },
+  }).then(({ stdout }) => JSON.parse(stdout));
+}
+
+function powerbiPagesQueryKey({ start, end }) {
+  return `${start}|${end}`;
+}
+
+export async function queryPowerbiPagesOnDemand(opts) {
+  const key = powerbiPagesQueryKey(opts);
+  const mtime = warehouseSnapshotMtime();
+  const entry = powerbiPagesQueryCache.get(key);
+  if (entry && entry.mtime === mtime && entry.value) {
+    return entry.value;
+  }
+  // 同一 key + 同一 mtime 下进行中的查询复用，避免并发重复 spawn
+  if (entry?.inflight && entry.inflightMtime === mtime) {
+    return entry.inflight;
+  }
+  const inflight = runQueryPowerbiPagesOnDemand(opts)
+    .then((value) => {
+      powerbiPagesQueryCache.set(key, { value, mtime, inflight: null, inflightMtime: null });
+      return value;
+    })
+    .catch((error) => {
+      const current = powerbiPagesQueryCache.get(key);
+      if (current) current.inflight = null;
+      throw error;
+    });
+  const existing = powerbiPagesQueryCache.get(key);
+  if (existing) {
+    existing.inflight = inflight;
+    existing.inflightMtime = mtime;
+  } else {
+    powerbiPagesQueryCache.set(key, { value: null, mtime: null, inflight, inflightMtime: mtime });
+  }
+  return inflight;
+}
+
+// 天猫明细按需重算预热：同步跑在独立进程，预热必须在 server 进程内做才能命中上面的内存缓存。
+// 区间 = 「当年 1 月 1 日 ~ 数据最新日」（起点可用 POWERBI_PREWARM_START 覆盖）；
+// mtime 未变化时跳过（缓存自身也幂等），同步锁库/失败时返回 error 由调用方记日志、下轮再试。
+let powerbiPrewarmMtime = null;
+
+export async function prewarmPowerbiPagesOnDemand() {
+  const mtime = warehouseSnapshotMtime();
+  if (!mtime || mtime === powerbiPrewarmMtime) return { skipped: true };
+  const snapshot = await readWarehouseSnapshot();
+  const period = snapshot?.powerbiPages?.period;
+  if (!period?.end) return { skipped: true };
+  const start = process.env.POWERBI_PREWARM_START || `${period.end.slice(0, 4)}-01-01`;
+  const end = period.end;
+  if (start >= end) return { skipped: true };
+  const startedAt = Date.now();
+  try {
+    await queryPowerbiPagesOnDemand({ start, end });
+    powerbiPrewarmMtime = mtime;
+    return { skipped: false, start, end, elapsedMs: Date.now() - startedAt };
+  } catch (error) {
+    return { skipped: false, start, end, elapsedMs: Date.now() - startedAt, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
 function productQueryKey({ start, end, statuses, channels, storeShortNames }) {
   const s = [...(statuses ?? [])].sort().join(",");
   const c = [...(channels ?? [])].sort().join(",");

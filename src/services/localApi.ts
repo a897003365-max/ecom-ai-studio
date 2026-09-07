@@ -1,6 +1,6 @@
 import type { CompetitorPriceItem, QueueTask } from "../types";
 import { tmallCompetitorPrices } from "../data/tmallCompetitorData";
-import type { AnalyticsIntegrationPayload, DataSourcesPayload, ProductsPayload, UploadRecord } from "../types/integration";
+import type { AnalyticsIntegrationPayload, DataSourcesPayload, PowerBiPages, ProductsPayload, UploadRecord } from "../types/integration";
 import type { SearchRequest, SearchResponse } from "../types/search";
 import { startProgress, stopProgress } from "../utils/progress";
 
@@ -34,6 +34,15 @@ export function getDataSources() {
 export function getAnalyticsData(filters?: { start: string; end: string }) {
   const query = filters ? `?${new URLSearchParams(filters).toString()}` : "";
   return request<AnalyticsIntegrationPayload>(`/api/analytics${query}`);
+}
+
+// 天猫明细按需重算：快照固定 60 天窗口，全局筛选超出时由 GrowthDiagnosis 调用本接口；
+// status="stale" 表示数仓同步中或重算失败，powerbiPages 为空，前端回退快照窗口数据
+export function getPowerbiPagesOnDemand(filters: { start: string; end: string }) {
+  const query = new URLSearchParams(filters).toString();
+  return request<{ powerbiPages: PowerBiPages | null; refreshedAt: string | null; status: "ok" | "stale"; error?: string }>(
+    `/api/analytics/powerbi-pages?${query}`,
+  );
 }
 
 export function getProductData(filters?: {

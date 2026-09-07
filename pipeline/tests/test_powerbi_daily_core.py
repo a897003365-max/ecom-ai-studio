@@ -201,6 +201,64 @@ class PowerBiDailyCoreTests(unittest.TestCase):
         self.assertAlmostEqual(row["subsidizedFeeRate"], 500 / 16_065)
         self.assertEqual(row["storeRank"], "2")
 
+    def test_explicit_period_overrides_window_and_reports_coverage(self) -> None:
+        # 按需重算：显式区间必须原样生效（不向滚动窗口钳制），coverage 回报各来源表覆盖
+        pages = _build_powerbi_pages(
+            self.connection,
+            {},
+            period_start="2026-06-01",
+            period_end="2026-07-01",
+            include_customer_service=False,
+        )
+
+        self.assertEqual(str(pages["period"]["start"]), "2026-06-01")
+        self.assertEqual(str(pages["period"]["end"]), "2026-07-01")
+        # 区间 31 天，数据只有 07-01 一天：missingDays = 30
+        coverage = pages["coverage"]
+        self.assertEqual(coverage["range"], {"start": "2026-06-01", "end": "2026-07-01"})
+        self.assertEqual(coverage["base"]["days"], 1)
+        self.assertEqual(coverage["base"]["missingDays"], 30)
+        self.assertEqual(coverage["base"]["min"], "2026-07-01")
+        self.assertEqual(coverage["base"]["max"], "2026-07-01")
+        # 07/08 表同日有数据；客服按需跳过（天猫明细工作区不渲染客服，客服 tab 读快照）
+        self.assertEqual(coverage["product"]["days"], 1)
+        self.assertEqual(coverage["promotion"]["days"], 1)
+        self.assertIsNone(pages["customerService"])
+        # 行仍按显式区间聚合：overallDaily 只含 07-01 一行
+        self.assertEqual([str(row["date"]) for row in pages["overallDaily"]], ["2026-07-01"])
+
+    def test_explicit_period_with_dates_only_accepts_strings(self) -> None:
+        # 只给 end 时向前推同样的滚动窗口（60 天）
+        pages = _build_powerbi_pages(self.connection, {}, period_start=None, period_end="2026-07-01")
+        self.assertEqual(str(pages["period"]["start"]), "2026-05-03")
+        self.assertEqual(str(pages["period"]["end"]), "2026-07-01")
+
+    def test_explicit_period_rejects_inverted_range(self) -> None:
+        with self.assertRaises(ValueError):
+            _build_powerbi_pages(self.connection, {}, period_start="2026-07-02", period_end="2026-07-01")
+
+    def test_thin_export_snapshot_loses_to_wide_snapshot(self) -> None:
+        # 新版 12 列瘦导出（无访客/加购/退款列）与 38 列宽表同日同商品并存时，
+        # 即使瘦导出下载更晚，也必须让位给宽表快照。
+        self.connection.executemany(
+            "INSERT INTO product_model VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            [
+                ("2026-07-02", "p1", "标准款", None, None, 4, 20_000, None, 6, 2, "thin.xlsx"),
+                ("2026-07-02", "p1", "标准款", 100, 10, 4, 20_000, 2_000, 6, 1, "wide.xlsx"),
+            ],
+        )
+        pages = _build_powerbi_pages(self.connection, {})
+        row = next(item for item in pages["dailyCore"] if str(item["date"]) == "2026-07-02")
+        self.assertEqual(row["productVisitors"], 100)
+        self.assertEqual(row["addToCart"], 10)
+        self.assertEqual(row["refundAmount"], 2_000)
+        self.assertEqual(row["paidUnits"], 6)
+        product_row = next(
+            item for item in pages["productDaily"] if str(item["date"]) == "2026-07-02"
+        )
+        self.assertEqual(product_row["visitors"], 100)
+        self.assertEqual(product_row["refund"], 2_000)
+
 
 if __name__ == "__main__":
     unittest.main()

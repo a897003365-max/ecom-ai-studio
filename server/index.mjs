@@ -1,9 +1,10 @@
-import { createReadStream, existsSync, mkdirSync, readFileSync, readdirSync } from "node:fs";
+import { createReadStream, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { createHash } from "node:crypto";
 import { brotliCompressSync, constants as zlibConstants, gzipSync } from "node:zlib";
-import { extname, join, normalize } from "node:path";
+import { dirname, extname, isAbsolute, join, normalize, relative, resolve } from "node:path";
+import { homedir } from "node:os";
 import "dotenv/config";
 import { createServer as createViteServer } from "vite";
 import { AuthError, createAuthService, PERMISSIONS } from "./auth.mjs";
@@ -14,7 +15,7 @@ import { checkDingTalkApi, syncDingTalkApi } from "./dingtalk-api.mjs";
 import { acquireDingTalkLock } from "./dingtalk-lock.mjs";
 import { checkFeishu, sheetInventory, syncFeishu } from "./feishu.mjs";
 import { buildDashboardDataStatus } from "./dashboard-status.mjs";
-import { checkWarehouse, queryProductsOnDemand, readWarehouseSnapshot, syncWarehouse, warehouseSnapshotMtime } from "./warehouse.mjs";
+import { checkWarehouse, prewarmPowerbiPagesOnDemand, queryPowerbiPagesOnDemand, queryProductsOnDemand, readWarehouseSnapshot, syncWarehouse, warehouseSnapshotMtime } from "./warehouse.mjs";
 import { searchSite } from "./search-service.mjs";
 import { fetchCompetitorPrices, fetchProducts } from "./yudao-client.mjs";
 import { getPipelineState, hasSourceXlsx, saveSourceFile, sourceXlsxInfo, startAnalysisPipeline, requestCancel, visionProviderInfo } from "./intelligence-pipeline.mjs";
@@ -282,6 +283,7 @@ function requiredPermissionForApi(method, path) {
   if (path === "/api/uploads" || /^\/api\/sync\/(warehouse|feishu|dingtalk)$/.test(path)) return "settings.manage";
   if (path === "/api/ark/call") return "content.manage";
   if (path === "/api/analytics") return "analytics.view";
+  if (path === "/api/analytics/powerbi-pages") return "analytics.view";
   if (path === "/api/search") return ["analytics.view", "products.view"];
   if (path === "/api/sync/analytics") return "analytics.manage";
   if (path === "/api/products") return "products.view";
@@ -684,6 +686,33 @@ async function handleApi(request, response, url) {
     const { value } = await getAnalytics(start, end);
     return sendJsonCached(response, value);
   }
+  // 天猫明细按需重算：快照窗口（60 天）外的全局筛选区间实时聚合 04/07/08 表，
+  // 同步锁库/查询失败时返回 stale，由前端回退快照窗口数据并在标签注明
+  if (request.method === "GET" && path === "/api/analytics/powerbi-pages") {
+    const start = url.searchParams.get("start") || "";
+    const end = url.searchParams.get("end") || "";
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(start) || !/^\d{4}-\d{2}-\d{2}$/.test(end) || start > end) {
+      return sendJson(response, 400, { error: { code: "invalid_period", message: "start/end 必须为 YYYY-MM-DD 且 start ≤ end" } });
+    }
+    const snapshot = await readWarehouseSnapshot();
+    const refreshedAt = snapshot?.refreshedAt ?? null;
+    try {
+      const parsed = await queryPowerbiPagesOnDemand({ start, end });
+      const pages = parsed?.powerbiPages ?? null;
+      if (!pages) throw new Error("按需重算返回为空");
+      // 按需聚合不含客服数据（客服 tab 固定读快照），补齐后响应结构与快照一致
+      const merged = { ...pages, customerService: pages.customerService ?? snapshot?.powerbiPages?.customerService ?? null };
+      return sendJsonCached(response, { powerbiPages: merged, refreshedAt, status: "ok" });
+    } catch (error) {
+      const detail = error instanceof Error ? error.message.split("\n").filter(Boolean).pop() : "unknown";
+      return sendJson(response, 200, {
+        powerbiPages: null,
+        refreshedAt: null,
+        status: "stale",
+        error: `天猫明细按需重算失败：${String(detail || "").slice(0, 200)}`,
+      });
+    }
+  }
   if (request.method === "POST" && path === "/api/search") {
     let body;
     try {
@@ -1036,6 +1065,61 @@ async function handleApi(request, response, url) {
       return sendJson(response, 400, { error: errorMessage(error) });
     }
   }
+  // 报告落盘到指定位置：用户在弹窗里给绝对路径（.md 结尾），server 端写文件
+  // v2: Origin 同源校验 + 桌面/文档/下载根限定 + 已存在 409 确认覆盖
+  if (request.method === "POST" && path === "/api/intelligence/save-report") {
+    try {
+      // CSRF 防护：浏览器跨站 POST 必带 Origin，与 Host 不符即拒绝（curl 等非浏览器客户端无 Origin，不受影响）
+      const origin = String(request.headers.origin || "");
+      if (origin) {
+        let originHost = "";
+        try { originHost = new URL(origin).host; } catch {}
+        const host = String(request.headers.host || "");
+        if (originHost && host && originHost !== host) {
+          return sendJson(response, 403, { error: "跨站请求被拒绝" });
+        }
+      }
+      const body = await readJson(request).catch(() => ({}));
+      const target = String(body?.path || "").trim();
+      const content = String(body?.content || "");
+      const overwrite = body?.overwrite === true;
+      if (!/^[A-Za-z]:[\\/]/.test(target)) {
+        return sendJson(response, 400, { error: "路径必须是绝对路径（如 C:\\Users\\...\\报告.md）" });
+      }
+      if (!/\.md$/i.test(target)) {
+        return sendJson(response, 400, { error: "文件名必须以 .md 结尾" });
+      }
+      if (target.includes("..")) {
+        return sendJson(response, 400, { error: "路径不能包含 .. 段" });
+      }
+      if (!content) {
+        return sendJson(response, 400, { error: "报告内容为空" });
+      }
+      if (content.length > 5 * 1024 * 1024) {
+        return sendJson(response, 400, { error: "报告内容超过 5MB 限制" });
+      }
+      // 限定可写根目录：当前用户的 桌面/文档/下载（防止任意路径覆盖）
+      const home = homedir();
+      const allowedRoots = ["Desktop", "Documents", "Downloads"].map((d) => resolve(home, d));
+      const resolved = resolve(target);
+      const underAllowed = allowedRoots.some((root) => {
+        const rel = relative(root, resolved);
+        return rel !== "" && !rel.startsWith("..") && !isAbsolute(rel);
+      });
+      if (!underAllowed) {
+        return sendJson(response, 400, { error: `只允许保存到桌面、文档或下载目录（当前用户：${home}）` });
+      }
+      const alreadyExists = existsSync(resolved);
+      if (alreadyExists && !overwrite) {
+        return sendJson(response, 409, { error: "文件已存在", exists: true, path: resolved });
+      }
+      mkdirSync(dirname(resolved), { recursive: true });
+      writeFileSync(resolved, content, "utf8");
+      return sendJson(response, 200, { ok: true, path: resolved, bytes: Buffer.byteLength(content, "utf8"), overwritten: alreadyExists });
+    } catch (error) {
+      return sendJson(response, 400, { error: errorMessage(error) });
+    }
+  }
   if (request.method === "POST" && path === "/api/intelligence/analyze-source") {
     try {
       const body = await readJson(request).catch(() => ({}));
@@ -1295,6 +1379,18 @@ console.log(`Mode: ${production ? "production" : "development"}; API and UI shar
 // 启动后后台异步预热 analytics 缓存，不阻塞端口监听；首请求若未就绪则等待 single-flight
 prewarmAnalyticsCache();
 console.log("Analytics cache prewarm started in background.");
+
+// 天猫明细按需重算预热：启动延迟 15s（错开 analytics 预热的 python spawn），
+// 之后每 5 分钟检测快照 mtime，变化时后台预跑「当年 1 月 1 日 ~ 数据最新日」，
+// 用户把全局筛选终点选到数据最新日即可直接命中缓存，免去 30-75s 首次重算等待。
+async function prewarmPowerbiPages() {
+  const result = await prewarmPowerbiPagesOnDemand().catch((error) => ({ error: String(error) }));
+  if (result?.skipped) return;
+  if (result?.error) console.log(`PowerBI pages prewarm failed: ${result.start}~${result.end} (${Math.round(result.elapsedMs / 1000)}s) ${result.error}`);
+  else console.log(`PowerBI pages prewarm done: ${result.start}~${result.end} in ${Math.round(result.elapsedMs / 1000)}s`);
+}
+setTimeout(prewarmPowerbiPages, 15_000).unref?.();
+setInterval(prewarmPowerbiPages, 5 * 60_000).unref?.();
 
 // restart-trigger: 1787733992
 // Wed Aug 26 21:34:07     2026 touch

@@ -291,9 +291,26 @@ export interface PowerBiCustomerService {
   } | null;
 }
 
+// 单张来源表在所选区间内的实际覆盖：min/max 为区间内首末有数据日（ISO），
+// days = 有数据天数，missingDays = 日历日口径缺失天数；days=0 表示区间内整段无数据
+export interface PowerBiCoverageEntry {
+  min: string | null;
+  max: string | null;
+  days: number;
+  missingDays: number;
+}
+
+export interface PowerBiCoverage {
+  range: { start: string; end: string };
+  base: PowerBiCoverageEntry;
+  product: PowerBiCoverageEntry;
+  promotion: PowerBiCoverageEntry;
+}
+
 export interface PowerBiPages {
   source: "powerbi_local_logic";
   period: { start: string; end: string } | null;
+  coverage?: PowerBiCoverage | null;
   overallDaily: PowerBiOverallDaily[];
   dailyCore: PowerBiDailyCore[];
   productDaily: PowerBiProductDaily[];
@@ -536,6 +553,7 @@ export interface ProductManagementPages {
   warehouseStatusMatrix: ProductMatrix;
   dailyChannelMatrix: ProductMatrix;
   dailyWarehouseMatrix: ProductMatrix;
+  dailyShipWarehouseMatrix: ProductMatrix;
   dailyCategoryMatrix: ProductMatrix;
   dailyChannelMarginMatrix: ProductMatrix;
   dailyStatusMatrix: ProductMatrix;

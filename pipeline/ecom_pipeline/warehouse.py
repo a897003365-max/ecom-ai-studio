@@ -33,6 +33,8 @@ from .transforms import transform_source_file
 
 ProgressCallback = Callable[[dict[str, Any]], None]
 POWERBI_PAGE_WINDOW_DAYS = 60
+# analytics_snapshots 审计留痕保留份数（每日 3 次同步约 2 天的历史）
+ANALYTICS_SNAPSHOT_KEEP = 7
 
 
 @dataclass(frozen=True)
@@ -40,6 +42,10 @@ class SyncOptions:
     query_names: frozenset[str] | None = None
     max_files_per_query: int | None = None
     force: bool = False
+
+
+# 文件解析规则变更时递增对应查询的版本号，触发历史分区重建
+PARSE_VERSIONS = {"07-旗舰店商品销售数据": 2}
 
 
 def _read_state(path: Path) -> dict[str, Any]:
@@ -78,9 +84,12 @@ def _state_key(path: Path) -> str:
     return str(path.resolve()).lower()
 
 
-def _file_signature(path: Path) -> str:
+def _file_signature(path: Path, spec: QuerySpec | None = None) -> str:
     metadata = path.stat()
-    return f"{metadata.st_size}:{metadata.st_mtime_ns}"
+    base = f"{metadata.st_size}:{metadata.st_mtime_ns}"
+    # 解析规则变更后重建对应查询的历史分区；签名带版本避免脏分区被增量同步复用
+    version = PARSE_VERSIONS.get(spec.name, 0) if spec else 0
+    return f"{base}:v{version}" if version else base
 
 
 def _partition_path(root: Path, spec: QuerySpec, source: Path) -> Path:
@@ -117,7 +126,7 @@ def _sync_query(
     _emit(progress, {"event": "query_started", "query": spec.name, "files": len(selected), "totalFiles": len(all_files)})
     for index, source in enumerate(selected, start=1):
         key = _state_key(source)
-        signature = _file_signature(source)
+        signature = _file_signature(source, spec)
         destination = _partition_path(paths.staging_root, spec, source)
         previous = state["files"].get(key)
         if not options.force and previous and previous.get("query") == spec.name and previous.get("signature") == signature:
@@ -809,11 +818,52 @@ def _build_competitor_daily(connection: duckdb.DuckDBPyConnection) -> list[dict[
     return rows
 
 
+def _coerce_iso_date(value: "date | str") -> date:
+    """接受 date 或 YYYY-MM-DD 字符串，统一为 date（按需区间参数入口）。"""
+    if isinstance(value, date):
+        return value
+    return date.fromisoformat(str(value))
+
+
+def _source_coverage(
+    connection: duckdb.DuckDBPyConnection,
+    view: str,
+    column: str,
+    range_start: date,
+    range_end: date,
+) -> dict[str, Any]:
+    """所选区间内某来源表的实际覆盖：min/max（区间内首末有数据日）、有数据天数、缺失天数（日历日口径）。"""
+    row = connection.execute(
+        f'SELECT min(try_cast("{column}" AS DATE)), max(try_cast("{column}" AS DATE)), '
+        f'count(DISTINCT try_cast("{column}" AS DATE)) FROM {view} '
+        f'WHERE try_cast("{column}" AS DATE) BETWEEN ? AND ?',
+        [range_start, range_end],
+    ).fetchone()
+    minimum, maximum, days = row[0], row[1], int(row[2] or 0)
+    total_days = (range_end - range_start).days + 1
+    return {
+        "min": minimum.isoformat() if minimum else None,
+        "max": maximum.isoformat() if maximum else None,
+        "days": days,
+        "missingDays": max(total_days - days, 0),
+    }
+
+
 def _build_powerbi_pages(
     connection: duckdb.DuckDBPyConnection,
     store_rank_daily: dict[str, str] | None = None,
+    period_start: "date | str | None" = None,
+    period_end: "date | str | None" = None,
+    include_customer_service: bool = True,
 ) -> dict[str, Any]:
-    """Build compact daily aggregates for the three PBIX-derived website pages."""
+    """Build compact daily aggregates for the three PBIX-derived website pages.
+
+    默认产出滚动窗口快照（POWERBI_PAGE_WINDOW_DAYS 天，随最新数据日前移）；
+    显式传入 period_start/period_end 时按所选区间重算（服务端 /api/analytics/powerbi-pages
+    按需查询用），并在 coverage 中回报 04/07/08 来源表在该区间的实际覆盖，
+    供前端「数仓缺口」标签区分「筛选了但没有数据」与「数据齐全」。
+    include_customer_service=False 供按需路径跳过客服聚合（天猫明细工作区不渲染客服，
+    客服 tab 固定读快照），省去 10-1~10-4 四张表的重算。"""
 
     base_view = _model_view(connection, "04-旗舰店基础数据")
     product_view = _model_view(connection, "07-旗舰店商品销售数据")
@@ -839,6 +889,7 @@ def _build_powerbi_pages(
         return {
             "source": "powerbi_local_logic",
             "period": None,
+            "coverage": None,
             "overallDaily": [],
             "dailyCore": [],
             "productDaily": [],
@@ -849,8 +900,17 @@ def _build_powerbi_pages(
             "products": [],
             "customerService": {"period": None, "tmall": None, "jd": None},
         }
-    period_end = max(latest_dates)
-    period_start = period_end - timedelta(days=POWERBI_PAGE_WINDOW_DAYS - 1)
+    if period_end is not None:
+        # 按需模式：调用方显式给定区间；只给 end 时 end 前推同样长度的滚动窗口
+        period_end = _coerce_iso_date(period_end)
+        period_start = _coerce_iso_date(period_start) if period_start is not None else (
+            period_end - timedelta(days=POWERBI_PAGE_WINDOW_DAYS - 1)
+        )
+        if period_start > period_end:
+            raise ValueError("period_start 不能晚于 period_end")
+    else:
+        period_end = max(latest_dates)
+        period_start = period_end - timedelta(days=POWERBI_PAGE_WINDOW_DAYS - 1)
 
     overall_daily = _records(
         connection,
@@ -896,7 +956,8 @@ def _build_powerbi_pages(
           SELECT * EXCLUDE (_snapshot_rank) FROM (
             SELECT *, row_number() OVER (
               PARTITION BY try_cast("日期" AS DATE), cast("商品ID" AS VARCHAR)
-              ORDER BY "_source_mtime_ns" DESC, "_source_path" DESC
+              -- 同日期同商品兼有宽表（含访客数）与瘦导出（仅支付列）快照时，优先保留宽表
+              ORDER BY (try_cast("商品访客数" AS DOUBLE) IS NOT NULL) DESC, "_source_mtime_ns" DESC, "_source_path" DESC
             ) AS _snapshot_rank
             FROM {product_view}
             WHERE try_cast("日期" AS DATE) BETWEEN ? AND ? AND "商品ID" IS NOT NULL
@@ -989,7 +1050,8 @@ def _build_powerbi_pages(
           SELECT * EXCLUDE (_snapshot_rank) FROM (
             SELECT *, row_number() OVER (
               PARTITION BY try_cast("日期" AS DATE), cast("商品ID" AS VARCHAR)
-              ORDER BY "_source_mtime_ns" DESC, "_source_path" DESC
+              -- 同日期同商品兼有宽表（含访客数）与瘦导出（仅支付列）快照时，优先保留宽表
+              ORDER BY (try_cast("商品访客数" AS DOUBLE) IS NOT NULL) DESC, "_source_mtime_ns" DESC, "_source_path" DESC
             ) AS _snapshot_rank
             FROM {product_view}
             WHERE try_cast("日期" AS DATE) BETWEEN ? AND ? AND "商品ID" IS NOT NULL
@@ -1027,7 +1089,8 @@ def _build_powerbi_pages(
           SELECT * EXCLUDE (_snapshot_rank) FROM (
             SELECT *, row_number() OVER (
               PARTITION BY try_cast("日期" AS DATE), cast("商品ID" AS VARCHAR)
-              ORDER BY "_source_mtime_ns" DESC, "_source_path" DESC
+              -- 同日期同商品兼有宽表（含访客数）与瘦导出（仅支付列）快照时，优先保留宽表
+              ORDER BY (try_cast("商品访客数" AS DOUBLE) IS NOT NULL) DESC, "_source_mtime_ns" DESC, "_source_path" DESC
             ) AS _snapshot_rank
             FROM {product_view}
             WHERE try_cast("日期" AS DATE) BETWEEN ? AND ? AND "商品ID" IS NOT NULL
@@ -1149,6 +1212,12 @@ def _build_powerbi_pages(
     return {
         "source": "powerbi_local_logic",
         "period": {"start": period_start, "end": period_end},
+        "coverage": {
+            "range": {"start": period_start.isoformat(), "end": period_end.isoformat()},
+            "base": _source_coverage(connection, base_view, "统计日期", period_start, period_end),
+            "product": _source_coverage(connection, product_view, "日期", period_start, period_end),
+            "promotion": _source_coverage(connection, promotion_view, "日期", period_start, period_end),
+        },
         "overallDaily": overall_daily,
         "dailyCore": daily_core,
         "productDaily": product_daily,
@@ -1157,7 +1226,7 @@ def _build_powerbi_pages(
         "promotionProductDaily": promotion_product_daily,
         "competitorDaily": _build_competitor_daily(connection),
         "products": products,
-        "customerService": _build_customer_service(connection, period_start, period_end),
+        "customerService": _build_customer_service(connection, period_start, period_end) if include_customer_service else None,
         "privacy": {
             "rawRowsExposed": False,
             "sourcePathsExposed": False,
@@ -1550,6 +1619,7 @@ def _build_product_management_pages(
             "warehouseStatusMatrix": {"columns": [], "rows": []},
             "dailyChannelMatrix": {"columns": [], "rows": []},
             "dailyWarehouseMatrix": {"columns": [], "rows": []},
+            "dailyShipWarehouseMatrix": {"columns": [], "rows": []},
             "dailyCategoryMatrix": {"columns": [], "rows": []},
             "dailyChannelMarginMatrix": {"columns": [], "rows": []},
             "dailyStatusMatrix": {"columns": [], "rows": []},
@@ -1698,7 +1768,7 @@ def _build_product_management_pages(
             cur_range = _month_to_range(cur_m)
             cur_label = cur_m
             # 上期 = 当期前一个月
-            prev_m_idx = 2 if cur_m == months[1][0] else 1
+            prev_m_idx = 2 if len(months) > 1 and cur_m == months[1][0] else 1
             if len(months) > prev_m_idx:
                 prev_m = months[prev_m_idx][0]
                 prev_range = _month_to_range(prev_m)
@@ -2678,6 +2748,38 @@ def _build_product_management_pages(
     else:
         daily_warehouse_matrix = {"columns": [], "rows": []}
 
+    # 每日 × 发货仓发货量（纯发货日期口径，用于仓配履约折线图）。
+    # 全局日期范围直接作用于发货日期：基于 prev_view（保留状态/渠道/店铺筛选、不带订单日期过滤），
+    # 避免订单日期窗口把"下单早、发货晚"的长周期订单（如定制床架）截断；未发货订单（发货日期为空）不计入。
+    if "发货仓" in source_columns and "发货日期" in source_columns:
+        ship_date_cast = 'try_cast(s."发货日期" AS DATE)'
+        if date_filter:
+            ship_window = (
+                f"AND {ship_date_cast} >= DATE '{date_filter[0]}' "
+                f"AND {ship_date_cast} <= DATE '{date_filter[1]}'"
+            )
+        else:
+            ship_window = (
+                f"AND {ship_date_cast} >= "
+                f"(SELECT max(try_cast(\"发货日期\" AS DATE)) - INTERVAL 30 DAY FROM {prev_view})"
+            )
+        daily_ship_warehouse_matrix = _matrix(
+            connection,
+            f"""
+            PIVOT (
+              SELECT cast({ship_date_cast} AS VARCHAR) AS row,
+                      coalesce(cast(s."发货仓" AS VARCHAR), '(未设定)') AS warehouse,
+                      coalesce(try_cast(s."销售数量" AS DOUBLE),0) AS units
+              FROM {prev_view} s
+              WHERE {ship_date_cast} IS NOT NULL
+                {ship_window}
+            ) ON warehouse USING sum(units) ORDER BY row
+            """,
+            "row",
+        )
+    else:
+        daily_ship_warehouse_matrix = {"columns": [], "rows": []}
+
     # 每日 × 床垫类别销量（用于产品分类分布时间序列折线图，空白归"其他"）
     # 床垫类别取自辅4-床垫编码(q18)的大类（弹簧床垫/黄麻薄垫等），与 size_structure 优先级一致
     if q18_view and "床垫类别" in q18_columns:
@@ -2819,19 +2921,22 @@ def _build_product_management_pages(
     )
 
     # 渠道平台 × 订单状态明细（销售数量）
-    channel_status_matrix = _matrix(
-        connection,
-        f"""
-        PIVOT (
-          SELECT {channel_expr} AS row,
-                 coalesce(cast(s."订单状态明细" AS VARCHAR), '(未知)') AS status,
-                 coalesce(try_cast(s."销售数量" AS DOUBLE),0) AS units
-          FROM {view} s
-          WHERE s."渠道平台" IS NOT NULL OR s."订单状态明细" IS NOT NULL
-        ) ON status USING sum(units) ORDER BY row
-        """,
-        "row",
-    )
+    if "渠道平台" in source_columns:
+        channel_status_matrix = _matrix(
+            connection,
+            f"""
+            PIVOT (
+              SELECT {channel_expr} AS row,
+                     coalesce(cast(s."订单状态明细" AS VARCHAR), '(未知)') AS status,
+                     coalesce(try_cast(s."销售数量" AS DOUBLE),0) AS units
+              FROM {view} s
+              WHERE s."渠道平台" IS NOT NULL OR s."订单状态明细" IS NOT NULL
+            ) ON status USING sum(units) ORDER BY row
+            """,
+            "row",
+        )
+    else:
+        channel_status_matrix = {"columns": [], "rows": []}
 
     # 渠道平台 × 发货仓（销售数量）
     channel_warehouse_matrix = _matrix(
@@ -2895,6 +3000,7 @@ def _build_product_management_pages(
         "warehouseStatusMatrix": warehouse_status_matrix,
         "dailyChannelMatrix": daily_channel_matrix,
         "dailyWarehouseMatrix": daily_warehouse_matrix,
+        "dailyShipWarehouseMatrix": daily_ship_warehouse_matrix,
         "dailyCategoryMatrix": daily_category_matrix,
         "dailyChannelMarginMatrix": daily_channel_margin_matrix,
         "dailyStatusMatrix": daily_status_matrix,
@@ -2983,7 +3089,25 @@ def _build_unique_snapshot(
         "INSERT INTO analytics_snapshots VALUES (current_timestamp, ?, ?, ?, ?)",
         [None, None, rows, json.dumps(snapshot, ensure_ascii=False, default=_json_value)],
     )
+    _prune_analytics_snapshots(connection)
     return snapshot
+
+
+def _prune_analytics_snapshots(connection: duckdb.DuckDBPyConnection) -> None:
+    """快照历史保留策略：服务端只读 analytics-snapshot.json，本表仅作审计留痕；
+    单份 snapshot_json 约 10MB，逐次追加（每日 3 次同步）会让 duckdb 无限膨胀，
+    因此只保留最近 ANALYTICS_SNAPSHOT_KEEP 份，超出的旧快照随每次同步清理。"""
+    connection.execute(
+        f"""
+        DELETE FROM analytics_snapshots
+        WHERE refreshed_at < (
+          SELECT MIN(refreshed_at) FROM (
+            SELECT refreshed_at FROM analytics_snapshots
+            ORDER BY refreshed_at DESC LIMIT {ANALYTICS_SNAPSHOT_KEEP}
+          )
+        )
+        """
+    )
 
 
 def _write_migration_status(

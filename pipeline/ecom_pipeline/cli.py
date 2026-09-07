@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 import sys
+from datetime import date
 
 import duckdb
 
@@ -15,7 +16,14 @@ from .export import (
     failure_result,
     write_health,
 )
-from .warehouse import SyncOptions, _build_product_management_pages, sync_warehouse, warehouse_status
+from .warehouse import (
+    SyncOptions,
+    _build_powerbi_pages,
+    _build_product_management_pages,
+    _load_pbix_store_rank_daily,
+    sync_warehouse,
+    warehouse_status,
+)
 
 
 def _progress(payload: dict[str, object]) -> None:
@@ -36,6 +44,12 @@ def build_parser() -> argparse.ArgumentParser:
     qp.add_argument("--status", action="append", dest="statuses", default=None, help="订单状态筛选（可重复）")
     qp.add_argument("--channel", action="append", dest="channels", default=None, help="渠道平台筛选（可重复）")
     qp.add_argument("--store-short-name", action="append", dest="store_short_names", default=None, help="店铺简称筛选（可重复）")
+    pp = subparsers.add_parser(
+        "query-powerbi-pages",
+        help="Query PowerBI replica page aggregates for an explicit date range (on-demand, bypasses the 60-day snapshot window)",
+    )
+    pp.add_argument("--start", required=True, help="Start date YYYY-MM-DD (inclusive)")
+    pp.add_argument("--end", required=True, help="End date YYYY-MM-DD (inclusive)")
     export = subparsers.add_parser(
         "export-jushuitan",
         help="Export 15-聚水潭商品数据 to D:\\麻大师\\日更数据\\商品管理\\15-聚水潭商品数据.xlsx",
@@ -88,6 +102,21 @@ def main(argv: list[str] | None = None) -> int:
         finally:
             connection.close()
         sys.stdout.buffer.write(json.dumps({"productManagement": pages}, ensure_ascii=False, default=str).encode("utf-8"))
+        return 0
+    if arguments.command == "query-powerbi-pages":
+        paths = WarehousePaths.discover()
+        connection = duckdb.connect(str(paths.database), read_only=True)
+        try:
+            pages = _build_powerbi_pages(
+                connection,
+                _load_pbix_store_rank_daily(paths),
+                period_start=date.fromisoformat(arguments.start),
+                period_end=date.fromisoformat(arguments.end),
+                include_customer_service=False,
+            )
+        finally:
+            connection.close()
+        sys.stdout.buffer.write(json.dumps({"powerbiPages": pages}, ensure_ascii=False, default=str).encode("utf-8"))
         return 0
     if arguments.command == "export-jushuitan":
         from pathlib import Path

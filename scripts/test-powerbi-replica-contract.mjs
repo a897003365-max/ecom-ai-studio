@@ -5,12 +5,15 @@ function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
 
-const [analyticsPage, replica, types, warehouse, styles] = await Promise.all([
+const [analyticsPage, replica, types, warehouse, styles, cli, serverIndex, serverWarehouse] = await Promise.all([
   readFile(new URL("../src/pages/AnalyticsPage.tsx", import.meta.url), "utf8"),
   readFile(new URL("../src/components/PowerBiReplica.tsx", import.meta.url), "utf8"),
   readFile(new URL("../src/types/integration.ts", import.meta.url), "utf8"),
   readFile(new URL("../pipeline/ecom_pipeline/warehouse.py", import.meta.url), "utf8"),
   readFile(new URL("../src/styles.css", import.meta.url), "utf8"),
+  readFile(new URL("../pipeline/ecom_pipeline/cli.py", import.meta.url), "utf8"),
+  readFile(new URL("../server/index.mjs", import.meta.url), "utf8"),
+  readFile(new URL("../server/warehouse.mjs", import.meta.url), "utf8"),
 ]);
 
 assert(analyticsPage.includes("PowerBiReplica"), "运营数据看板未接入 PowerBI 复刻模块");
@@ -105,17 +108,24 @@ assert(replica.includes("rgba(0, 235, 207"), "竞品明细表 ROI 数据条未�
 const competitorDetailStart = replica.indexOf('data-testid="competitor-brand-channel-table"');
 const competitorDetailEnd = replica.indexOf("</table>", competitorDetailStart);
 const competitorDetailMarkup = replica.slice(competitorDetailStart, competitorDetailEnd);
-const competitorDetailColumns = ["品牌", "渠道", "消耗(万)", "ROI(公式)", "消耗占比", "展现量(万)", "点击量(万)", "点击率(竞品)", "访问人群成本", "兴趣人群成本", "首购人群成本", "复购人群成本"];
+// 明细表头为简化版「ROI/点击率」（品牌汇总表保留 ROI(公式)/点击率(竞品) 全称），
+// 且 4 列人群成本合并为单个 hover 浮窗列（costTip），以线上组件为准
+const competitorDetailColumns = ["品牌", "渠道", "消耗(万)", "ROI", "消耗占比", "展现量(万)", "点击量(万)", "点击率"];
 previousColumnIndex = -1;
 for (const column of competitorDetailColumns) {
   const columnIndex = competitorDetailMarkup.indexOf(`label="${column}"`);
   assert(columnIndex > previousColumnIndex, `竞品明细表列缺失或顺序不符合 PBIX：${column}`);
   previousColumnIndex = columnIndex;
 }
+assert(
+  competitorDetailMarkup.includes("pb-competitor-cost-cell") && replica.includes("visitCost") && replica.includes("repurchaseCost"),
+  "竞品明细表缺少 hover 合并的人群成本列（访问/兴趣/首购/复购）",
+);
 const competitorSummaryStart = replica.indexOf('data-testid="competitor-brand-summary-table"');
 const competitorSummaryEnd = replica.indexOf("</table>", competitorSummaryStart);
 const competitorSummaryMarkup = replica.slice(competitorSummaryStart, competitorSummaryEnd);
-const competitorSummaryColumns = ["品牌", "消耗(万)", "ROI(公式)", "展现量(万)", "点击量(万)", "点击率(竞品)", "成交金额(万)", "访问人群成本", "兴趣人群成本", "首购人群成本", "复购人群成本"];
+// 品牌汇总表同样将 4 列人群成本合并为 hover 浮窗列，以线上组件为准
+const competitorSummaryColumns = ["品牌", "消耗(万)", "ROI(公式)", "展现量(万)", "点击量(万)", "点击率(竞品)", "成交金额(万)"];
 previousColumnIndex = -1;
 for (const column of competitorSummaryColumns) {
   const columnIndex = competitorSummaryMarkup.indexOf(`label="${column}"`);
@@ -148,10 +158,35 @@ assert(replica.includes("setSelectedAgent") && replica.includes("is-selected") &
 assert(replica.includes("previousRangeFor") && replica.includes("较上期环比"), "客服 KPI 缺少较上期环比口径");
 assert(replica.includes('data-testid="tmall-service-agent-table"') && replica.indexOf("onClick={() => setSelectedAgent") > -1, "客服明细行缺少点击联动回调");
 assert(replica.includes("pb-selected-agent-chip") && replica.includes("is-selected"), "客服联动缺少筛选 chip 或选中行高亮样式类");
-assert(replica.includes("unavailable") && replica.includes('value={tile.unavailable ? "—"'), "客服联动 KPI 缺少客服维度占位（unavailable 显示 —）");
+assert(replica.includes("unavailable") && replica.includes('value={current == null ? "—"'), "客服联动 KPI 缺少客服维度占位（unavailable 显示 —）");
 assert(replica.includes('"salesAmountWan"') && replica.includes('"inquiryConvRate"') && replica.includes('"inquiryConversionRate"'), "客服整体/客服模式趋势图字段映射缺失");
 assert(types.includes("interface PowerBiCustomerService") && types.includes("customerService: PowerBiCustomerService"), "前端类型未接入客服数据 customerService");
 assert(warehouse.includes("_build_customer_service") && warehouse.includes('"customerService"'), "数仓未生成 customerService 客服页面数据");
 assert(styles.includes("pb-chart-tooltip") && styles.includes("translateX(-50%)"), "客服趋势图 tooltip 缺少本地坐标居中样式");
+
+// ===== 天猫明细按需重算（快照 60 天窗口外的全局筛选区间）契约 =====
+assert(cli.includes("query-powerbi-pages") && cli.includes("_build_powerbi_pages"), "CLI 缺少 query-powerbi-pages 按需重算子命令");
+assert(
+  warehouse.includes("period_start: \"date | str | None\" = None") && warehouse.includes("period_end: \"date | str | None\" = None") && warehouse.includes("include_customer_service: bool = True"),
+  "数仓 _build_powerbi_pages 缺少显式区间与客服跳过参数",
+);
+assert(warehouse.includes("_source_coverage") && warehouse.includes('"coverage"'), "数仓按需重算未回报 04/07/08 来源表覆盖 coverage");
+assert(
+  serverWarehouse.includes("queryPowerbiPagesOnDemand") && serverWarehouse.includes("query-powerbi-pages"),
+  "服务端缺少天猫明细按需重算查询（spawn + 缓存）",
+);
+assert(
+  serverIndex.includes('path === "/api/analytics/powerbi-pages"') && serverIndex.includes("queryPowerbiPagesOnDemand"),
+  "服务端缺少 /api/analytics/powerbi-pages 路由",
+);
+assert(types.includes("interface PowerBiCoverage") && types.includes("coverage?:"), "前端类型缺少按需覆盖 coverage 字段");
+assert(
+  replica.includes("getPowerbiPagesOnDemand") && replica.includes("按需重算中") && replica.includes("按需重算暂不可用"),
+  "天猫明细缺少快照窗口外区间的按需重算加载/失败回退",
+);
+assert(
+  replica.includes("coverageSummary") && replica.includes("数仓缺口") && replica.includes("数仓覆盖完整"),
+  "天猫明细标签缺少数仓覆盖缺口说明",
+);
 
 console.log("powerbi replica contract ok");
