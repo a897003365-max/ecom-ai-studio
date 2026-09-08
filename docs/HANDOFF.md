@@ -27,7 +27,7 @@
 
 - Windows 任务：EcomAIStudio-DingTalk-Sync。
 - 任务属性：Ready、S4U、Limited、StartWhenAvailable、IgnoreNew、网络可用、失败重试 3 次、重试间隔 10 分钟。
-- 执行时间：11:00、13:00、17:30（Asia/Shanghai，2026-08-25 起早间由 10:30 调整为 11:00）。
+- 执行时间：10:20、13:00、17:30（Asia/Shanghai，2026-09-08 起早间由 11:00 调整为 10:20）。
 - 2026-07-14 06:03:50 启动的同步在 06:09:32 成功，读取 19 张表、7669 条记录。
 - 健康状态文件：local-data/runtime/dingtalk-sync-health.json。
 - 运行日志：local-data/logs/dingtalk-sync.log。
@@ -112,7 +112,7 @@
 
 ## 8. 接手前检查
 
-1. 访问 /api/health，确认 dingtalk healthy、schedule 为 11:00,13:00,17:30。
+1. 访问 /api/health，确认 dingtalk healthy、schedule 为 10:20,13:00,17:30。
 2. 确认 Windows 任务 EcomAIStudio-DingTalk-Sync 的 LastResult 为 0。
 3. 保留 local-data/runtime/dingtalk-sync-health.json 和 local-data/logs/dingtalk-sync.log，勿将它们清理为“临时文件”。
 4. 检查 MaterialId、ContentId、SKU 的映射是否仍与 PowerBI 快照一致。

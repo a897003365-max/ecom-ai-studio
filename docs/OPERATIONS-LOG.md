@@ -2,6 +2,18 @@
 
 本文件只记录可复核的运行事件、数据口径修复和验证结果；日期使用 YYYY-MM-DD。
 
+## 2026-09-08
+
+### 钉钉同步早间计划时间由 11:00 调整为 10:20
+
+- 背景：运营要求看板早间更新从 11:00 提前到 10:20。
+- 改动（唯一口径来源为注册表 `HKCU:\Environment\DINGTALK_SYNC_TIMES`）：
+  - 注册表值 `11:00,13:00,17:30` → `10:20,13:00,17:30`；
+  - `server/dingtalk-api.mjs` `scheduleTimes()` 冷启动默认值同步改为 `10:20,13:00,17:30`；
+  - 重新运行 `scripts/register-dingtalk-schedule.ps1` 重建 `EcomAIStudio-DingTalk-Sync`（S4U/Limited/网络可用/失败重试属性保持不变），触发器验证为 10:20、13:00、17:30，State=Ready，NextRun 指向当日 13:00（改动时点在 10:20 旧计划已跑完、13:00 前，新计划当日即生效）；
+  - `scripts/test-dingtalk-api.mjs` 两处断言改为 10:20；干净环境 `env -u DINGTALK_SYNC_TIMES node scripts/test-dingtalk-api.mjs` 退出码 0。
+- 注意：长驻 `start-tailscale-server.ps1` 看门狗（PID 10484）在自启动时固化读到的 env，5174 服务 `/api/health` 仍显示旧 11:00，需重启该看门狗后展示值才对齐 10:20；计划任务本身已按新时间真实触发，功能生效不受影响。
+
 ## 2026-09-07
 
 ### 天猫明细支持全局筛选区间按需重算 + 数仓缺口标注（60 天快照窗口外不再静默钳制）
