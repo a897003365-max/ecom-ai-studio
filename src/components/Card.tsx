@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { clsx } from "../utils/format";
+import { ViewStateScope } from "../hooks/useViewState";
 
 interface CardProps {
   title?: string;
@@ -19,7 +20,7 @@ export function Card({ title, action, children, className, dataUi, hover = false
           {action}
         </div>
       )}
-      {children}
+      <ViewStateScope name={title ?? dataUi ?? "card"}>{children}</ViewStateScope>
     </section>
   );
 }

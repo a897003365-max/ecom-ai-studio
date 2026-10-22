@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "node server/index.mjs",
     "dev:ui": "vite --host 127.0.0.1",
-    "build": "tsc --noEmit && vite build && node scripts/export-price-snapshots.mjs",
+    "build": "tsc --noEmit && vite build && node scripts/export-price-snapshots.mjs && node scripts/compress-assets.mjs",
     "lint": "eslint src server scripts vite.config.ts",
     "typecheck": "tsc --noEmit",
     "test": "npm run test:dashboard-ui && npm run test:select-theme && npm run test:ux-polish",
@@ -40,7 +40,9 @@
     "test:smoke": "node scripts/smoke-local.mjs",
     "test:sentiment": "node --experimental-strip-types scripts/test-sentiment-classifier.mjs",
     "test:intelligence-report": "node scripts/test-intelligence-report.mjs",
-    "test:price-snapshots": "node --test scripts/test-price-snapshots.mjs"
+    "test:price-snapshots": "node --test scripts/test-price-snapshots.mjs",
+    "test:static-assets": "node --test scripts/test-static-assets.mjs",
+    "test:product-filters": "node --experimental-strip-types scripts/test-product-filters.mjs"
   },
   "dependencies": {
     "@fontsource/space-grotesk": "^5.2.10",

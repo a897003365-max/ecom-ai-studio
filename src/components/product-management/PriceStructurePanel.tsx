@@ -1,3 +1,4 @@
+import { money, percent as pct, count } from "./productCommandFormat";
 import { Card } from "../Card";
 import { SortableTable } from "../SortableTable";
 import { StructureMatrixTable } from "./StructureMatrixTable";
@@ -17,12 +18,10 @@ const EMPTY: ProductPriceStructurePages = {
   quality: { status: "unavailable", coverage: null, warnings: ["模块未实现"] },
 };
 
-const pct = (v: number) => `${(v * 100).toFixed(1)}%`;
-const money = (v: number) => `¥${(v / 10000).toLocaleString("zh-CN", { maximumFractionDigits: 1 })}万`;
-const count = (v: number) => v.toLocaleString("zh-CN");
 
 export function PriceStructurePanel({ data }: { data?: ProductPriceStructurePages | null }) {
   const v = data ?? EMPTY;
+  const emptyHint = v.quality.status === "unavailable" ? "当前数据源未覆盖价格结构，请检查数据覆盖范围。" : "当前筛选范围没有匹配的价格结构数据。";
   return (
     <>
       <Card title="商家实收价格段分布">
@@ -33,7 +32,7 @@ export function PriceStructurePanel({ data }: { data?: ProductPriceStructurePage
           minWidth={920}
           rowKey={(r) => r.bucket}
           rows={v.buckets}
-          emptyHint="当前筛选范围无有效价格数据"
+          emptyHint={emptyHint}
           columns={[
             { key: "label", label: "价格段", sortValue: (r) => BUCKET_ORDER.indexOf(r.label), render: (r) => <span className="font-semibold">{r.label}</span> },
             { key: "salesUnits", label: "销量", align: "right", sortValue: (r) => r.salesUnits, render: (r) => count(r.salesUnits) },
@@ -45,13 +44,13 @@ export function PriceStructurePanel({ data }: { data?: ProductPriceStructurePage
         />
       </Card>
       <Card title="渠道 × 价格段 订单行占比" className="mt-4">
-        <StructureMatrixTable matrix={v.channelMatrix} rowHeader="渠道平台" />
+        <StructureMatrixTable emptyHint={emptyHint} matrix={v.channelMatrix} rowHeader="渠道平台" />
       </Card>
       <Card title="床垫类别 × 价格段 订单行占比" className="mt-4">
-        <StructureMatrixTable matrix={v.mattressCategoryMatrix} rowHeader="床垫类别" />
+        <StructureMatrixTable emptyHint={emptyHint} matrix={v.mattressCategoryMatrix} rowHeader="床垫类别" />
       </Card>
       <Card title="TOP15 产品 × 价格段 订单行占比" className="mt-4">
-        <StructureMatrixTable matrix={v.topProductMatrix} rowHeader="产品名称" />
+        <StructureMatrixTable emptyHint={emptyHint} matrix={v.topProductMatrix} rowHeader="产品名称" />
       </Card>
     </>
   );

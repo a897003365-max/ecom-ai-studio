@@ -1,3 +1,5 @@
+import { useViewState } from "../../hooks/useViewState";
+import "../../styles/product-ui.css";
 import {
   ArrowDownRight,
   ArrowUpRight,
@@ -12,7 +14,6 @@ import {
   useMemo,
   useRef,
   useState,
-  type CSSProperties,
   type MouseEvent as ReactMouseEvent,
 } from "react";
 import { Pagination } from "../SortableTable";
@@ -60,6 +61,7 @@ const compactCount = new Intl.NumberFormat("zh-CN", {
 });
 
 function money(value: number | null | undefined, compact = true) {
+  if (value == null || !Number.isFinite(value)) return "数据不足";
   return (compact ? compactMoney : fullMoney).format(Number(value) || 0);
 }
 
@@ -140,13 +142,15 @@ function DrawerMetric({ label, value, detail, tone }: { label: string; value: st
 }
 
 export function ProductGalleryView({ pm }: { pm: ProductManagementPages }) {
-  const [query, setQuery] = useState("");
-  const [sort, setSort] = useState<ProductSort>("received");
-  const [page, setPage] = useState(0);
+  const [query, setQuery] = useViewState("gallery.query", "");
+  const [sort, setSort] = useViewState<ProductSort>("gallery.sort", "received");
+  const [page, setPage] = useViewState("gallery.page", 0, { resetOnFilterChange: true });
   const [selected, setSelected] = useState<ProductNameOverviewItem | null>(null);
   const [skuQuery, setSkuQuery] = useState("");
   const [skuSort, setSkuSort] = useState<SkuSort>("received");
   const [skuPage, setSkuPage] = useState(0);
+  const [closing, setClosing] = useState(false);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dialogRef = useRef<HTMLElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
@@ -184,7 +188,6 @@ export function ProductGalleryView({ pm }: { pm: ProductManagementPages }) {
   const productPage = safePage(page, pageCount);
   const visibleProducts = products.slice(productPage * PAGE_SIZE, productPage * PAGE_SIZE + PAGE_SIZE);
 
-  useEffect(() => setPage(0), [query, sort]);
   useEffect(() => {
     if (page !== productPage) setPage(productPage);
   }, [page, productPage]);
@@ -249,14 +252,20 @@ export function ProductGalleryView({ pm }: { pm: ProductManagementPages }) {
   const currentSkuPage = safePage(skuPage, skuPageCount);
   const visibleSkus = selectedSkus.slice(currentSkuPage * SKU_PAGE_SIZE, currentSkuPage * SKU_PAGE_SIZE + SKU_PAGE_SIZE);
 
-  useEffect(() => setSkuPage(0), [selected, skuQuery, skuSort]);
+  useEffect(() => setSkuPage(0), [selected?.productName, skuQuery, skuSort]);
   useEffect(() => {
     if (skuPage !== currentSkuPage) setSkuPage(currentSkuPage);
   }, [currentSkuPage, skuPage]);
 
   function closeDrawer() {
-    setSelected(null);
-    window.setTimeout(() => triggerRef.current?.focus(), 0);
+    if (closeTimer.current !== null) return;
+    setClosing(true);
+    closeTimer.current = setTimeout(() => {
+      setSelected(null);
+      setClosing(false);
+      closeTimer.current = null;
+      triggerRef.current?.focus();
+    }, window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 200);
   }
 
   useEffect(() => {
@@ -294,9 +303,20 @@ export function ProductGalleryView({ pm }: { pm: ProductManagementPages }) {
       document.body.style.overflow = previousOverflow;
       document.removeEventListener("keydown", onKeyDown);
     };
-  }, [selected]);
+  }, [selected?.productName]);
+
+  useEffect(() => () => { if (closeTimer.current !== null) clearTimeout(closeTimer.current); }, []);
+  useEffect(() => {
+    if (!selected) return;
+    const current = pm.productNameOverview?.find((product) => product.productName === selected.productName);
+    if (!current) closeDrawer();
+    else if (current !== selected) setSelected(current);
+  }, [pm.productNameOverview, selected]);
 
   function openDrawer(product: ProductNameOverviewItem, event: ReactMouseEvent<HTMLButtonElement>) {
+    if (closeTimer.current !== null) clearTimeout(closeTimer.current);
+    closeTimer.current = null;
+    setClosing(false);
     triggerRef.current = event.currentTarget;
     setSkuQuery("");
     setSkuSort("received");
@@ -328,7 +348,7 @@ export function ProductGalleryView({ pm }: { pm: ProductManagementPages }) {
           <Search aria-hidden="true" size={15} />
           <input
             aria-label="搜索产品、SPU 或 SKU"
-            onChange={(event) => setQuery(event.target.value)}
+            onChange={(event) => { setQuery(event.target.value); setPage(0); }}
             placeholder="搜索产品、SPU 或 SKU"
             type="search"
             value={query}
@@ -336,7 +356,7 @@ export function ProductGalleryView({ pm }: { pm: ProductManagementPages }) {
         </label>
         <label className="product-gallery-sort">
           <span>排序</span>
-          <select aria-label="商品画册排序" onChange={(event) => setSort(event.target.value as ProductSort)} value={sort}>
+          <select aria-label="商品画册排序" onChange={(event) => { setSort(event.target.value as ProductSort); setPage(0); }} value={sort}>
             <option value="received">商家实收 · 从高到低</option>
             <option value="margin">毛利率 · 从高到低</option>
             <option value="units">销量 · 从高到低</option>
@@ -364,7 +384,6 @@ export function ProductGalleryView({ pm }: { pm: ProductManagementPages }) {
                 data-testid="product-card"
                 key={product.productName}
                 onClick={(event) => openDrawer(product, event)}
-                style={{ "--gallery-order": index } as CSSProperties}
                 type="button"
               >
                 <div className="product-gallery-card-media">
@@ -392,8 +411,8 @@ export function ProductGalleryView({ pm }: { pm: ProductManagementPages }) {
       ) : (
         <div className="product-gallery-empty">
           <Search aria-hidden="true" size={24} />
-          <strong>没有找到匹配产品</strong>
-          <span>请换一个产品名、SPU 或 SKU 编码。</span>
+          <strong>{query ? "没有找到匹配产品" : "当前范围没有商品数据"}</strong>
+          <span>{query ? "请换一个产品名、SPU 或 SKU 编码。" : "请调整筛选条件，并查看页面的数据覆盖范围。"}</span>
         </div>
       )}
 
@@ -405,7 +424,7 @@ export function ProductGalleryView({ pm }: { pm: ProductManagementPages }) {
 
       {selected && (
         <div
-          className="product-gallery-backdrop"
+          className={`product-gallery-backdrop${closing ? " is-closing" : ""}`}
           onMouseDown={(event) => {
             if (event.target === event.currentTarget) closeDrawer();
           }}

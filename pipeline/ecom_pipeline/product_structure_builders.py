@@ -216,6 +216,11 @@ def build_price_structure(
     # 用 total - valid 计算 excluded，避开 SQL 三值逻辑下 NOT(NULL) 不命中的问题。
     excluded = int(totals["total_lines"] or 0) - valid_lines
 
+    if valid_lines > 0:
+        # 本模块的维度关联与清洗只做一次；后续聚合复用连接内临时结果。
+        connection.execute(f"CREATE OR REPLACE TEMP TABLE _jt_price AS {valid_cte} SELECT * FROM valid")
+        valid_cte = "WITH valid AS (SELECT * FROM _jt_price)"
+
     bucket_map: dict[str, dict[str, Any]] = {}
     channel_cells: list[dict[str, Any]] = []
     top_by_bucket: dict[str, list[str]] = {}
@@ -396,6 +401,10 @@ def build_size_structure(
         result = empty_size_structure()
         result["quality"] = {"status": "unavailable", "coverage": None, "warnings": ["当前筛选范围无订单数据"]}
         return result
+
+    # 本模块的维度关联与清洗只做一次；后续聚合复用连接内临时结果。
+    connection.execute(f"CREATE OR REPLACE TEMP TABLE _jt_size AS {enriched} SELECT * FROM enriched")
+    enriched = "WITH enriched AS (SELECT * FROM _jt_size)"
 
     size_rows = _fetch_records(
         connection,
@@ -596,6 +605,10 @@ def build_spu_sales_trend(
         result["quality"] = {"status": "unavailable", "coverage": None, "warnings": ["当前筛选范围无订单数据"]}
         return result
 
+    # 本模块的维度关联与清洗只做一次；后续聚合复用连接内临时结果。
+    connection.execute(f"CREATE OR REPLACE TEMP TABLE _jt_spu AS {enriched} SELECT * FROM enriched")
+    enriched = "WITH enriched AS (SELECT * FROM _jt_spu)"
+
     spu_rows = _fetch_records(
         connection,
         f"""{enriched}
@@ -768,6 +781,10 @@ def build_customization_structure(
         result = empty_customization_structure()
         result["quality"] = {"status": "unavailable", "coverage": None, "warnings": ["当前筛选范围无订单数据"]}
         return result
+
+    # 本模块的维度关联与清洗只做一次；后续聚合复用连接内临时结果。
+    connection.execute(f"CREATE OR REPLACE TEMP TABLE _jt_custom AS {enriched} SELECT * FROM enriched")
+    enriched = "WITH enriched AS (SELECT * FROM _jt_custom)"
 
     comp_rows = _fetch_records(
         connection,

@@ -51,7 +51,7 @@ export function Sidebar({ items, activePage, onNavigate, onToggleTheme, theme }:
           aria-pressed={theme === "dark"}
           className="flex h-[30px] w-[30px] items-center justify-center rounded-[5px] bg-[var(--brand-dim)] text-[var(--brand)]"
           onClick={onToggleTheme}
-          title={`手动切换为${nextThemeLabel} · 07:00/19:00 跟随系统时间自动切换`}
+            title={`手动切换为${nextThemeLabel}`}
           type="button"
         >
           <ThemeIcon aria-hidden="true" size={15} strokeWidth={1.8} />

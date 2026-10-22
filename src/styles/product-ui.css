@@ -1,0 +1,45 @@
+/* 商品模块的可读性与触控规则。全局表格与其他页面保持各自样式。 */
+.product-management-page { --product-table-body: 15px; --product-table-heading: 13px; --product-table-caption: 12px; }
+.product-management-page .data-table { font-size: var(--product-table-body); }
+.product-management-page .data-table td { font-size: var(--product-table-body); }
+.product-management-page .data-table th { font-size: var(--product-table-heading); }
+.product-management-page .data-table :is(th, td) { font-variant-numeric: tabular-nums; }
+.product-management-page .data-table :is(th, td):first-child,
+.product-management-page .product-gallery-sku-table-wrap :is(th, td):first-child {
+  position: sticky; left: 0; z-index: 1; background: var(--panel-solid); text-align: left;
+}
+.product-management-page .data-table th:first-child { z-index: 2; }
+.product-management-page .product-rank-cell,
+.product-management-page .priority-products-table > :is(thead, tbody) > tr > :is(th, td):first-child { width: 48px; min-width: 48px; max-width: 48px; }
+.product-management-page .product-identity-cell,
+.product-management-page .priority-products-table > :is(thead, tbody) > tr > :is(th, td):nth-child(2) { position: sticky; left: 48px; z-index: 1; background: var(--panel-solid); }
+.product-management-page th.product-identity-cell { z-index: 2; }
+.product-management-page .matrix-table-wrap :is(th, td):not(:first-child) { text-align: right; }
+.product-management-page .matrix-table-wrap th:not(:first-child) .th-sort { justify-content: flex-end; width: 100%; }
+.product-management-page .data-table th[style*="right"] .th-sort { justify-content: flex-end; width: 100%; }
+.product-management-page .product-pagination-mobile { display: none; }
+.product-management-page .product-pagination button { min-height: 36px; min-width: 36px; }
+.product-management-page [role="tablist"] { overflow-y: hidden; }
+.product-management-page [role="tab"] { min-height: 44px; }
+.product-management-page .product-trend-chart { position: relative; min-width: 0; }
+.product-management-page .product-trend-chart svg:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.product-management-page .product-trend-tooltip { position: absolute; z-index: 10; width: min(260px, calc(100% - 16px)); max-height: 240px; overflow: auto; pointer-events: auto; padding: 10px; background: var(--panel-solid); border: 1px solid var(--border-2); border-radius: 6px; font-size: 12px; }
+.product-management-page .product-trend-tooltip table { width: 100%; min-width: 0; }
+.product-management-page .product-trend-tooltip td { padding: 2px 4px; }
+.product-management-page .product-trend-tooltip td:last-child { text-align: right; white-space: nowrap; }
+@media (max-width: 767px) {
+  .product-management-page .product-pagination { display: block; }
+  .product-management-page .product-pagination-extra { display: none; }
+  .product-management-page .product-pagination-summary { display: block; margin-bottom: 8px; }
+  .product-management-page .product-pagination-controls { display: grid; grid-template-columns: 44px 1fr 44px; width: 100%; gap: 8px; }
+  .product-management-page .product-pagination-mobile { display: block; text-align: center; font-variant-numeric: tabular-nums; }
+  .product-management-page .product-pagination button { min-width: 44px; min-height: 44px; }
+  .product-management-page :is(.matrix-expand-btn, .cq-drilldown-toggle, .product-gallery-close, .spu-search-option) { min-width: 44px; min-height: 44px; }
+}
+
+.product-management-page .priority-products-table > :is(thead, tbody) > tr > :is(th, td):first-child { position: sticky; left: 0; z-index: 1; background: var(--panel-solid); }
+.product-management-page .priority-products-table > tbody > tr > td { font-size: var(--product-table-body); }
+.product-management-page .priority-products-table > thead > tr > th { font-size: var(--product-table-heading); }
+
+.product-management-page .product-trend-tooltip-heading { position: sticky; top: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; background: var(--panel-solid); }
+.product-management-page .product-trend-tooltip-close { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; min-width: 44px; min-height: 44px; padding: 8px; border: 1px solid var(--border-2); border-radius: 5px; background: var(--panel-solid); color: var(--text); cursor: pointer; }

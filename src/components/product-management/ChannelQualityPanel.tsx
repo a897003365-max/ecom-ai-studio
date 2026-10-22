@@ -2,11 +2,11 @@
 // 结构：渠道毛利率对比条形 + 渠道质量决策卡（取代 callout） + 7.1 渠道销售明细表（加评级/风险列+退款下钻） + 7.2/7.3 明细表 + 每日矩阵
 // 数据：全部来自真实 ProductManagementPages，按全局筛选实时计算。
 // 评分：scoreChannelHealth 三维评分（产出力/盈利力/风险力），选不同时间段 pm 实时变化 → 评级实时更新。
-import { useState, Fragment } from "react";
+import { useEffect, useRef, Fragment } from "react";
 import { Card } from "../Card";
 import { TableShell } from "../TableShell";
 import { MatrixTable } from "./MatrixTable";
-import { judgeChannelQuality } from "./channelQualityJudge";
+import { useViewState } from "../../hooks/useViewState";
 import { scoreChannelHealth } from "./scoreChannelHealth";
 import { ChannelDecisionCard } from "./ChannelDecisionCard";
 import type {
@@ -199,7 +199,6 @@ export function ChannelQualityPanel({ pm }: { pm: ProductManagementPages }) {
   const channelRows = buildChannelRows(channels);
   const categoryRows = buildCategoryRows(categories);
   const productRows = buildProductRows(products);
-  const callout = judgeChannelQuality(channels);
   const report = scoreChannelHealth(pm);
 
   // 渠道 → 评级 / 风险 关联
@@ -214,11 +213,21 @@ export function ChannelQualityPanel({ pm }: { pm: ProductManagementPages }) {
     if (r.dim) returnChannelMap.set(r.dim, r);
   }
 
-  const [expanded, setExpanded] = useState<string | null>(null);
+  const [expanded, setExpanded] = useViewState<string | null>("channel.expanded", null);
+
+  const panelRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (expanded && !channels.some((channel) => channel.channel === expanded)) setExpanded(null);
+  }, [channels, expanded, setExpanded]);
 
   // 决策卡"查看归因" → 展开对应渠道行
   const handleDrilldown = (channel: string, _type: "refund" | "category") => {
-    setExpanded((prev) => (prev === channel ? null : channel));
+    setExpanded(channel);
+    requestAnimationFrame(() => {
+      const target = panelRef.current?.querySelector<HTMLButtonElement>(`[data-channel="${CSS.escape(channel)}"]`);
+      target?.scrollIntoView({ block: "center", behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+      target?.focus({ preventScroll: true });
+    });
   };
 
   // 渠道分组：按商家实收降序
@@ -230,7 +239,7 @@ export function ChannelQualityPanel({ pm }: { pm: ProductManagementPages }) {
   const barWidth = (value: number, max: number) => (max > 0 ? Math.max(2, (value / max) * 100) : 0);
 
   return (
-    <div className="channel-quality" data-testid="channel-quality-panel" data-ui="channel-quality">
+    <div ref={panelRef} className="channel-quality" data-testid="channel-quality-panel" data-ui="channel-quality">
       <div className="channel-quality-top">
         <Card title="渠道毛利率 & 商家实收对比">
           <div className="cq-groups" aria-label="各渠道毛利率与商家实收对比条形图">
@@ -260,12 +269,6 @@ export function ChannelQualityPanel({ pm }: { pm: ProductManagementPages }) {
           <p className="cq-note">按商家实收降序；毛利率为已匹配成本数据的汇总结果。两指标各按全渠道最大值相对显示。</p>
         </Card>
         <ChannelDecisionCard report={report} onDrilldown={handleDrilldown} />
-      </div>
-
-      {/* 兼容旧 callout 文本（视觉隐藏，保留 judgeChannelQuality 行为测试锚点） */}
-      <div className="cq-callout cq-callout--legacy" data-testid="channel-quality-callout" style={{ position: "absolute", left: -9999, width: 1, height: 1, overflow: "hidden" }} aria-hidden="true">
-        <h3>{callout.title}</h3>
-        <p>{callout.text}</p>
       </div>
 
       {/* 7.1 渠道销售明细表（加评级/风险列 + 行展开退款归因） */}
@@ -332,6 +335,7 @@ export function ChannelQualityPanel({ pm }: { pm: ProductManagementPages }) {
                       <button
                         type="button"
                         className="cq-drilldown-toggle"
+                        data-channel={r.channel}
                         onClick={() => setExpanded((prev) => (prev === r.channel ? null : r.channel))}
                         aria-expanded={isOpen}
                         aria-label={`${isOpen ? "收起" : "展开"}${r.channel}退款归因`}

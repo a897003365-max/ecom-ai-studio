@@ -166,7 +166,7 @@ ProductManagementPage
 
 | 现有 | 透出后 | 改动类型 |
 |------|--------|---------|
-| `channelQualityJudge.ts` | `scoreChannelHealth.ts`（新纯函数） | 新增，沿用可单测模式；judge 暂保留兼容 |
+| 原渠道文字判断 | `scoreChannelHealth.ts` | 当前唯一评分入口；旧 judge 及隐藏兼容展示已删除，行为测试为 `scripts/test-channel-health.mjs` |
 | `cq-callout`（callout 区） | `ChannelDecisionCard.tsx`（新组件） | 取代 |
 | 7.1 渠道销售明细表 | 表头加评级/风险列 + 行展开 `RefundDrilldown` | 改造 |
 | `returnRanking` / `returnChannelBreakdown` | 被 `RefundDrilldown` 消费 | 数据已就绪，新增消费方 |
@@ -178,7 +178,7 @@ ProductManagementPage
 
 ## 九、约束与口径
 
-- 评分纯函数无 React 依赖，可被 `scripts/test-channel-health.mjs` 直接 import（沿用 `channelQualityJudge.ts` 模式）
+- 评分纯函数无 React 依赖，可被 `scripts/test-channel-health.mjs` 直接 import（独立验证当前评分规则）
 - 钉钉字段只读 join，不回写 PowerBI；渠道名归一化在前端做
 - 退款率阈值 15%、毛利率阈值用全渠道中位数、ROI 阈值 8——阈值集中配置，便于调参
 - 决策卡信息密度上限：评级条 ≤6 渠道、红黄灯 ≤4 条、头部建议 ≤3 条，超出的折叠

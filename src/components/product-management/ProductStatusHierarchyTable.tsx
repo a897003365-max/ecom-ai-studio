@@ -1,8 +1,10 @@
+import { Pagination } from "../SortableTable";
+import { useViewState } from "../../hooks/useViewState";
 // 产品名称 × 订单状态销售数量（全量）· 可折叠层级矩阵
 // 父行 = 产品名称（默认收起，合计 = 子名称之和）；展开后子行 = 子名称（主键）。
 // 列（已发货 / 待发货 / …）与数据（销售数量）与扁平矩阵一致，沿用 MatrixTable 视觉语言。
-import { Fragment, useMemo, useState, type ReactNode } from "react";
-import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
+import { Fragment, useEffect, useMemo, type ReactNode } from "react";
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, ChevronRight } from "lucide-react";
 import { TableShell } from "../TableShell";
 import type { ProductStatusChildRow, ProductStatusHierarchy } from "../../types/integration";
 
@@ -42,15 +44,23 @@ export function ProductStatusHierarchyTable({
   pageSize = 0,
   valueFormat = "count",
 }: ProductStatusHierarchyTableProps) {
-  const [sortKey, setSortKey] = useState<string | null>(null);
-  const [dir, setDir] = useState<"asc" | "desc">("asc");
-  const [page, setPage] = useState(0);
+  const [sortKey, setSortKey] = useViewState<string | null>("ProductStatusHierarchyTable.sortKey", null);
+  const [dir, setDir] = useViewState<"asc" | "desc">("ProductStatusHierarchyTable.dir", "asc");
+  const [page, setPage] = useViewState("ProductStatusHierarchyTable.page", 0, { resetOnFilterChange: true });
   // 默认全部收起：只显示产品名称父行
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [expanded, setExpanded] = useViewState<Set<string>>("ProductStatusHierarchyTable.expanded", new Set());
 
   // 兼容旧快照/未同步场景：字段缺失时退化为空表，避免整页渲染崩溃（白屏）
   const safeHierarchy: ProductStatusHierarchy = hierarchy ?? { columns: [], rows: [] };
   const rows = safeHierarchy.rows;
+
+  useEffect(() => {
+    const valid = new Set(rows.filter((r) => r.hasChildren && r.children.length).map((r) => r.productName));
+    setExpanded((previous) => {
+      const next = new Set([...previous].filter((key) => valid.has(key)));
+      return next.size === previous.size ? previous : next;
+    });
+  }, [rows, setExpanded]);
 
   // 全表统一量尺：父行 + 子行所有单元格
   const sharedMax = useMemo(() => {
@@ -65,6 +75,7 @@ export function ProductStatusHierarchyTable({
   function toggleSort(k: string) {
     if (sortKey === k) setDir((d) => (d === "asc" ? "desc" : "asc"));
     else { setSortKey(k); setDir("asc"); }
+    setPage(0);
   }
 
   type Sortable = { values: Record<string, number | null>; total: number | null; productName?: string; subName?: string };
@@ -91,6 +102,7 @@ export function ProductStatusHierarchyTable({
   const paginate = pageSize > 0 && sorted.length > pageSize;
   const pageCount = paginate ? Math.ceil(sorted.length / pageSize) : 1;
   const safePage = Math.min(page, pageCount - 1);
+  useEffect(() => { if (page !== safePage) setPage(safePage); }, [page, safePage, setPage]);
   const visible = paginate ? sorted.slice(safePage * pageSize, safePage * pageSize + pageSize) : sorted;
 
   function cell(val: number | null | undefined) {
@@ -154,7 +166,7 @@ export function ProductStatusHierarchyTable({
       <TableShell minWidth={minWidth} dataUi="product-status-hierarchy">
         <tbody>
           <tr>
-            <td className="py-6 text-center text-[var(--muted)]">暂无数据</td>
+            <td className="py-6 text-center text-[var(--muted)]">当前筛选范围没有匹配数据，请调整筛选；数据覆盖范围请查看页面提示。</td>
           </tr>
         </tbody>
       </TableShell>
@@ -222,16 +234,7 @@ export function ProductStatusHierarchyTable({
         </tbody>
       </TableShell>
       {paginate && (
-        <div className="mt-3 flex items-center justify-between gap-3 text-[12px] text-[var(--muted)]">
-          <span>共 {sorted.length.toLocaleString()} 个产品 · 第 {safePage + 1}/{pageCount} 页</span>
-          <div className="flex items-center gap-1">
-            <button type="button" className="matrix-page-btn" disabled={safePage === 0} onClick={() => setPage(0)} aria-label="首页"><ChevronsLeft size={14} /></button>
-            <button type="button" className="matrix-page-btn" disabled={safePage === 0} onClick={() => setPage(safePage - 1)} aria-label="上一页"><ChevronLeft size={14} /></button>
-            <span className="px-1 font-medium text-[var(--text)]">{safePage + 1} / {pageCount}</span>
-            <button type="button" className="matrix-page-btn" disabled={safePage === pageCount - 1} onClick={() => setPage(safePage + 1)} aria-label="下一页"><ChevronRight size={14} /></button>
-            <button type="button" className="matrix-page-btn" disabled={safePage === pageCount - 1} onClick={() => setPage(pageCount - 1)} aria-label="末页"><ChevronsRight size={14} /></button>
-          </div>
-        </div>
+        <Pagination page={safePage} pageCount={pageCount} total={sorted.length} onChange={setPage} />
       )}
     </div>
   );

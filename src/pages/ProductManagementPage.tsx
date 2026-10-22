@@ -1,6 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import { ChevronDown, Filter, RefreshCw, Store, X } from "lucide-react";
-import { AnalyticsDateFilter } from "../components/AnalyticsDateFilter";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { RefreshCw } from "lucide-react";
 import { Card } from "../components/Card";
 import { PageHeader } from "../components/PageHeader";
 import { SortableTable } from "../components/SortableTable";
@@ -16,7 +15,9 @@ import { ProductCommandOverview } from "../components/product-management/Product
 import { ProductGalleryView } from "../components/product-management/ProductGalleryView";
 import { SizeStructurePanel } from "../components/product-management/SizeStructurePanel";
 import { ChannelQualityPanel } from "../components/product-management/ChannelQualityPanel";
-import { EMPTY_PRODUCT_SCOPE, ProductScopeFilter, type ProductScopeValue } from "../components/product-management/ProductScopeFilter";
+import { ProductFilters } from "../components/product-management/ProductFilters";
+import { EMPTY_PRODUCT_FILTERS, normalizeProductFilters, productFilterError, productFilterKey, productFilterRequest, recentProductDays, type ProductFilterState } from "../components/product-management/productFilterState";
+import { ViewStateProvider, ViewStateScope } from "../hooks/useViewState";
 import { SpuTrendCard } from "../components/product-management/SpuTrendCard";
 import { DailyTrendChart } from "../components/product-management/DailyTrendChart";
 import { SpuTrendLineChart, SPU_TREND_COLORS, type SpuTrendSeries } from "../components/product-management/SpuTrendLineChart";
@@ -27,21 +28,6 @@ import { ProductStatusHierarchyTable } from "../components/product-management/Pr
 interface DateRange {
   start: string;
   end: string;
-}
-
-// 商品管理默认展示「最新日期近 7 天」（含最新日期当天），并在数据不足 7 天时收敛到可用起点。
-const DEFAULT_RANGE_DAYS = 7;
-
-function recentDaysRange(period: DateRange): DateRange {
-  const end = String(period.end).slice(0, 10);
-  const endMs = Date.parse(`${end}T00:00:00Z`);
-  if (Number.isNaN(endMs)) return period;
-  const availableStartMs = Date.parse(`${String(period.start).slice(0, 10)}T00:00:00Z`);
-  const fromMs = endMs - (DEFAULT_RANGE_DAYS - 1) * 86400000;
-  return {
-    start: new Date(Number.isNaN(availableStartMs) ? fromMs : Math.max(availableStartMs, fromMs)).toISOString().slice(0, 10),
-    end,
-  };
 }
 
 interface ProductManagementPageProps {
@@ -101,16 +87,6 @@ function hasGalleryFields(pm: ProductManagementPages | null) {
   return productReady && skuReady;
 }
 
-// 商品范围 → 请求参数。load() 主请求与后台画册补查共用，避免两处映射漂移。
-function toProductScopeFilters(scope: ProductScopeValue) {
-  return {
-    productCodes: scope.includeCodes.length ? scope.includeCodes : undefined,
-    excludeProductCodes: scope.excludeCodes.length ? scope.excludeCodes : undefined,
-    productIds: scope.includeIds.length ? scope.includeIds : undefined,
-    excludeProductIds: scope.excludeIds.length ? scope.excludeIds : undefined,
-  };
-}
-
 function matrixToTrendSeries(matrix: ProductMatrix | undefined | null): { series: SpuTrendSeries[]; dates: string[] } {
   if (!matrix) return { series: [], dates: [] };
   const dates = matrix.rows.map((r) => r.rowKey);
@@ -156,200 +132,128 @@ function ReturnBreakdownTable({
   );
 }
 
-function MultiValueSlicer({
-  label,
-  ariaLabel,
-  options,
-  selected,
-  onApply,
-  loading,
-  kind = "filter",
-}: {
-  label: string;
-  ariaLabel: string;
-  options: string[];
-  selected: string[];
-  onApply: (values: string[]) => void;
-  loading?: boolean;
-  kind?: "filter" | "store";
-}) {
-  const [open, setOpen] = useState(false);
-  const [draft, setDraft] = useState<string[]>(selected);
-  useEffect(() => setDraft(selected), [selected, open]);
-  const buttonLabel = selected.length === 0 ? `${label}：全部` : selected.length === 1 ? `${label}：${selected[0]}` : `${label}：${selected.length} 项`;
-  const Icon = kind === "store" ? Store : Filter;
-  function toggle(s: string) {
-    setDraft((cur) => (cur.includes(s) ? cur.filter((x) => x !== s) : [...cur, s]));
-  }
-  return (
-    <div className="date-filter">
-      <button aria-expanded={open} aria-label={ariaLabel} className="btn-select min-w-[170px]" onClick={() => setOpen((c) => !c)} type="button">
-        <span className="flex items-center gap-2"><Icon aria-hidden="true" size={14} />{buttonLabel}</span>
-        <ChevronDown aria-hidden="true" className={open ? "rotate-180" : ""} size={14} />
-      </button>
-      {open && (
-        <div className="date-filter-panel" role="dialog" aria-label={ariaLabel}>
-          <div className="flex items-center justify-between">
-            <div className="text-sm font-bold">{label}切片器</div>
-            <button aria-label="关闭" className="icon-btn" onClick={() => setOpen(false)} type="button"><X size={15} /></button>
-          </div>
-          <div className="mt-3 flex flex-col gap-1.5">
-            <label className="flex cursor-pointer items-center gap-2 text-[12.5px]">
-              <input type="checkbox" checked={draft.length === 0} onChange={() => setDraft([])} /> 全部（不设筛选）
-            </label>
-            {options.map((s) => (
-              <label key={s} className="flex cursor-pointer items-center gap-2 text-[12.5px]">
-                <input type="checkbox" checked={draft.includes(s)} onChange={() => toggle(s)} /> {s}
-              </label>
-            ))}
-          </div>
-          <div className="mt-4 flex items-center justify-end gap-3 border-t border-[var(--border)] pt-3">
-            <button className="btn" onClick={() => setDraft(selected)} type="button">重置</button>
-            <button className="btn-primary" disabled={loading} onClick={() => { onApply(draft); setOpen(false); }} type="button">{loading ? "更新中..." : "应用筛选"}</button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
 export function ProductManagementPage({ onAction, searchTarget, onSearchConsumed }: ProductManagementPageProps) {
-  const [pm, setPm] = useState<ProductManagementPages | null>(null);
-  const [refreshedAt, setRefreshedAt] = useState<string | null>(null);
+  // 数据与生效条件一起提交；请求失败时继续展示上次成功结果。
+  const [result, setResult] = useState<{ pm: ProductManagementPages | null; refreshedAt: string | null; applied: ProductFilterState }>(
+    { pm: null, refreshedAt: null, applied: EMPTY_PRODUCT_FILTERS },
+  );
+  const { pm, refreshedAt, applied } = result;
+  const [draft, setDraft] = useState<ProductFilterState>(EMPTY_PRODUCT_FILTERS);
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
   const [loading, setLoading] = useState(true);
+  const [ready, setReady] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState("");
+  const [periodError, setPeriodError] = useState("");
   const [tab, setTab] = useState<ProductTab>("overview");
-  const [dateRange, setDateRange] = useState<DateRange | null>(null);
-  const [statuses, setStatuses] = useState<string[]>([]);
-  const [channels, setChannels] = useState<string[]>([]);
-  const [storeShortNames, setStoreShortNames] = useState<string[]>([]);
-  const [productScope, setProductScope] = useState<ProductScopeValue>(EMPTY_PRODUCT_SCOPE);
   const [fullPeriod, setFullPeriod] = useState<DateRange | null>(null);
   const [selectedSpus, setSelectedSpus] = useState<string[]>([]);
-  // 防止后台 gallery 刷新覆盖更新后的筛选结果：每次 load 自增，过期 token 的回调丢弃
   const loadTokenRef = useRef(0);
-  // 同步数仓约 1 分钟，期间用户可能继续改筛选；同步完成时从 ref 读最新值，避免用点击时快照回滚。
-  const latestFiltersRef = useRef({ dateRange, statuses, channels, storeShortNames, productScope });
-  latestFiltersRef.current = { dateRange, statuses, channels, storeShortNames, productScope };
+  const controllerRef = useRef<AbortController | null>(null);
+  const periodControllerRef = useRef<AbortController | null>(null);
+  const appliedRef = useRef(applied);
+  const successfulKeyRef = useRef<string | null>(null);
+  const pendingKeyRef = useRef<string | null>(null);
+  const retryRef = useRef<ProductFilterState | null>(null);
+  const mountedRef = useRef(true);
+  const { channels } = applied;
 
-  async function load(
-    date: DateRange | null = null,
-    newStatuses: string[] = statuses,
-    newChannels: string[] = channels,
-    newStoreShortNames: string[] = storeShortNames,
-    newProductScope: ProductScopeValue = productScope,
-  ) {
+  async function load(value: ProductFilterState, force = false) {
+    const filters = normalizeProductFilters(value);
+    const key = productFilterKey(filters);
+    const validation = productFilterError(filters);
+    if (validation) { setError(validation); return false; }
+    if (!force && key === pendingKeyRef.current && !controllerRef.current?.signal.aborted) return false;
+    if (!force && key === successfulKeyRef.current) {
+      // 取消尚在进行的新条件请求，仍保留已成功应用的条件。
+      controllerRef.current?.abort();
+      ++loadTokenRef.current;
+      pendingKeyRef.current = null;
+      setLoading(false);
+      setError("");
+      return true;
+    }
+    controllerRef.current?.abort();
+    const controller = new AbortController();
+    controllerRef.current = controller;
     const token = ++loadTokenRef.current;
+    const draftAtStart = productFilterKey(draftRef.current);
+    pendingKeyRef.current = key;
+    retryRef.current = filters;
     setLoading(true);
     setError("");
     try {
-      const payload = await getProductData({
-        start: date?.start,
-        end: date?.end,
-        statuses: newStatuses.length ? newStatuses : undefined,
-        channels: newChannels.length ? newChannels : undefined,
-        storeShortNames: newStoreShortNames.length ? newStoreShortNames : undefined,
-        ...toProductScopeFilters(newProductScope),
-      });
-      // 并发 load 时只接受最后一次请求的结果，避免旧响应把新筛选回滚。
-      if (token !== loadTokenRef.current) return;
+      const payload = await getProductData(productFilterRequest(filters), { signal: controller.signal });
+      if (!mountedRef.current || token !== loadTokenRef.current) return false;
       const productManagement = payload.productManagement;
-      // 首包即渲染，不阻塞在画册字段补查上（快照缺 gallery 字段时后台补，见下方）
-      setPm(productManagement);
-      setRefreshedAt(payload.refreshedAt);
-      setDateRange(date);
-      setStatuses(newStatuses);
-      setChannels(newChannels);
-      setStoreShortNames(newStoreShortNames);
-      setProductScope(newProductScope);
-      if (productManagement?.period?.start && productManagement?.period?.end) {
-        const dataPeriod = {
-          start: String(productManagement.period.start).slice(0, 10),
-          end: String(productManagement.period.end).slice(0, 10),
-        };
-        // 仅在无任何筛选（全周期）时更新可选范围，避免维度筛选缩短日期控件范围。
-        if (
-          !date
-          && newStatuses.length === 0
-          && newChannels.length === 0
-          && newStoreShortNames.length === 0
-          && newProductScope.includeCodes.length === 0
-          && newProductScope.excludeCodes.length === 0
-          && newProductScope.includeIds.length === 0
-          && newProductScope.excludeIds.length === 0
-        ) {
-          setFullPeriod(dataPeriod);
-        }
+      if (payload.status === "stale" || !productManagement) throw new Error(payload.error || "商品数据暂不可用，请稍后重试。");
+      setResult({ pm: productManagement, refreshedAt: payload.refreshedAt, applied: filters });
+      appliedRef.current = filters;
+      successfulKeyRef.current = key;
+      if (productFilterKey(draftRef.current) === draftAtStart) setDraft(filters);
+      setSelectedSpus((current) => current.filter((spu) => productManagement.spuSalesTrend?.summaries.some((row) => row.spu === spu)));
+      // 仅全周期快照缺字段时补查一次。日期请求已走按需计算，无需重复同一查询。
+      if (!filters.start && !hasGalleryFields(productManagement) && productManagement.period?.start && productManagement.period.end) {
+        const galleryFilters = { ...filters, start: String(productManagement.period.start).slice(0, 10), end: String(productManagement.period.end).slice(0, 10) };
+        void getProductData(productFilterRequest(galleryFilters), { signal: controller.signal }).then((next) => {
+          if (!mountedRef.current || token !== loadTokenRef.current || next.status === "stale" || !next.productManagement) return;
+          setResult((current) => ({ ...current, pm: next.productManagement, refreshedAt: next.refreshedAt ?? current.refreshedAt }));
+        }).catch(() => { /* 已有快照继续可用；下一次手动应用或刷新重新读取。 */ });
       }
-      if (payload.status === "stale" && !productManagement) {
-        setError(payload.error || "商品数据尚未同步，点击右上角同步数仓生成看板。");
-      }
-      // 快照缺画册字段时后台按全周期 on-demand 补查（含 gallery 字段）。
-      // 不阻塞首屏；若用户已换筛选则丢弃过期回调，避免覆盖新结果。
-      if (!hasGalleryFields(productManagement) && productManagement?.period?.start && productManagement.period.end) {
-        void getProductData({
-          start: String(productManagement.period.start).slice(0, 10),
-          end: String(productManagement.period.end).slice(0, 10),
-          statuses: newStatuses.length ? newStatuses : undefined,
-          channels: newChannels.length ? newChannels : undefined,
-          storeShortNames: newStoreShortNames.length ? newStoreShortNames : undefined,
-          ...toProductScopeFilters(newProductScope),
-        })
-          .then((refreshedPayload) => {
-            if (token !== loadTokenRef.current) return;
-            const refreshed = refreshedPayload.productManagement;
-            if (refreshed) {
-              setPm(refreshed);
-              setRefreshedAt(refreshedPayload.refreshedAt ?? payload.refreshedAt);
-            }
-          })
-          .catch(() => { /* 保留首包数据 */ });
+      return true;
+    } catch (loadError) {
+      if (!controller.signal.aborted && mountedRef.current && token === loadTokenRef.current) setError(loadError instanceof Error ? loadError.message : "商品数据读取失败");
+      return false;
+    } finally {
+      if (mountedRef.current && token === loadTokenRef.current) { pendingKeyRef.current = null; setLoading(false); }
+    }
+  }
+
+  async function initialize(signal: AbortSignal) {
+    setLoading(true);
+    setPeriodError("");
+    try {
+      const meta = await getProductPeriod({ signal });
+      if (signal.aborted || !mountedRef.current) return;
+      const available = meta.period ? { start: meta.period.start.slice(0, 10), end: meta.period.end.slice(0, 10) } : null;
+      setFullPeriod(available);
+      setReady(true);
+      if (loadTokenRef.current === 0) {
+        const initial = { ...EMPTY_PRODUCT_FILTERS, ...(available ? recentProductDays(available) : {}) };
+        setDraft(initial);
+        void load(initial);
+      } else if (!pendingKeyRef.current) {
+        if (error && retryRef.current) void load(retryRef.current, true);
+        else setLoading(false);
       }
     } catch (loadError) {
-      if (token === loadTokenRef.current) {
-        setError(loadError instanceof Error ? loadError.message : "商品数据读取失败");
+      if (!signal.aborted && mountedRef.current) {
+        setPeriodError(loadError instanceof Error ? loadError.message : "商品周期读取失败");
+        if (!pendingKeyRef.current) setLoading(false);
       }
-    } finally {
-      if (token === loadTokenRef.current) setLoading(false);
     }
   }
 
   useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      let defaultRange: DateRange | null = null;
-      try {
-        const meta = await getProductPeriod();
-        if (meta.period?.start && meta.period?.end) {
-          const available = {
-            start: String(meta.period.start).slice(0, 10),
-            end: String(meta.period.end).slice(0, 10),
-          };
-          setFullPeriod(available);
-          defaultRange = recentDaysRange(available);
-        }
-      } catch {
-        // 周期读取失败时回退全周期加载，保持页面可用。
-      }
-      // 已有搜索跳转/用户筛选发起请求时不再叠加默认日期，让后发请求保持优先。
-      if (!cancelled && loadTokenRef.current === 0) void load(defaultRange);
-    })();
-    return () => { cancelled = true; };
+    mountedRef.current = true;
+    const controller = new AbortController();
+    periodControllerRef.current = controller;
+    void initialize(controller.signal);
+    return () => { mountedRef.current = false; periodControllerRef.current?.abort(); controllerRef.current?.abort(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 顶部智能找数：应用页签/日期/渠道/店铺筛选
   const searchRequestId = searchTarget?.requestId;
   useEffect(() => {
     if (searchTarget?.page !== "products") return;
     const target = searchTarget;
     if (target.tab) setTab(target.tab);
-    const date = target.filters?.start && target.filters?.end ? { start: target.filters.start, end: target.filters.end } : null;
-    const channels = target.filters?.channels ?? [];
-    const storeShortNames = target.filters?.storeShortNames ?? [];
-    if (date || channels.length || storeShortNames.length) {
-      // 智能找数跳转沿用“清空非目标筛选”的既有语义，商品范围一并清空，避免目标商品被旧范围过滤掉。
-      void load(date, [], channels, storeShortNames, EMPTY_PRODUCT_SCOPE);
+    const filters = target.filters;
+    if (filters?.start || filters?.end || filters?.channels?.length || filters?.storeShortNames?.length) {
+      const next = { ...EMPTY_PRODUCT_FILTERS, start: filters.start ?? "", end: filters.end ?? "", channels: filters.channels ?? [], storeShortNames: filters.storeShortNames ?? [] };
+      setDraft(next);
+      void load(next);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchRequestId]);
@@ -368,9 +272,9 @@ export function ProductManagementPage({ onAction, searchTarget, onSearchConsumed
     try {
       onAction("同步数仓", "正在读取聚水潭商品数据并刷新快照（约 1 分钟）");
       await syncDataSource("warehouse");
-      const latest = latestFiltersRef.current;
-      await load(latest.dateRange, latest.statuses, latest.channels, latest.storeShortNames, latest.productScope);
-      onAction("同步完成", "商品管理看板已刷新");
+      if (!mountedRef.current) return;
+      const refreshed = await load(appliedRef.current, true);
+      onAction(refreshed ? "同步完成" : "同步完成，页面刷新失败", refreshed ? "商品管理看板已刷新" : "保留原有结果，可手动重试");
     } catch (syncError) {
       onAction("同步失败", syncError instanceof Error ? syncError.message : "数仓同步出错");
     } finally {
@@ -378,104 +282,31 @@ export function ProductManagementPage({ onAction, searchTarget, onSearchConsumed
     }
   }
 
-  const period = pm?.period;
-  const filterPeriod = dateRange ?? fullPeriod;
-  const activeRangeLabel = dateRange ? `${dateRange.start} ~ ${dateRange.end}（已筛选）` : period ? `${period.start} ~ ${period.end}` : "尚未同步";
-  const scopeActive =
-    productScope.includeCodes.length > 0
-    || productScope.excludeCodes.length > 0
-    || productScope.includeIds.length > 0
-    || productScope.excludeIds.length > 0;
-  const activeFilterCount =
-    (dateRange ? 1 : 0)
-    + statuses.length
-    + channels.length
-    + storeShortNames.length
-    + productScope.includeCodes.length
-    + productScope.excludeCodes.length
-    + productScope.includeIds.length
-    + productScope.excludeIds.length;
+  const activeRangeLabel = applied.start ? `${applied.start} ~ ${applied.end}` : "全周期";
+  const scopeActive = Boolean(applied.includeCodes || applied.excludeCodes || applied.includeIds || applied.excludeIds);
+  const filterKey = productFilterKey(applied);
+  const channelTrend = useMemo(() => matrixToTrendSeries(pm?.dailyChannelMatrix), [pm?.dailyChannelMatrix]);
+  const warehouseTrend = useMemo(() => matrixToTrendSeries(pm?.dailyWarehouseMatrix), [pm?.dailyWarehouseMatrix]);
+  const categoryTrend = useMemo(() => matrixToTrendSeries(pm?.dailyCategoryMatrix), [pm?.dailyCategoryMatrix]);
+  const shipWarehouseTrend = useMemo(() => matrixToTrendSeries(pm?.dailyShipWarehouseMatrix), [pm?.dailyShipWarehouseMatrix]);
+  const productChannelMatrix = useMemo(() => {
+    if (!pm) return null;
+    const selectedNames = new Set((pm.spuSalesTrend?.summaries ?? []).filter((row) => selectedSpus.includes(row.spu)).flatMap((row) => row.productNames?.length ? row.productNames : row.productName ? [row.productName] : []));
+    return selectedSpus.length && selectedNames.size ? { ...pm.productChannelMatrix, rows: pm.productChannelMatrix.rows.filter((row) => selectedNames.has(row.rowKey)) } : pm.productChannelMatrix;
+  }, [pm, selectedSpus]);
 
   return (
-    <div>
+    <div className="product-management-page">
       <PageHeader
         title="商品管理"
         subtitle={`商品销售、履约、退货与渠道分布；数据周期 ${activeRangeLabel}，最近刷新 ${dateTime(refreshedAt)}。`}
-        actions={
-          <div className="product-filter-toolbar" data-testid="product-operations-filter" data-ui="filter-bar">
-            <div className="product-filter-kicker">
-              <span className="product-filter-status-dot" aria-hidden="true" />
-              <span>运营筛选</span>
-              <span className="product-filter-state">{activeFilterCount ? `已启用 ${activeFilterCount} 项` : "全量口径"}</span>
-            </div>
-            {fullPeriod && (
-              <AnalyticsDateFilter
-                available={fullPeriod}
-                completedThrough={fullPeriod.end}
-                loading={loading}
-                period={filterPeriod ?? fullPeriod}
-                onApply={(range) => void load(range, statuses, channels, storeShortNames)}
-              />
-            )}
-            {pm && pm.availableStatuses.length > 0 && (
-              <MultiValueSlicer
-                ariaLabel="订单状态筛选"
-                label="订单状态"
-                options={pm.availableStatuses}
-                selected={statuses}
-                loading={loading}
-                onApply={(values) => void load(dateRange, values, channels, storeShortNames)}
-              />
-            )}
-            {pm && (pm.availableChannels ?? []).length > 0 && (
-              <MultiValueSlicer
-                ariaLabel="渠道平台筛选"
-                label="渠道平台"
-                options={pm.availableChannels ?? []}
-                selected={channels}
-                loading={loading}
-                onApply={(values) => void load(dateRange, statuses, values, storeShortNames)}
-              />
-            )}
-            {pm && (pm.availableStoreShortNames ?? []).length > 0 && (
-              <MultiValueSlicer
-                ariaLabel="店铺简称筛选"
-                kind="store"
-                label="店铺简称"
-                options={pm.availableStoreShortNames ?? []}
-                selected={storeShortNames}
-                loading={loading}
-                onApply={(values) => void load(dateRange, statuses, channels, values)}
-              />
-            )}
-            <ProductScopeFilter
-              loading={loading}
-              value={productScope}
-              onApply={(value) => void load(dateRange, statuses, channels, storeShortNames, value)}
-            />
-            {activeFilterCount > 0 && (
-              <button
-                className="btn"
-                disabled={loading}
-                onClick={() => void load(null, [], [], [], EMPTY_PRODUCT_SCOPE)}
-                title="清除日期、状态、渠道平台、店铺简称和商品范围筛选"
-                type="button"
-              >
-                <X className="mr-1 inline-block" size={13} strokeWidth={2} />
-                重置
-              </button>
-            )}
-            <button className="btn-primary" disabled={syncing || loading} onClick={sync} type="button">
-              <RefreshCw className="mr-1.5 inline-block" size={14} strokeWidth={2} />
-              {syncing ? "同步中" : "同步数仓"}
-            </button>
-          </div>
-        }
+        actions={<button className="btn" disabled={syncing || !ready} onClick={sync} type="button"><RefreshCw className="mr-1.5 inline-block" size={14} strokeWidth={2} />{syncing ? "同步中" : "同步数仓"}</button>}
       />
-
-      {error && (
+      <ProductFilters draft={draft} applied={applied} onChange={setDraft} onApply={() => void load(draft)} loading={loading} ready={ready} period={fullPeriod} options={{ statuses: pm?.availableStatuses ?? [], channels: pm?.availableChannels ?? [], storeShortNames: pm?.availableStoreShortNames ?? [] }} />
+      {(error || periodError) && (
         <Card className="mb-4 border-[var(--orange)]">
-          <div className="text-[13px] text-[var(--orange)]">{error}</div>
+          <div className="text-[13px] text-[var(--orange)]" role="alert">{periodError || error}{pm ? " 当前保留上次成功结果。" : ""}</div>
+          <button className="btn mt-3" disabled={loading} type="button" onClick={() => { if (ready && retryRef.current) void load(retryRef.current, true); else { periodControllerRef.current?.abort(); const controller = new AbortController(); periodControllerRef.current = controller; void initialize(controller.signal); } }}>重试</button>
         </Card>
       )}
 
@@ -487,16 +318,16 @@ export function ProductManagementPage({ onAction, searchTarget, onSearchConsumed
         </Card>
       )}
 
-      {loading ? (
+      {loading && !pm ? (
         <Card>
-          <div className="py-10 text-center text-[13px] text-[var(--muted)]">正在读取商品数据…</div>
+          <div role="status" aria-label="正在读取商品数据"><p className="text-[var(--muted)] text-sm">正在读取商品数据…</p><div className="product-data-skeleton" aria-hidden="true"><span /><span /><span /></div></div>
         </Card>
       ) : !pm ? (
         <Card>
           <div className="py-10 text-center text-[13px] text-[var(--muted)]">暂无商品数据。请点击右上角「同步数仓」。</div>
         </Card>
       ) : (
-        <>
+        <ViewStateProvider filterKey={filterKey}>
           <Tabs<ProductTab>
             value={tab}
             onChange={setTab}
@@ -513,6 +344,7 @@ export function ProductManagementPage({ onAction, searchTarget, onSearchConsumed
             ]}
           />
 
+          <ViewStateScope name={tab}>
           {tab === "overview" && (
             <div data-search-anchor="products-overview">
               <ProductCommandOverview channelScoped={channels.length > 0} focusTarget={searchFocus} pm={pm} />
@@ -555,41 +387,25 @@ export function ProductManagementPage({ onAction, searchTarget, onSearchConsumed
               </Card>
               <Card title="每日 × 渠道平台销量趋势" className="mt-4">
                 {(() => {
-                  const t = matrixToTrendSeries(pm.dailyChannelMatrix);
+                  const t = channelTrend;
                   return <SpuTrendLineChart series={t.series} dates={t.dates} emptyHint="暂无渠道销量趋势数据" />;
                 })()}
               </Card>
               <Card title="每日 × 发货仓销量趋势" className="mt-4">
                 {(() => {
-                  const t = matrixToTrendSeries(pm.dailyWarehouseMatrix);
+                  const t = warehouseTrend;
                   return <SpuTrendLineChart series={t.series} dates={t.dates} emptyHint="暂无发货仓销量趋势数据" />;
                 })()}
               </Card>
               <Card title="床垫类别分布 · 每日销量趋势" className="mt-4">
                 {(() => {
-                  const t = matrixToTrendSeries(pm.dailyCategoryMatrix);
+                  const t = categoryTrend;
                   return <SpuTrendLineChart series={t.series} dates={t.dates} emptyHint="暂无产品分类销量趋势数据" />;
                 })()}
               </Card>
               <SpuTrendCard data={pm.spuSalesTrend} className="mt-4" selectedSpus={selectedSpus} onSelectedSpusChange={setSelectedSpus} />
-              <Card title={selectedSpus.length > 0 ? `产品名称 × 渠道销量（已联动 ${selectedSpus.length} 个 SPU）` : "产品名称 × 渠道销量（全量，按销量排序）"} className="mt-4">
-                {(() => {
-                  const summaries = pm.spuSalesTrend?.summaries ?? [];
-                  // 一个 SPU 商编可覆盖多个 pm 主表产品名称（如 M83 → 元气满满 + 元气满满2.0），
-                  // 用集合过滤矩阵，保证选中 SPU 后该 SPU 下所有产品行都显示、总量与趋势线一致。
-                  const spuToProductNames = new Map(summaries.map((s) => [
-                    s.spu,
-                    (s.productNames && s.productNames.length ? s.productNames : s.productName ? [s.productName] : []),
-                  ]));
-                  const selectedNames = selectedSpus.length > 0
-                    ? new Set(selectedSpus.flatMap((spu) => spuToProductNames.get(spu) ?? []).filter(Boolean))
-                    : null;
-                  const matrix = pm.productChannelMatrix;
-                  const filtered = selectedNames && selectedNames.size > 0
-                    ? { ...matrix, rows: matrix.rows.filter((r) => selectedNames.has(r.rowKey)) }
-                    : matrix;
-                  return <MatrixTable matrix={filtered} rowHeader="产品名称" minWidth={960} pageSize={15} />;
-                })()}
+              <Card title="产品名称 × 渠道销量" action={<span className="text-xs text-[var(--muted)]">{selectedSpus.length ? `已联动 ${selectedSpus.length} 个 SPU` : "全量，按销量排序"}</span>} className="mt-4">
+                {productChannelMatrix && <MatrixTable matrix={productChannelMatrix} rowHeader="产品名称" minWidth={960} pageSize={15} />}
               </Card>
               <Card title="床垫类别 × 渠道销量" className="mt-4">
                 <MatrixTable matrix={pm.categoryChannelMatrix} rowHeader="床垫类别" minWidth={960} />
@@ -636,7 +452,7 @@ export function ProductManagementPage({ onAction, searchTarget, onSearchConsumed
                 按发货日期统计，全局日期范围直接作用于发货日期；未发货订单不计入
               </div>
               {(() => {
-                const t = matrixToTrendSeries(pm.dailyShipWarehouseMatrix);
+                const t = shipWarehouseTrend;
                 return <SpuTrendLineChart series={t.series} dates={t.dates} emptyHint="暂无按发货日期统计的发货仓数据" />;
               })()}
             </Card>
@@ -680,7 +496,8 @@ export function ProductManagementPage({ onAction, searchTarget, onSearchConsumed
           {tab === "price" && <div data-search-anchor="products-price"><PriceStructurePanel data={pm.priceStructure} /></div>}
           {tab === "size" && <div data-search-anchor="products-size"><SizeStructurePanel data={pm.sizeStructure} /></div>}
           {tab === "custom" && <div data-search-anchor="products-custom"><CustomizationStructurePanel data={pm.customizationStructure} /></div>}
-        </>
+          </ViewStateScope>
+        </ViewStateProvider>
       )}
     </div>
   );

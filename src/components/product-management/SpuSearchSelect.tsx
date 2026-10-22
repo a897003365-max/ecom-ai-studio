@@ -1,3 +1,4 @@
+import { useViewState } from "../../hooks/useViewState";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 export interface SpuOption {
@@ -16,7 +17,7 @@ interface Props {
 
 /** SPU 多选搜索框：R5 变量替换、R6 框内仅摘要不堆叠 tag、R7 不透明底色+可见边框+聚焦描边。 */
 export function SpuSearchSelect({ options, selected, onChange, placeholder = "搜索 SPU 编码或产品名称" }: Props) {
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useViewState("spu-search.query", "");
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -56,6 +57,9 @@ export function SpuSearchSelect({ options, selected, onChange, placeholder = "�
           {selected.length > 0 ? `已选 ${selected.length} 个 SPU` : placeholder}
         </span>
         <input
+          aria-label="搜索 SPU 编码或产品名称"
+          aria-expanded={open}
+          onKeyDown={(event) => { if (event.key === "Escape") setOpen(false); }}
           value={query}
           onChange={(e) => {
             setQuery(e.target.value);
@@ -81,7 +85,7 @@ export function SpuSearchSelect({ options, selected, onChange, placeholder = "�
                 key={o.spu}
                 type="button"
                 onClick={() => toggle(o.spu)}
-                className={`w-full text-left px-2.5 py-2 text-[12.5px] rounded-md flex items-center justify-between gap-2 ${
+                className={`spu-search-option w-full text-left px-2.5 py-2 text-[12.5px] rounded-md flex items-center justify-between gap-2 ${
                   isSel ? "bg-[var(--blue-bg)]" : "hover:bg-[var(--bg-elevated)]"
                 }`}
               >
@@ -99,7 +103,7 @@ export function SpuSearchSelect({ options, selected, onChange, placeholder = "�
       )}
       {open && filtered.length === 0 && (
         <div className="absolute z-10 mt-1 px-3 py-2.5 text-[12.5px] text-[var(--muted)] bg-[var(--panel-solid)] border border-[var(--border-2)] rounded-lg shadow-xl">
-          未匹配到 SPU
+          {options.length ? "未匹配到 SPU，请更换关键词。" : "当前数据没有可选 SPU，请查看数据覆盖范围。"}
         </div>
       )}
     </div>

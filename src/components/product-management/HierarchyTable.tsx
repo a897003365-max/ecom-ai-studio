@@ -1,4 +1,5 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useViewState } from "../../hooks/useViewState";
+import { useEffect, useMemo, type ReactNode } from "react";
 import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, ChevronRight } from "lucide-react";
 import { TableShell } from "../TableShell";
 import { Pagination, type SortColumn } from "../SortableTable";
@@ -42,11 +43,11 @@ export function HierarchyTable<T extends HierarchyTableRow>({
   emptyHint,
   rankColumnKey = "rank",
 }: HierarchyTableProps<T>) {
-  const [sortKey, setSortKey] = useState<string | null>(defaultSortKey ?? null);
-  const [dir, setDir] = useState<"asc" | "desc">(defaultSortDir);
-  const [page, setPage] = useState(0);
-  const [expanded, setExpanded] = useState<Set<string>>(
-    () => (defaultExpanded ? new Set(rows.map((r) => rowKey(r))) : new Set())
+  const [sortKey, setSortKey] = useViewState<string | null>("HierarchyTable.sortKey", defaultSortKey ?? null);
+  const [dir, setDir] = useViewState<"asc" | "desc">("HierarchyTable.dir", defaultSortDir);
+  const [page, setPage] = useViewState("HierarchyTable.page", 0, { resetOnFilterChange: true });
+  const [expanded, setExpanded] = useViewState<Set<string>>("HierarchyTable.expanded",
+    () => (defaultExpanded ? new Set(rows.filter((r) => r.hasChildren && r.children?.length).map((r) => rowKey(r))) : new Set())
   );
 
   function toggleSort(key: string) {
@@ -68,6 +69,14 @@ export function HierarchyTable<T extends HierarchyTableRow>({
     });
   }
 
+  useEffect(() => {
+    const valid = new Set(rows.filter((r) => r.hasChildren && r.children?.length).map((r) => rowKey(r)));
+    setExpanded((previous) => {
+      const next = new Set([...previous].filter((key) => valid.has(key)));
+      return next.size === previous.size ? previous : next;
+    });
+  }, [rows, setExpanded]);
+
   const sortableCols = columns.filter((c) => c.sortValue);
   const sorted = useMemo(() => {
     if (!sortKey) return rows;
@@ -87,10 +96,11 @@ export function HierarchyTable<T extends HierarchyTableRow>({
   const paginate = pageSize > 0 && sorted.length > pageSize;
   const pageCount = paginate ? Math.ceil(sorted.length / pageSize) : 1;
   const safePage = Math.min(page, pageCount - 1);
+  useEffect(() => { if (page !== safePage) setPage(safePage); }, [page, safePage, setPage]);
   const visible = paginate ? sorted.slice(safePage * pageSize, safePage * pageSize + pageSize) : sorted;
   const baseIndex = paginate ? safePage * pageSize : 0;
 
-  const expandableCount = rows.filter((r) => r.hasChildren).length;
+  const expandableCount = rows.filter((r) => r.hasChildren && r.children?.length).length;
   const allExpanded = expandableCount > 0 && expanded.size >= expandableCount;
 
   function nameCell(col: SortColumn<T>, row: T, index: number, isChild: boolean, isOpen: boolean) {
@@ -133,7 +143,7 @@ export function HierarchyTable<T extends HierarchyTableRow>({
           <button
             type="button"
             className="text-[var(--brand)] hover:underline"
-            onClick={() => setExpanded(allExpanded ? new Set() : new Set(rows.map((r) => rowKey(r))))}
+            onClick={() => setExpanded(allExpanded ? new Set() : new Set(rows.filter((r) => r.hasChildren && r.children?.length).map((r) => rowKey(r))))}
           >
             {allExpanded ? "收起全部" : "展开全部"}
           </button>
@@ -145,12 +155,12 @@ export function HierarchyTable<T extends HierarchyTableRow>({
           <tr>
             {columns.map((col) => {
               if (!col.sortValue) {
-                return <th key={col.key} style={col.align === "right" ? { textAlign: "right" } : undefined}>{col.label}</th>;
+                return <th key={col.key} style={{ textAlign: col.align ?? "left" }}>{col.label}</th>;
               }
               const active = sortKey === col.key;
               const Icon = !active ? ArrowUpDown : dir === "asc" ? ArrowUp : ArrowDown;
               return (
-                <th key={col.key} style={col.align === "right" ? { textAlign: "right" } : undefined}>
+                <th key={col.key} style={{ textAlign: col.align ?? "left" }}>
                   <button className="th-sort" onClick={() => toggleSort(col.key)} type="button">
                     <span>{col.label}</span>
                     <Icon aria-hidden="true" className={active ? "th-sort-active" : "th-sort-idle"} size={12} strokeWidth={2} />
@@ -171,7 +181,7 @@ export function HierarchyTable<T extends HierarchyTableRow>({
               const block: ReactNode[] = [
                 <tr key={rowKey(row)} className={row.hasChildren ? "hier-parent" : ""}>
                   {columns.map((col) => (
-                    <td key={col.key} style={col.align === "right" ? { textAlign: "right" } : undefined}>
+                    <td key={col.key} style={{ textAlign: col.align ?? "left" }}>
                       {renderCell(col, row, baseIndex + index, false, isOpen)}
                     </td>
                   ))}
@@ -182,7 +192,7 @@ export function HierarchyTable<T extends HierarchyTableRow>({
                   block.push(
                     <tr key={rowKey(child)} className="hier-child-row">
                       {columns.map((col) => (
-                        <td key={col.key} style={col.align === "right" ? { textAlign: "right" } : undefined}>
+                        <td key={col.key} style={{ textAlign: col.align ?? "left" }}>
                           {renderCell(col, child as T, 0, true, false)}
                         </td>
                       ))}

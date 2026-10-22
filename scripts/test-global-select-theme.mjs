@@ -9,12 +9,11 @@ const topbar = readFileSync(new URL("../src/components/Topbar.tsx", import.meta.
 const dashboard = readFileSync(new URL("../src/pages/DashboardPage.tsx", import.meta.url), "utf8");
 
 assert.match(tokens, /:root\[data-theme="light"\]\s*\{[^}]*color-scheme:\s*light;/s, "缺少白天模式语义变量");
-assert.match(app, /DAY_THEME_START_HOUR\s*=\s*7;/, "白天模式开始时间不是 07:00");
-assert.match(app, /DAY_THEME_END_HOUR\s*=\s*19;/, "白天模式结束时间不是 19:00");
+assert.match(app, /const initialTheme: Theme = "light";/, "主题应沿用当前明确的浅色初始设置");
 assert.match(app, /document\.documentElement\.dataset\.theme\s*=\s*nextTheme;/, "主题未写入根节点");
-assert.match(app, /window\.setTimeout\(syncTheme,\s*millisecondsUntilThemeBoundary\(now\)\)/, "主题未在时间边界自动重算");
+assert.doesNotMatch(app, /window\.setTimeout\(syncTheme/, "当前手动主题模式不应再由时钟覆盖");
 assert.match(app, /function handleThemeToggle\(\)/, "缺少手动切换白天与夜间模式");
-assert.match(sidebar, /跟随系统时间自动切换/, "侧栏未说明主题随系统时间切换");
+assert.doesNotMatch(sidebar, /跟随系统时间自动切换/, "主题提示应与当前手动切换行为一致");
 assert.match(sidebar, /onClick=\{onToggleTheme\}/, "侧栏主题按钮未连接手动切换");
 assert.match(topbar, /lg:hidden/, "窄屏缺少可见的主题切换入口");
 assert.match(topbar, /onClick=\{onToggleTheme\}/, "顶部主题按钮未连接手动切换");
@@ -34,4 +33,4 @@ assert.match(styles, /select option:checked\s*\{[^}]*color:\s*#f7ffe8;/s, "选�
 assert.match(styles, /select option:disabled\s*\{[^}]*color:\s*var\(--muted\);/s, "禁用项缺少可辨识状态");
 assert.match(styles, /:root\[data-theme="light"\]\s+input,[^}]*color-scheme:\s*light;/s, "表单控件未适配白天模式");
 
-console.log("time-based light and dark theme: ok");
+console.log("manual light and dark theme: ok");

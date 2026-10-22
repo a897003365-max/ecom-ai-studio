@@ -1,4 +1,6 @@
 node_modules/
+.venv/
+/evidence/
 dist/
 local-data/
 .git_disabled/

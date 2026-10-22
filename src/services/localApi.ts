@@ -1,5 +1,4 @@
 import type { CompetitorPriceItem, QueueTask } from "../types";
-import { tmallCompetitorPrices } from "../data/tmallCompetitorData";
 import type { AnalyticsIntegrationPayload, DataSourcesPayload, PowerBiPages, ProductsPayload, UploadRecord } from "../types/integration";
 import type { SearchRequest, SearchResponse } from "../types/search";
 import { startProgress, stopProgress } from "../utils/progress";
@@ -46,8 +45,8 @@ export function getPowerbiPagesOnDemand(filters: { start: string; end: string })
 }
 
 // 商品页首屏默认日期用：只取产品数据可用周期，不加载完整商品快照。
-export function getProductPeriod() {
-  return request<{ period: { start: string; end: string } | null; refreshedAt: string | null }>("/api/products/period");
+export function getProductPeriod(options?: { signal?: AbortSignal }) {
+  return request<{ period: { start: string; end: string } | null; refreshedAt: string | null }>("/api/products/period", options);
 }
 
 export function getProductData(filters?: {
@@ -60,8 +59,8 @@ export function getProductData(filters?: {
   excludeProductCodes?: string[];
   productIds?: string[];
   excludeProductIds?: string[];
-}) {
-  if (!filters) return request<ProductsPayload>("/api/products");
+}, options?: { signal?: AbortSignal }) {
+  if (!filters) return request<ProductsPayload>("/api/products", options);
   const params = new URLSearchParams();
   if (filters.start) params.set("start", filters.start);
   if (filters.end) params.set("end", filters.end);
@@ -73,7 +72,7 @@ export function getProductData(filters?: {
   for (const productId of filters.productIds ?? []) params.append("productId", productId);
   for (const productId of filters.excludeProductIds ?? []) params.append("excludeProductId", productId);
   const query = params.toString();
-  return request<ProductsPayload>(`/api/products${query ? `?${query}` : ""}`);
+  return request<ProductsPayload>(`/api/products${query ? `?${query}` : ""}`, options);
 }
 
 export function syncDataSource(source: "warehouse" | "feishu" | "dingtalk") {
@@ -167,6 +166,7 @@ export async function getCompetitorPrices(): Promise<CompetitorPricesPayload> {
   }>("/api/masterdata/competitor-prices");
   const mapped = (payload.items ?? []).map(toCompetitorPriceItem);
   if (payload.degraded === true || mapped.length === 0) {
+    const { tmallCompetitorPrices } = await import("../data/tmallCompetitorData");
     // yudao 不可用 → 用天猫实时抓取数据兜底（tmall-sku-price 项目产出）
     return {
       items: tmallCompetitorPrices,

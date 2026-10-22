@@ -41,6 +41,7 @@ import { getAnalysis, getAnalysisStatus, getCrawlStatus, listAnalyses, listCrawl
 import { fetchRelatedKeywords } from "./workflow-proxy.mjs";
 import { getWorkflowStatus, queueWorkflowEnvelope, workflowEnvelopePaths } from "./workflow.mjs";
 import { requiredTaskPermission } from "./task-permissions.mjs";
+import { createProductionHandler } from "./static-assets.mjs";
 
 const production = process.argv.includes("--production");
 const host = process.env.HOST || "127.0.0.1";
@@ -1362,36 +1363,7 @@ function listIntelligencePeriods(category) {
   }
 }
 
-function serveProduction(response, pathname) {
-  const requested = pathname === "/" ? "index.html" : pathname.replace(/^\/+/, "");
-  const normalizedPath = normalize(join(distDir, requested));
-  const filePath = normalizedPath.startsWith(distDir) && existsSync(normalizedPath) ? normalizedPath : join(distDir, "index.html");
-  const ext = extname(filePath).toLowerCase();
-  const headers = { "Content-Type": mimeTypes[ext] ?? "application/octet-stream" };
-  // 构建产物带内容 hash，可强缓存一年；index.html 必须实时校验
-  headers["Cache-Control"] = ext === ".html" ? "no-cache" : "public, max-age=31536000, immutable";
-  const body = readFileSync(filePath);
-  // 静态资源按 Accept-Encoding 协商压缩，降低 SSH 隧道传输量（803KB js -> ~200KB）
-  const acceptEncoding = String(response.req?.headers?.["accept-encoding"] || "").toLowerCase();
-  const compressible = [".js", ".css", ".html", ".json", ".svg", ".txt", ".map", ".woff2"].includes(ext) && body.length > 1024;
-  if (compressible && acceptEncoding.includes("br")) {
-    headers["Content-Encoding"] = "br";
-    headers["Vary"] = "Accept-Encoding";
-    const compressed = brotliCompressSync(body, { params: { [zlibConstants.BROTLI_PARAM_QUALITY]: 9 } });
-    response.writeHead(200, headers);
-    response.end(compressed);
-    return;
-  }
-  if (compressible && acceptEncoding.includes("gzip")) {
-    headers["Content-Encoding"] = "gzip";
-    headers["Vary"] = "Accept-Encoding";
-    response.writeHead(200, headers);
-    response.end(gzipSync(body, { level: 9 }));
-    return;
-  }
-  response.writeHead(200, headers);
-  response.end(body);
-}
+const serveProduction = createProductionHandler(distDir, mimeTypes);
 
 const vite = production ? null : await createViteServer({
   server: {

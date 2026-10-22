@@ -1,4 +1,5 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useViewState } from "../hooks/useViewState";
+import { useEffect, useMemo, type ReactNode } from "react";
 import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { TableShell } from "./TableShell";
 
@@ -37,9 +38,9 @@ export function SortableTable<T>({
   defaultSortKey,
   defaultSortDir = "asc",
 }: SortableTableProps<T>) {
-  const [sortKey, setSortKey] = useState<string | null>(defaultSortKey ?? null);
-  const [dir, setDir] = useState<"asc" | "desc">(defaultSortDir);
-  const [page, setPage] = useState(0);
+  const [sortKey, setSortKey] = useViewState<string | null>("sortable.sort", defaultSortKey ?? null);
+  const [dir, setDir] = useViewState<"asc" | "desc">("sortable.direction", defaultSortDir);
+  const [page, setPage] = useViewState("sortable.page", 0, { resetOnFilterChange: true });
 
   function toggle(key: string) {
     if (sortKey === key) {
@@ -70,22 +71,24 @@ export function SortableTable<T>({
   const paginate = pageSize > 0 && sorted.length > pageSize;
   const pageCount = paginate ? Math.ceil(sorted.length / pageSize) : 1;
   const safePage = Math.min(page, pageCount - 1);
+  useEffect(() => { if (page !== safePage) setPage(safePage); }, [page, safePage, setPage]);
   const visible = paginate ? sorted.slice(safePage * pageSize, safePage * pageSize + pageSize) : sorted;
   const baseIndex = paginate ? safePage * pageSize : 0;
+  const columnClass = (index: number) => columns[0]?.key === "rank" ? ["product-rank-cell", "product-identity-cell"][index] : undefined;
 
   return (
     <>
       <TableShell minWidth={minWidth}>
         <thead>
           <tr>
-            {columns.map((col) => {
+            {columns.map((col, columnIndex) => {
               if (!col.sortValue) {
-                return <th key={col.key} style={col.align === "right" ? { textAlign: "right" } : undefined}>{col.label}</th>;
+                return <th className={columnClass(columnIndex)} key={col.key} style={{ textAlign: col.align ?? "left" }}>{col.label}</th>;
               }
               const active = sortKey === col.key;
               const Icon = !active ? ArrowUpDown : dir === "asc" ? ArrowUp : ArrowDown;
               return (
-                <th key={col.key} style={col.align === "right" ? { textAlign: "right" } : undefined}>
+                <th className={columnClass(columnIndex)} key={col.key} aria-sort={active ? (dir === "asc" ? "ascending" : "descending") : "none"} style={{ textAlign: col.align ?? "left" }}>
                   <button className="th-sort" onClick={() => toggle(col.key)} type="button">
                     <span>{col.label}</span>
                     <Icon aria-hidden="true" className={active ? "th-sort-active" : "th-sort-idle"} size={12} strokeWidth={2} />
@@ -103,8 +106,8 @@ export function SortableTable<T>({
           ) : (
             visible.map((row, index) => (
               <tr key={rowKey(row)}>
-                {columns.map((col) => (
-                  <td key={col.key} style={col.align === "right" ? { textAlign: "right" } : undefined}>{col.render(row, baseIndex + index)}</td>
+                {columns.map((col, columnIndex) => (
+                  <td className={columnClass(columnIndex)} key={col.key} style={{ textAlign: col.align ?? "left" }}>{col.render(row, baseIndex + index)}</td>
                 ))}
               </tr>
             ))
@@ -122,19 +125,21 @@ export function Pagination({ page, pageCount, total, onChange }: { page: number;
   const pages = pageNumbers(page, pageCount);
   const btn = "inline-flex h-7 min-w-7 items-center justify-center rounded px-1.5 text-[12px] border border-[var(--border-2)] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[var(--bg-elevated)]";
   return (
-    <div className="mt-3 flex items-center justify-between gap-3 text-[12px] text-[var(--muted)]">
-      <span>共 {total.toLocaleString()} 行 · 第 {page + 1}/{pageCount} 页</span>
-      <div className="flex items-center gap-1">
-        <button type="button" className={btn} disabled={page === 0} onClick={() => onChange(0)} aria-label="首页"><ChevronsLeft size={14} /></button>
+    <div className="product-pagination mt-3 flex items-center justify-between gap-3 text-[12px] text-[var(--muted)]">
+      <span className="product-pagination-summary">共 {total.toLocaleString()} 行 · 第 {page + 1}/{pageCount} 页</span>
+      <div className="product-pagination-controls flex items-center gap-1">
+        <button type="button" className={`${btn} product-pagination-extra`} disabled={page === 0} onClick={() => onChange(0)} aria-label="首页"><ChevronsLeft size={14} /></button>
         <button type="button" className={btn} disabled={page === 0} onClick={() => onChange(page - 1)} aria-label="上一页"><ChevronLeft size={14} /></button>
+        <span className="product-pagination-mobile hidden" aria-live="polite">{page + 1} / {pageCount}</span>
         {pages.map((p, i) =>
           p === -1 ? (
-            <span key={`gap${i}`} className="px-1">…</span>
+            <span key={`gap${i}`} className="product-pagination-extra px-1">…</span>
           ) : (
             <button
               key={p}
               type="button"
-              className={`${btn} ${p === page ? "bg-[var(--brand)] text-[var(--bg)] border-[var(--brand)] font-semibold" : ""}`}
+              className={`${btn} product-pagination-extra ${p === page ? "bg-[var(--brand)] text-[var(--bg)] border-[var(--brand)] font-semibold" : ""}`}
+              aria-current={p === page ? "page" : undefined}
               onClick={() => onChange(p)}
             >
               {p + 1}
@@ -142,7 +147,7 @@ export function Pagination({ page, pageCount, total, onChange }: { page: number;
           ),
         )}
         <button type="button" className={btn} disabled={page === pageCount - 1} onClick={() => onChange(page + 1)} aria-label="下一页"><ChevronRight size={14} /></button>
-        <button type="button" className={btn} disabled={page === pageCount - 1} onClick={() => onChange(pageCount - 1)} aria-label="末页"><ChevronsRight size={14} /></button>
+        <button type="button" className={`${btn} product-pagination-extra`} disabled={page === pageCount - 1} onClick={() => onChange(pageCount - 1)} aria-label="末页"><ChevronsRight size={14} /></button>
       </div>
     </div>
   );

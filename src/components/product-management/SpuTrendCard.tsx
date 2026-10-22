@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useViewState } from "../../hooks/useViewState";
+import { useEffect, useMemo } from "react";
 import { Card } from "../Card";
 import { SpuSearchSelect } from "./SpuSearchSelect";
 import { SpuTrendLineChart, SPU_TREND_COLORS } from "./SpuTrendLineChart";
@@ -16,15 +17,18 @@ const EMPTY: ProductSpuSalesTrendPages = {
 
 export function SpuTrendCard({ data, className, selectedSpus: controlledSpus, onSelectedSpusChange }: { data?: ProductSpuSalesTrendPages | null; className?: string; selectedSpus?: string[]; onSelectedSpusChange?: (spus: string[]) => void }) {
   const v = data ?? EMPTY;
-  const [internalSpus, setInternalSpus] = useState<string[]>(() => (v.defaultSpus || []).slice(0, 5));
+  const [internalSpus, setInternalSpus] = useViewState<string[]>("spu-trend.selection", () => v.defaultSpus || []);
   const selectedSpus = controlledSpus ?? internalSpus;
   const setSelectedSpus = onSelectedSpusChange ?? setInternalSpus;
 
   useEffect(() => {
     if (!controlledSpus) {
-      setInternalSpus((v.defaultSpus || []).slice(0, 5));
+      setInternalSpus((previous) => {
+        const next = previous.filter((spu) => v.availableSpus.includes(spu));
+        return next.length === previous.length ? previous : next;
+      });
     }
-  }, [v.defaultSpus, controlledSpus]);
+  }, [v.availableSpus, controlledSpus, setInternalSpus]);
 
   const options = useMemo(
     () => v.summaries.map((s) => ({
@@ -72,9 +76,9 @@ export function SpuTrendCard({ data, className, selectedSpus: controlledSpus, on
       }
     >
       <div className="mb-3 text-[12px] text-[var(--muted)]">
-        搜索框可选择 SPU，<span className="text-[var(--orange)] font-medium">仅影响此趋势图</span>。
+        搜索框可选择 SPU，<span className="text-[var(--orange)] font-medium">同步联动此趋势图与下方商品表</span>。
       </div>
-      <SpuTrendLineChart series={series} dates={dates} />
+      <SpuTrendLineChart series={series} dates={dates} emptyHint={v.quality.status === "unavailable" ? "当前数据源未覆盖 SPU 日销量，请查看数据覆盖范围。" : undefined} />
     </Card>
   );
 }

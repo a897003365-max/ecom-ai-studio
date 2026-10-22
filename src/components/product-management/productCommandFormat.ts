@@ -31,3 +31,9 @@ export function days(value: number | null | undefined): string {
   if (value === null || value === undefined) return "-";
   return `${fmt1.format(value)}天`;
 }
+
+
+/** 金额按元显示，保留货币单位。 */
+export function moneyYuan(value: number | null | undefined): string {
+  return value == null || !Number.isFinite(value) ? "-" : `¥${value.toLocaleString("zh-CN", { maximumFractionDigits: 0 })}`;
+}

@@ -5,7 +5,8 @@ const app = readFileSync(new URL("../src/App.tsx", import.meta.url), "utf8");
 const dashboard = readFileSync(new URL("../src/pages/DashboardPage.tsx", import.meta.url), "utf8");
 const topbar = readFileSync(new URL("../src/components/Topbar.tsx", import.meta.url), "utf8");
 const productManagement = readFileSync(new URL("../src/pages/ProductManagementPage.tsx", import.meta.url), "utf8");
-const productScopeFilter = readFileSync(new URL("../src/components/product-management/ProductScopeFilter.tsx", import.meta.url), "utf8");
+const productFilters = readFileSync(new URL("../src/components/product-management/ProductFilters.tsx", import.meta.url), "utf8");
+const productFilterState = readFileSync(new URL("../src/components/product-management/productFilterState.ts", import.meta.url), "utf8");
 const indexServer = readFileSync(new URL("../server/index.mjs", import.meta.url), "utf8");
 const warehouseServer = readFileSync(new URL("../server/warehouse.mjs", import.meta.url), "utf8");
 const productCli = readFileSync(new URL("../pipeline/ecom_pipeline/cli.py", import.meta.url), "utf8");
@@ -38,25 +39,26 @@ assert.doesNotMatch(dashboard, /当前任务概览|业务主线/, "工作台首�
 
 assert.doesNotMatch(app, /showStoreSelector=/, "顶部不应再按页面显示店铺选择器");
 assert.doesNotMatch(topbar, /床垫旗舰店（天猫）/, "全站顶部不应保留固定天猫店铺入口");
-assert.match(productManagement, /ariaLabel="渠道平台筛选"/, "商品总览缺少渠道平台筛选器");
-assert.match(productManagement, /ariaLabel="店铺简称筛选"/, "商品总览缺少店铺简称筛选器");
-assert.match(productManagement, /ProductScopeFilter/, "商品管理缺少商品编码/商品ID筛选器");
-assert.match(productScopeFilter, /aria-label="仅保留商品编码"/, "商品范围筛选缺少仅保留商品编码输入");
-assert.match(productScopeFilter, /aria-label="仅保留商品ID"/, "商品范围筛选缺少仅保留商品ID输入");
-assert.match(productScopeFilter, /aria-label="排除商品编码"/, "商品范围筛选缺少排除商品编码输入");
-assert.match(productScopeFilter, /aria-label="排除商品ID"/, "商品范围筛选缺少排除商品ID输入");
-assert.match(productScopeFilter, /排除优先于保留/, "商品范围筛选未说明排除优先于保留");
+assert.match(productFilters, /\["channels", "渠道平台"\]/, "商品总览缺少渠道平台筛选器");
+assert.match(productFilters, /\["storeShortNames", "店铺简称"\]/, "商品总览缺少店铺简称筛选器");
+assert.match(productManagement, /ProductFilters/, "商品管理缺少统一筛选器");
+for (const label of ["仅保留商品编码", "仅保留商品ID", "排除商品编码", "排除商品ID"]) assert.ok(productFilters.includes(label), `商品范围缺少${label}`);
+assert.match(productFilters, /aria-label=\{label\}/, "商品范围输入需要可访问名称");
+assert.match(productFilters, /排除优先于保留/, "商品范围筛选未说明排除优先于保留");
+assert.match(productManagement, /loading && !pm/, "只有首次加载可以替换主体");
+assert.match(productManagement, /setResult\(\{ pm: productManagement, refreshedAt: payload.refreshedAt, applied: filters \}\)/, "数据和条件应一并提交");
+assert.match(productManagement, /AbortController/, "新筛选应能取消旧请求");
 assert.match(productManagement, /当前筛选条件下没有匹配到商品/, "商品范围无匹配时缺少提示");
 assert.match(localApi, /getProductPeriod/, "商品接口缺少可用周期查询");
 assert.match(indexServer, /"\/api\/products\/period"/, "服务端缺少商品可用周期接口");
-assert.match(productManagement, /DEFAULT_RANGE_DAYS = 7/, "商品管理默认日期必须为近 7 天");
-assert.match(productManagement, /recentDaysRange\(available\)/, "商品管理首屏未按可用周期计算默认近 7 天");
+assert.match(productFilterState, /endMs - 6 \* 86400000/, "默认日期含结束日共7天");
+assert.match(productManagement, /recentProductDays\(available\)/, "商品管理首屏未按可用周期计算默认近 7 天");
 assert.match(matrixTable, /const sharedMax = Math\.max\(/, "矩阵进度条必须使用全表共享量尺");
 assert.match(matrixTable, /data-testid="matrix-shared-scale"/, "矩阵未明确标注统一量尺口径");
 assert.match(productManagement, /label: "商家实收"/, "商品管理未显示商家实收口径");
 assert.doesNotMatch(productManagement, /label: "销售金额"/, "商品管理不应再展示销售金额列");
 assert.doesNotMatch(productManagement, /实发金额|实发量|实发数量/, "商品管理仍展示实发金额或实发量字段");
-assert.match(productManagement, /matrixToTrendSeries\(pm\.dailyWarehouseMatrix\)/, "每日发货仓销量应渲染为趋势折线图而非矩阵表");
+assert.match(productManagement, /matrixToTrendSeries\(pm\?\.dailyWarehouseMatrix\)/, "每日发货仓销量应渲染为趋势折线图而非矩阵表");
 assert.match(productManagement, /id: "fulfillment", label: "仓配履约"/, "商品管理缺少仓配履约页");
 assert.match(productManagement, /id: "price", label: "价格结构"/, "商品管理缺少价格结构页签");
 assert.match(productManagement, /id: "size", label: "尺寸结构"/, "商品管理缺少尺寸结构页签");
@@ -79,11 +81,9 @@ assert.match(localApi, /productCodes\?: string\[\]/, "商品接口缺少商品�
 assert.match(localApi, /excludeProductCodes\?: string\[\]/, "商品接口缺少商品编码排除参数");
 assert.match(localApi, /productIds\?: string\[\]/, "商品接口缺少商品ID筛选参数");
 assert.match(localApi, /excludeProductIds\?: string\[\]/, "商品接口缺少商品ID排除参数");
-assert.equal(
-  (productManagement.match(/\.\.\.toProductScopeFilters\(newProductScope\)/g) ?? []).length,
-  2,
-  "商品主请求与画册补查都必须透传商品范围",
-);
+assert.match(productManagement, /getProductData\(productFilterRequest\(filters\)/, "商品主请求需透传全部筛选");
+assert.match(productManagement, /getProductData\(productFilterRequest\(galleryFilters\)/, "画册补查需透传全部筛选");
+assert.match(productManagement, /galleryFilters = \{ \.\.\.filters,/, "补查必须保持已应用商品范围");
 for (const [queryName, flag] of [
   ["productCode", "--product-code"],
   ["excludeProductCode", "--exclude-product-code"],
@@ -145,8 +145,8 @@ assert.match(styles, /@keyframes exec-band-in \{[^}]*from \{ opacity:\s*0/, "exe
 // 带 animation-delay 的入场动画必须用 both：延迟期间套用 from（隐藏），否则基础态会先闪现再重播
 assert.match(styles, /\.exec-line \{[^}]*animation:\s*exec-line-draw [^;]*\bboth\b/, ".exec-line 带延迟的描边动画必须使用 fill-mode both，避免延迟期间基础态闪现");
 assert.doesNotMatch(productGalleryStyles, /\.product-gallery-card \{[^}]*opacity:\s*0/, ".product-gallery-card 基础态不允许 opacity: 0，隐藏只能写在 product-gallery-enter 的 from 里");
-assert.match(productGalleryStyles, /@keyframes product-gallery-enter \{[^}]*from \{ opacity:\s*0/, "product-gallery-enter 的隐藏态必须只存在于 keyframes from");
-assert.match(productGalleryStyles, /\.product-gallery-card \{[^}]*animation:\s*product-gallery-enter [^;]*\bboth\b/, ".product-gallery-card 交错延迟动画必须使用 fill-mode both");
+assert.doesNotMatch(productGalleryStyles, /product-gallery-enter|--gallery-order/, "画册更新和翻页不应重播逐卡入场");
+assert.doesNotMatch(productGallery, /--gallery-order/, "画册不应生成逐卡延迟变量");
 for (const testId of ["product-gallery", "product-card", "product-detail-drawer", "product-sku-table"]) {
   assert.match(productGallery, new RegExp(`data-testid=["'{\\s]*${testId}`), `商品画册缺少 ${testId} 稳定定位`);
 }
@@ -160,7 +160,8 @@ assert.match(productGallery, /毛利率/, "商品卡片未展示毛利率");
 assert.match(productGallery, /销量/, "商品卡片未展示销量");
 assert.match(productGallery, /较上期/, "商品详情未展示等长上期变化");
 assert.match(productGalleryStyles, /aspect-ratio:\s*1/, "商品主视觉必须保持 1:1");
-assert.match(productGalleryStyles, /grid-template-columns:\s*repeat\(4/, "商品画册桌面端必须为四列");
+assert.match(productGalleryStyles, /repeat\(auto-fit,\s*minmax\(200px,\s*1fr\)/, "画册应按容器采用最小200px自动网格");
+assert.match(productGalleryStyles, /112px/, "手机画册应保留112px图片列");
 assert.match(productGalleryStyles, /@media\s*\(max-width:\s*639px\)/, "商品画册缺少手机单列断点（<640px）");
 
 console.log("dashboard-ui contract: ok");

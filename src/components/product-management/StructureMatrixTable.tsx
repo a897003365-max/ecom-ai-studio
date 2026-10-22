@@ -5,9 +5,10 @@ interface Props {
   matrix: ProductShareMatrix;
   rowHeader: string;
   minWidth?: number;
+  emptyHint?: string;
 }
 
-export function StructureMatrixTable({ matrix, rowHeader, minWidth = 960 }: Props) {
+export function StructureMatrixTable({ matrix, rowHeader, minWidth = 960, emptyHint = "当前筛选范围没有匹配数据" }: Props) {
   const rows: ProductShareMatrixRow[] = matrix.rows;
   const pct = (v: number) => `${(v * 100).toFixed(1)}%`;
   const columns: SortColumn<ProductShareMatrixRow>[] = [
@@ -32,5 +33,5 @@ export function StructureMatrixTable({ matrix, rowHeader, minWidth = 960 }: Prop
       render: (r) => pct(r.shares[c] ?? 0),
     })),
   ];
-  return <SortableTable<ProductShareMatrixRow> minWidth={minWidth} rowKey={(r) => r.rowKey} rows={rows} emptyHint="暂无数据" columns={columns} />;
+  return <SortableTable<ProductShareMatrixRow> minWidth={minWidth} rowKey={(r) => r.rowKey} rows={rows} emptyHint={emptyHint} columns={columns} />;
 }

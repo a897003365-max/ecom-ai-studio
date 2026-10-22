@@ -1,5 +1,6 @@
+import { useViewState } from "../../hooks/useViewState";
 // 商品变化指挥中心 · 重点商品数据表
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo } from "react";
 import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 import { money, percent, count } from "./useProductSummary";
 import type { ProductRow } from "./useProductSummary";
@@ -62,10 +63,19 @@ export function PriorityProductsTable({
   productChannelRefundMatrix: ProductMatrix;
   focusTarget?: { kind: "product" | "spu" | "sku"; value: string; productName?: string } | null;
 }) {
-  const [sortKey, setSortKey] = useState<string>("received");
-  const [dir, setDir] = useState<SortDir>("desc");
-  const [page, setPage] = useState(0);
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [sortKey, setSortKey] = useViewState<string>("PriorityProductsTable.sortKey", "received");
+  const [dir, setDir] = useViewState<SortDir>("PriorityProductsTable.dir", "desc");
+  const [page, setPage] = useViewState("PriorityProductsTable.page", 0, { resetOnFilterChange: true });
+  const [expanded, setExpanded] = useViewState<Set<string>>("PriorityProductsTable.expanded", new Set());
+
+  useEffect(() => {
+    const currentRows = new Set(rows.map((r) => r.name));
+    const valid = new Set(productChannelMatrix.rows.filter((r) => currentRows.has(r.rowKey) && Object.values(r.values).some((value) => (value ?? 0) > 0)).map((r) => r.rowKey));
+    setExpanded((previous) => {
+      const next = new Set([...previous].filter((key) => valid.has(key)));
+      return next.size === previous.size ? previous : next;
+    });
+  }, [rows, productChannelMatrix, setExpanded]);
 
   const unitLookup = useMemo(() => buildMatrixLookup(productChannelMatrix), [productChannelMatrix]);
   const revenueLookup = useMemo(() => buildMatrixLookup(productChannelRevenueMatrix), [productChannelRevenueMatrix]);
@@ -114,6 +124,7 @@ export function PriorityProductsTable({
   const paginate = sorted.length > PAGE_SIZE;
   const pageCount = paginate ? Math.ceil(sorted.length / PAGE_SIZE) : 1;
   const safePage = Math.min(page, pageCount - 1);
+  useEffect(() => { if (page !== safePage) setPage(safePage); }, [page, safePage, setPage]);
   const visible = paginate ? sorted.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE) : sorted;
   const baseIndex = paginate ? safePage * PAGE_SIZE : 0;
 

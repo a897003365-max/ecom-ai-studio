@@ -1,7 +1,9 @@
+import { Pagination } from "../SortableTable";
+import { useViewState } from "../../hooks/useViewState";
 // 通用矩阵表组件 · 渲染 ProductMatrix 结构
 // 支持排序、分页、进度条、百分比/数量格式
-import { useState, type ReactNode } from "react";
-import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
+import { useEffect, type ReactNode } from "react";
+import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 import { TableShell } from "../TableShell";
 import type { ProductMatrix } from "../../types/integration";
 
@@ -35,16 +37,19 @@ interface MatrixTableProps {
 }
 
 export function MatrixTable({ matrix, rowHeader, minWidth, pageSize = 0, valueFormat = "count" }: MatrixTableProps) {
-  const [sortKey, setSortKey] = useState<string | null>(null);
-  const [dir, setDir] = useState<"asc" | "desc">("asc");
-  const [page, setPage] = useState(0);
+  const [sortKey, setSortKey] = useViewState<string | null>("MatrixTable.sortKey", null);
+  const [dir, setDir] = useViewState<"asc" | "desc">("MatrixTable.dir", "asc");
+  const [page, setPage] = useViewState("MatrixTable.page", 0, { resetOnFilterChange: true });
+
+  const currentPage = Math.min(page, Math.max(0, pageSize > 0 ? Math.ceil(matrix.rows.length / pageSize) - 1 : 0));
+  useEffect(() => { if (page !== currentPage) setPage(currentPage); }, [page, currentPage, setPage]);
 
   if (!matrix.rows.length) {
     return (
       <TableShell minWidth={minWidth}>
         <tbody>
           <tr>
-            <td className="py-6 text-center text-[var(--muted)]">暂无数据</td>
+            <td className="py-6 text-center text-[var(--muted)]">当前筛选范围没有匹配数据，请调整筛选；数据覆盖范围请查看页面提示。</td>
           </tr>
         </tbody>
       </TableShell>
@@ -59,6 +64,7 @@ export function MatrixTable({ matrix, rowHeader, minWidth, pageSize = 0, valueFo
   function toggle(k: string) {
     if (sortKey === k) setDir((d) => (d === "asc" ? "desc" : "asc"));
     else { setSortKey(k); setDir("asc"); }
+    setPage(0);
   }
 
   const valueOf = (r: ProductMatrix["rows"][number], k: string): string | number => {
@@ -128,16 +134,7 @@ export function MatrixTable({ matrix, rowHeader, minWidth, pageSize = 0, valueFo
         </tbody>
       </TableShell>
       {paginate && (
-        <div className="mt-3 flex items-center justify-between gap-3 text-[12px] text-[var(--muted)]">
-          <span>共 {sorted.length.toLocaleString()} 行 · 第 {safePage + 1}/{pageCount} 页</span>
-          <div className="flex items-center gap-1">
-            <button type="button" className="inline-flex h-7 min-w-7 items-center justify-center rounded px-1.5 text-[12px] border border-[var(--border-2)] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[var(--bg-elevated)]" disabled={safePage === 0} onClick={() => setPage(0)} aria-label="首页"><ChevronsLeft size={14} /></button>
-            <button type="button" className="inline-flex h-7 min-w-7 items-center justify-center rounded px-1.5 text-[12px] border border-[var(--border-2)] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[var(--bg-elevated)]" disabled={safePage === 0} onClick={() => setPage(safePage - 1)} aria-label="上一页"><ChevronLeft size={14} /></button>
-            <span className="px-1 font-medium text-[var(--text)]">{safePage + 1} / {pageCount}</span>
-            <button type="button" className="inline-flex h-7 min-w-7 items-center justify-center rounded px-1.5 text-[12px] border border-[var(--border-2)] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[var(--bg-elevated)]" disabled={safePage === pageCount - 1} onClick={() => setPage(safePage + 1)} aria-label="下一页"><ChevronRight size={14} /></button>
-            <button type="button" className="inline-flex h-7 min-w-7 items-center justify-center rounded px-1.5 text-[12px] border border-[var(--border-2)] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[var(--bg-elevated)]" disabled={safePage === pageCount - 1} onClick={() => setPage(pageCount - 1)} aria-label="末页"><ChevronsRight size={14} /></button>
-          </div>
-        </div>
+        <Pagination page={safePage} pageCount={pageCount} total={sorted.length} onChange={setPage} />
       )}
     </div>
   );

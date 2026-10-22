@@ -1,0 +1,27 @@
+import assert from "node:assert/strict";
+import { EMPTY_PRODUCT_FILTERS, normalizeProductFilters, parseProductValues, productFilterError, productFilterKey, productFilterRequest, recentProductDays } from "../src/components/product-management/productFilterState.ts";
+
+assert.deepEqual(recentProductDays({ start: "2026-01-01", end: "2026-10-22" }), { start: "2026-10-16", end: "2026-10-22" });
+assert.deepEqual(recentProductDays({ start: "2026-10-20", end: "2026-10-22" }), { start: "2026-10-20", end: "2026-10-22" });
+assert.deepEqual(recentProductDays({ start: "2024-02-01", end: "2024-03-01" }), { start: "2024-02-24", end: "2024-03-01" });
+assert.deepEqual(parseProductValues(" SKU A ,SKU B\nSKU A； SKU C\tSKU D "), ["SKU A", "SKU B", "SKU C", "SKU D"]);
+const a = { ...EMPTY_PRODUCT_FILTERS, statuses: ["完成", "待发货", "完成"], includeCodes: "B,A\nA" };
+const b = { ...EMPTY_PRODUCT_FILTERS, statuses: ["待发货", "完成"], includeCodes: "A； B" };
+assert.equal(productFilterKey(a), productFilterKey(b), "equivalent conditions share one request identity");
+assert.notEqual(productFilterKey(a), productFilterKey({ ...b, channels: ["天猫"] }));
+assert.deepEqual(normalizeProductFilters(normalizeProductFilters(a)), normalizeProductFilters(a));
+assert.equal(productFilterError(EMPTY_PRODUCT_FILTERS), "");
+assert.ok(productFilterError({ ...a, start: "2026-10-22" }));
+assert.ok(productFilterError({ ...a, start: "2026-02-30", end: "2026-03-01" }));
+assert.ok(productFilterError({ ...a, start: "2026-10-22", end: "2026-10-21" }));
+assert.ok(productFilterError({ ...a, includeIds: Array.from({ length: 201 }, (_, i) => String(i)).join("\n") }));
+const cleared = productFilterRequest(EMPTY_PRODUCT_FILTERS);
+assert.equal(cleared.start, undefined);
+assert.equal(cleared.end, undefined);
+for (const [key, value] of Object.entries(cleared)) if (!['start', 'end'].includes(key)) assert.deepEqual(value, []);
+const request = productFilterRequest({ ...a, excludeCodes: "A", includeIds: "12,12", excludeIds: "34" });
+assert.deepEqual(request.productCodes, ["A", "B"]);
+assert.deepEqual(request.excludeProductCodes, ["A"], "retain exclusions for server exclusion priority");
+assert.deepEqual(request.productIds, ["12"]);
+assert.deepEqual(request.excludeProductIds, ["34"]);
+console.log("Product filter normalization, date range, validation and request mapping passed.");

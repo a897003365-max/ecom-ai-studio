@@ -1,3 +1,4 @@
+import { moneyYuan as money, percent as pct, count, days } from "./productCommandFormat";
 import { Card } from "../Card";
 import { SortableTable } from "../SortableTable";
 import type {
@@ -19,13 +20,10 @@ const EMPTY: ProductCustomizationStructurePages = {
   quality: { status: "unavailable", coverage: null, warnings: ["模块未实现"] },
 };
 
-const pct = (v: number | null) => (v === null ? "-" : `${(v * 100).toFixed(1)}%`);
-const money = (v: number) => `¥${v.toLocaleString("zh-CN", { maximumFractionDigits: 0 })}`;
-const count = (v: number) => v.toLocaleString("zh-CN");
-const days = (v: number | null) => (v === null ? "-" : v.toFixed(1));
 
 export function CustomizationStructurePanel({ data }: { data?: ProductCustomizationStructurePages | null }) {
   const v = data ?? EMPTY;
+  const emptyHint = v.quality.status === "unavailable" ? "当前数据源未覆盖定制结构，请检查数据覆盖范围。" : "当前筛选范围没有匹配的定制结构数据。";
   return (
     <>
       <Card title="定制结构 · 常规 vs 定制对比">
@@ -33,7 +31,7 @@ export function CustomizationStructurePanel({ data }: { data?: ProductCustomizat
           minWidth={860}
           rowKey={(r) => r.orderType}
           rows={v.comparison}
-          emptyHint="无数据"
+          emptyHint={emptyHint}
           columns={[
             { key: "orderType", label: "订单类型", sortValue: (r) => r.orderType, render: (r) => <span className="font-semibold">{r.orderType}</span> },
             { key: "salesUnits", label: "销量", align: "right", sortValue: (r) => r.salesUnits, render: (r) => count(r.salesUnits) },
@@ -54,7 +52,7 @@ export function CustomizationStructurePanel({ data }: { data?: ProductCustomizat
           minWidth={720}
           rowKey={(r) => r.spu}
           rows={v.spuSummary ?? []}
-          emptyHint="无数据（刷新商品管理快照后显示）"
+          emptyHint={emptyHint}
           defaultSortKey="salesUnits"
           defaultSortDir="desc"
           columns={[
@@ -71,7 +69,7 @@ export function CustomizationStructurePanel({ data }: { data?: ProductCustomizat
           minWidth={720}
           rowKey={(r) => r.mattressCategory}
           rows={v.categoryStructure}
-          emptyHint="无数据"
+          emptyHint={emptyHint}
           defaultSortKey="salesUnits"
           defaultSortDir="desc"
           columns={[
@@ -87,7 +85,7 @@ export function CustomizationStructurePanel({ data }: { data?: ProductCustomizat
           minWidth={560}
           rowKey={(r) => r.tag}
           rows={v.tags}
-          emptyHint="无数据"
+          emptyHint={emptyHint}
           columns={[
             { key: "tag", label: "定制标签", sortValue: (r) => r.tag, render: (r) => <span className="font-semibold">{r.tag}</span> },
             { key: "orderLines", label: "订单行", align: "right", sortValue: (r) => r.orderLines, render: (r) => count(r.orderLines) },

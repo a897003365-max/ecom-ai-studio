@@ -2192,7 +2192,7 @@ def _build_product_management_pages(
     start/end（YYYY-MM-DD）为切片器日期范围；statuses、channels、store_short_names 为
     订单状态、渠道平台、店铺简称的多选切片器值（IN 过滤）。product_codes / product_ids
     为商品编码、商品ID 的「仅保留」列表，exclude_* 为排除列表；商品ID 经产品主数据
-    （商品编码 ↔ 商品ID）映射后按商品编码过滤。传入任一后创建临时过滤视图，
+    （商品编码 ↔ 商品ID）映射后按商品编码过滤。当前订单集合写入连接内临时表，
     所有聚合自动联动；可选项始终取自未过滤 base_view。
     """
     try:
@@ -2311,7 +2311,7 @@ def _build_product_management_pages(
     analysis_date = "付款日期" if "付款日期" in source_columns else "订单日期"
 
     # 切片器过滤：日期范围 + 订单状态 + 渠道平台 + 店铺简称 + 商品范围，
-    # 创建临时视图替换 base_view。上期数据可能落在日期范围之外（如仅选本月时上月为上期），
+    # 当前集合准备为临时表。上期数据可能落在日期范围之外（如仅选本月时上月为上期），
     # 因此单独保留一份不带日期过滤、但保留其他维度过滤的视图 _jt_filtered_other，供上期查询使用。
     date_filter = None
     date_conds: list[str] = []
@@ -2385,14 +2385,14 @@ def _build_product_management_pages(
             if id_filter:
                 other_conds.append(f"NOT ({id_filter})")
 
+    # 当前订单集合只准备一次，避免每个聚合重新执行模型去重和源文件扫描。
+    # TEMP TABLE 只存在于本连接，read_only 数仓连接同样可用。
     all_conds = date_conds + other_conds
-    if all_conds:
-        connection.execute(
-            f'CREATE OR REPLACE TEMP VIEW _jt_filtered AS SELECT * FROM {base_view} WHERE {" AND ".join(all_conds)}'
-        )
-        view = "_jt_filtered"
-    else:
-        view = base_view
+    current_where = f' WHERE {" AND ".join(all_conds)}' if all_conds else ''
+    connection.execute(
+        f'CREATE OR REPLACE TEMP TABLE _jt_filtered AS SELECT * FROM {base_view}{current_where}'
+    )
+    view = "_jt_filtered"
 
     if other_conds:
         connection.execute(
@@ -2579,42 +2579,36 @@ def _build_product_management_pages(
         matched_received = float(margin[1] or 0)
         matched_codes = int(margin[2] or 0)
 
+    total_columns = ("销售金额", "退货金额", "商家实收", "销售数量", "买家实付", "平台补贴金额")
+    total_select = ", ".join(
+        f'sum(coalesce(try_cast("{column}" AS DOUBLE), 0))' for column in total_columns
+    )
+    custom_condition = 'coalesce(try_cast("是否定制" AS BOOLEAN), FALSE)' if "是否定制" in source_columns else "FALSE"
+    totals = connection.execute(f"""
+        SELECT {total_select}, count(DISTINCT "商品编码"), count(*),
+               sum(CASE WHEN {custom_condition} THEN coalesce(try_cast("销售数量" AS DOUBLE), 0) ELSE 0 END),
+               sum(CASE WHEN cast("订单状态明细" AS VARCHAR) LIKE '%待发货%'
+                        THEN coalesce(try_cast("销售数量" AS DOUBLE), 0) ELSE 0 END)
+        FROM {view}
+    """).fetchone()
+    total_values = dict(zip(total_columns, (float(value or 0) for value in totals[:6])))
+
     def _total(column: str) -> float:
-        return float(
-            connection.execute(
-                f'SELECT sum(coalesce(try_cast("{column}" AS DOUBLE), 0)) FROM {view}'
-            ).fetchone()[0]
-            or 0
-        )
+        return total_values[column]
 
     total_sales = _total("销售金额")
     total_refund = _total("退货金额")
     total_received = _total("商家实收")
     total_sales_units = _total("销售数量")
-    product_count = connection.execute(
-        f'SELECT count(DISTINCT "商品编码") FROM {view} WHERE "商品编码" IS NOT NULL'
-    ).fetchone()[0] or 0
-    order_lines = connection.execute(f"SELECT count(*) FROM {view}").fetchone()[0] or 0
+    product_count = totals[6] or 0
+    order_lines = totals[7] or 0
     # 定制率 = 定制销量 / 总销量（是否定制由 transforms.py 从卖家备注推导，对齐 PBI）。
     custom_rate = None
     if "是否定制" in source_columns and total_sales_units:
-        custom_sales_units = float(
-            connection.execute(
-                f'SELECT sum(coalesce(try_cast("销售数量" AS DOUBLE), 0)) FROM {view} '
-                f'WHERE coalesce(try_cast("是否定制" AS BOOLEAN), FALSE)'
-            ).fetchone()[0]
-            or 0
-        )
+        custom_sales_units = float(totals[8] or 0)
         custom_rate = round(custom_sales_units / total_sales_units, 4)
     # 待发货件数 = 订单状态明细含「待发货」的销售数量合计（当前过滤期）。上期值在 prev_m 确定后回填。
-    pending_units = float(
-        connection.execute(
-            f"""SELECT sum(coalesce(try_cast(s."销售数量" AS DOUBLE), 0))
-                FROM {view} s
-                WHERE cast(s."订单状态明细" AS VARCHAR) LIKE '%待发货%'"""
-        ).fetchone()[0]
-        or 0
-    )
+    pending_units = float(totals[9] or 0)
     # 商品管理统一使用商家实收作为金额口径；回款率 = 商家实收 / 销售金额。
     # 礼品袋、链接等垃圾单已在转换层按 PBIX M 规则置零并过滤；0.01 过滤已于 2026-10-06 取消，0.01 链接订单计入销量口径。
     kpis = {
@@ -3233,21 +3227,28 @@ def _build_product_management_pages(
         def _range_totals(rng: tuple[str, str] | None, query_view: str) -> dict[str, Any]:
             if not rng:
                 return {}
-            row = connection.execute(
-                f"""
-                SELECT
-                  sum(coalesce(try_cast(s."商家实收" AS DOUBLE),0)) AS receivedAmount,
-                  sum(coalesce(try_cast(s."销售金额" AS DOUBLE),0)) AS salesAmount,
-                  sum(coalesce(try_cast(s."退货金额" AS DOUBLE),0)) AS refundAmount,
-                  sum(coalesce(try_cast(s."销售数量" AS DOUBLE),0)) AS salesUnits,
-                  count(*) AS orderLines,
-                  {margin_select}
-                  {custom_sales_col}
-                FROM {query_view} s {pm_join}
-                WHERE s."{analysis_date}" >= CAST(? AS DATE) AND s."{analysis_date}" <= CAST(? AS DATE)
-                """,
-                [rng[0], rng[1]],
-            ).fetchone()
+            if query_view == view and rng == date_filter:
+                row = (
+                    total_received, total_sales, total_refund, total_sales_units,
+                    order_lines, margin[0] if has_master else 0,
+                    margin[1] if has_master else 0, totals[8],
+                )
+            else:
+                row = connection.execute(
+                    f"""
+                    SELECT
+                      sum(coalesce(try_cast(s."商家实收" AS DOUBLE),0)) AS receivedAmount,
+                      sum(coalesce(try_cast(s."销售金额" AS DOUBLE),0)) AS salesAmount,
+                      sum(coalesce(try_cast(s."退货金额" AS DOUBLE),0)) AS refundAmount,
+                      sum(coalesce(try_cast(s."销售数量" AS DOUBLE),0)) AS salesUnits,
+                      count(*) AS orderLines,
+                      {margin_select}
+                      {custom_sales_col}
+                    FROM {query_view} s {pm_join}
+                    WHERE s."{analysis_date}" >= CAST(? AS DATE) AND s."{analysis_date}" <= CAST(? AS DATE)
+                    """,
+                    [rng[0], rng[1]],
+                ).fetchone()
             received = float(row[0] or 0)
             refund = float(row[2] or 0)
             sales_units = float(row[3] or 0)
@@ -3524,58 +3525,20 @@ def _build_product_management_pages(
     else:
         daily_channel_margin_matrix = {"columns": [], "rows": []}
 
-    # 产品名称 × 渠道销量（产品主数据口径，全量）
-    product_channel_matrix = _matrix(
-        connection,
-        f"""
-        PIVOT (
-          SELECT {product_name_expr} AS row, {channel_expr} AS channel,
-                 coalesce(try_cast(s."销售数量" AS DOUBLE),0) AS units
-          FROM {view} s {pm_join}
-          WHERE {product_name_expr} IN (
-            SELECT {product_name_expr} FROM {view} s {pm_join}
-            WHERE {product_name_expr} <> '(未命名)'
-            GROUP BY 1 ORDER BY sum(coalesce(try_cast("销售数量" AS DOUBLE),0)) DESC
-          )
-        ) ON channel USING sum(units) ORDER BY row
-        """,
-        "row",
-    )
-
-    # 产品名称 × 渠道商家实收（产品主数据口径，全量）
-    product_channel_revenue_matrix = _matrix(
-        connection,
-        f"""
-        PIVOT (
-          SELECT {product_name_expr} AS row, {channel_expr} AS channel,
-                 coalesce(try_cast(s."商家实收" AS DOUBLE),0) AS v
-          FROM {view} s {pm_join}
-          WHERE {product_name_expr} IN (
-            SELECT {product_name_expr} FROM {view} s {pm_join}
-            WHERE {product_name_expr} <> '(未命名)'
-            GROUP BY 1 ORDER BY sum(coalesce(try_cast("销售数量" AS DOUBLE),0)) DESC
-          )
-        ) ON channel USING sum(v) ORDER BY row
-        """,
-        "row",
-    )
-
-    # 产品名称 × 渠道退货金额（产品主数据口径，全量）
-    product_channel_refund_matrix = _matrix(
-        connection,
-        f"""
-        PIVOT (
-          SELECT {product_name_expr} AS row, {channel_expr} AS channel,
-                 coalesce(try_cast(s."退货金额" AS DOUBLE),0) AS v
-          FROM {view} s {pm_join}
-          WHERE {product_name_expr} IN (
-            SELECT {product_name_expr} FROM {view} s {pm_join}
-            WHERE {product_name_expr} <> '(未命名)'
-            GROUP BY 1 ORDER BY sum(coalesce(try_cast("销售数量" AS DOUBLE),0)) DESC
-          )
-        ) ON channel USING sum(v) ORDER BY row
-        """,
-        "row",
+    # 产品 × 渠道只聚合一次，三个矩阵共用分组结果并各自保持原列排序。
+    connection.execute(f"""
+        CREATE OR REPLACE TEMP TABLE _jt_product_channel AS
+        SELECT {product_name_expr} AS row, {channel_expr} AS channel,
+               sum(coalesce(try_cast(s."销售数量" AS DOUBLE), 0)) AS units,
+               sum(coalesce(try_cast(s."商家实收" AS DOUBLE), 0)) AS revenue,
+               sum(coalesce(try_cast(s."退货金额" AS DOUBLE), 0)) AS refund
+        FROM {view} s {pm_join}
+        WHERE {product_name_expr} <> '(未命名)'
+        GROUP BY 1, 2
+    """)
+    product_channel_matrix, product_channel_revenue_matrix, product_channel_refund_matrix = (
+        _matrix(connection, f"PIVOT (SELECT row, channel, {metric} FROM _jt_product_channel) ON channel USING sum({metric}) ORDER BY row", "row")
+        for metric in ("units", "revenue", "refund")
     )
 
     # 产品名称 × 订单状态（产品主数据口径，全量）

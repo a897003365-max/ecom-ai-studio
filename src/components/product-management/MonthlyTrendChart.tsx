@@ -1,7 +1,8 @@
 // 商品变化指挥中心 · 月度趋势主图（当期 vs 上期 + 退货率 + 毛利率）
 // 左轴=商家实收（万），右轴=百分比刻度（退货率 / 毛利率共用）。
 // 悬停改为纵向虚线十字 + 数据标签 tooltip，参考相邻 SpuTrendLineChart 交互。
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import { useChartWidth } from "./useTrendInteraction";
 import { money, percent } from "./useProductSummary";
 import type { ChartTooltipApi, TipContent } from "./ChartTooltip";
 import type { Summary, TrendSeries } from "./useProductSummary";
@@ -14,7 +15,6 @@ interface Props {
   tooltip: ChartTooltipApi;
 }
 
-const WIDTH = 860;
 const HEIGHT = 330;
 const PLOT = { left: 54, right: 44, top: 24, bottom: 44 };
 const RATE_STEPS = 5;
@@ -39,68 +39,80 @@ function buildSparsePath(values: (number | null)[], x: (i: number) => number, y:
 
 export function MonthlyTrendChart({ trend, summary, previousMonth, tooltip }: Props) {
   const { days, prevDays, current, previous, refund, margin } = trend;
+  const { containerRef, width } = useChartWidth();
   const svgRef = useRef<SVGSVGElement>(null);
   const [hover, setHover] = useState<number | null>(null);
 
+  const geometry = useMemo(() => {
+    const plotW = width - PLOT.left - PLOT.right;
+    const plotH = HEIGHT - PLOT.top - PLOT.bottom;
+    const prevValues = previous.filter((v): v is number => v != null && Number.isFinite(v));
+    const max = Math.max(...current, ...prevValues, 1) * 1.18;
+    const x = (i: number) => PLOT.left + (i * plotW) / Math.max(current.length - 1, 1);
+    const y = (v: number) => PLOT.top + (1 - v / max) * plotH;
+
+    // 次坐标轴（右）：退货率 + 毛利率共用 0~rateCeil 百分比刻度。
+    const rateVals = [
+      ...refund.filter((v) => Number.isFinite(v) && v > 0),
+      ...margin.filter((v): v is number => v != null && Number.isFinite(v) && v > 0),
+    ];
+    const rateMax = rateVals.length ? Math.max(...rateVals) : 12;
+    const rateCeil = Math.max(10, Math.ceil(rateMax / 10) * 10);
+    const yRate = (v: number) => PLOT.top + (1 - v / rateCeil) * plotH;
+
+    const currentPath = buildPath(current, x, y);
+    const previousPath = buildSparsePath(previous, x, y);
+    const refundPath = buildSparsePath(refund, x, yRate);
+    const marginPath = buildSparsePath(margin, x, yRate);
+    const area = `${currentPath} L ${x(current.length - 1).toFixed(2)} ${PLOT.top + plotH} L ${x(0).toFixed(2)} ${PLOT.top + plotH} Z`;
+
+    const guides = [0, 0.25, 0.5, 0.75, 1].map((ratio) => {
+      const yy = PLOT.top + (1 - ratio) * plotH;
+      return (
+        <g key={ratio}>
+          <line className="grid-line" x1={PLOT.left} x2={width - PLOT.right} y1={yy} y2={yy} />
+          <text className="axis-text" x={PLOT.left - 10} y={yy + 4} textAnchor="end">{Math.round((max * ratio) / 10000)}万</text>
+        </g>
+      );
+    });
+
+    const rateGuides = Array.from({ length: RATE_STEPS + 1 }, (_, i) => {
+      const v = (rateCeil / RATE_STEPS) * i;
+      const yy = yRate(v);
+      return <text className="axis-text" key={`r${i}`} x={width - PLOT.right + 8} y={yy + 4} textAnchor="start">{Math.round(v)}%</text>;
+    });
+
+    const tickCount = Math.min(days.length, 7, Math.max(2, Math.floor(plotW / 64)));
+    const tickIndices = new Set(Array.from({ length: tickCount }, (_, index) => Math.round(index * (days.length - 1) / Math.max(1, tickCount - 1))));
+    const ticks = days.map((label, index) => tickIndices.has(index)
+      ? <text className="axis-text" key={index} x={x(index)} y={HEIGHT - 14} textAnchor="middle">{label}</text>
+      : null);
+    const marks = <>
+      {guides}{rateGuides}{ticks}
+      <path className="trend-area" d={area} />
+      {previousPath && <path className="line-previous" d={previousPath} pathLength={1} />}
+      <path className="line-current" d={currentPath} pathLength={1} />
+      {refundPath && <path className="line-refund" d={refundPath} pathLength={1} />}
+      {marginPath && <path className="line-margin" d={marginPath} pathLength={1} />}
+    </>;
+    return { plotW, plotH, x, y, yRate, marks };
+  }, [days, current, previous, refund, margin, width]);
+  const { plotW, plotH, x, y, yRate, marks } = geometry;
+
   if (!days.length || !current.length) {
     return (
-      <div className="chart-area">
+      <><div className="chart-area" ref={containerRef}>
         <div className="trend-svg" style={{ minHeight: 292, display: "grid", placeItems: "center", color: "var(--muted)" }}>
           本期逐日数据不足，暂无趋势图
         </div>
-      </div>
+      </div></>
     );
   }
-  const plotW = WIDTH - PLOT.left - PLOT.right;
-  const plotH = HEIGHT - PLOT.top - PLOT.bottom;
-  const prevValues = previous.filter((v): v is number => v != null && Number.isFinite(v));
-  const max = Math.max(...current, ...prevValues, 1) * 1.18;
-  const x = (i: number) => PLOT.left + (i * plotW) / Math.max(current.length - 1, 1);
-  const y = (v: number) => PLOT.top + (1 - v / max) * plotH;
-
-  // 次坐标轴（右）：退货率 + 毛利率共用 0~rateCeil 百分比刻度。
-  const rateVals = [
-    ...refund.filter((v) => Number.isFinite(v) && v > 0),
-    ...margin.filter((v): v is number => v != null && Number.isFinite(v) && v > 0),
-  ];
-  const rateMax = rateVals.length ? Math.max(...rateVals) : 12;
-  const rateCeil = Math.max(10, Math.ceil(rateMax / 10) * 10);
-  const yRate = (v: number) => PLOT.top + (1 - v / rateCeil) * plotH;
-
-  const currentPath = buildPath(current, x, y);
-  const previousPath = buildSparsePath(previous, x, y);
-  const refundPath = buildSparsePath(refund, x, yRate);
-  const marginPath = buildSparsePath(margin, x, yRate);
-  const area = `${currentPath} L ${x(current.length - 1).toFixed(2)} ${PLOT.top + plotH} L ${x(0).toFixed(2)} ${PLOT.top + plotH} Z`;
-
-  const guides = [0, 0.25, 0.5, 0.75, 1].map((ratio) => {
-    const yy = PLOT.top + (1 - ratio) * plotH;
-    return (
-      <g key={ratio}>
-        <line className="grid-line" x1={PLOT.left} x2={WIDTH - PLOT.right} y1={yy} y2={yy} />
-        <text className="axis-text" x={PLOT.left - 10} y={yy + 4} textAnchor="end">{Math.round((max * ratio) / 10000)}万</text>
-      </g>
-    );
-  });
-
-  const rateGuides = Array.from({ length: RATE_STEPS + 1 }, (_, i) => {
-    const v = (rateCeil / RATE_STEPS) * i;
-    const yy = yRate(v);
-    return <text className="axis-text" key={`r${i}`} x={WIDTH - PLOT.right + 8} y={yy + 4} textAnchor="start">{Math.round(v)}%</text>;
-  });
-
-  const ticks = days.map((label, index) => {
-    const day = parseInt(label.slice(3, 5), 10);
-    if (day === 1 || day % 5 === 0 || index === days.length - 1) {
-      return <text className="axis-text" key={index} x={x(index)} y={HEIGHT - 14} textAnchor="middle">{label}</text>;
-    }
-    return null;
-  });
 
   function onMove(e: React.PointerEvent<SVGSVGElement>) {
     if (!svgRef.current || !current.length) return;
     const rect = svgRef.current.getBoundingClientRect();
-    const xSvg = ((e.clientX - rect.left) * WIDTH) / rect.width;
+    const xSvg = ((e.clientX - rect.left) * width) / rect.width;
     const idx = Math.max(0, Math.min(current.length - 1, Math.round(((xSvg - PLOT.left) / plotW) * Math.max(0, current.length - 1))));
     setHover(idx);
     const value = current[idx];
@@ -123,38 +135,32 @@ export function MonthlyTrendChart({ trend, summary, previousMonth, tooltip }: Pr
     tooltip.hide();
   }
 
-  const hoverX = hover != null ? x(hover) : null;
-  const safeHover = hover ?? -1;
+  const activeHover = hover != null && hover < current.length ? hover : null;
+  const hoverX = activeHover != null ? x(activeHover) : null;
+  const safeHover = activeHover ?? -1;
   const pv = previous[safeHover];
   const rv = refund[safeHover];
   const mv = margin[safeHover];
 
   return (
     <>
-      <div className="chart-area">
+      <div className="chart-area" ref={containerRef}>
         <svg
           className="trend-svg"
           ref={svgRef}
-          viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
+          viewBox={`0 0 ${width} ${HEIGHT}`}
           role="img"
           aria-label="月度趋势对比：当期与上期商家实收、退货率、毛利率"
           onPointerMove={onMove}
           onPointerLeave={onLeave}
         >
-          {guides}
-          {rateGuides}
-          {ticks}
-          <path className="trend-area" d={area} />
-          {previousPath && <path className="line-previous" d={previousPath} pathLength={1} />}
-          <path className="line-current" d={currentPath} pathLength={1} />
-          {refundPath && <path className="line-refund" d={refundPath} pathLength={1} />}
-          {marginPath && <path className="line-margin" d={marginPath} pathLength={1} />}
+          {marks}
           {hoverX != null && (
             <line className="trend-crosshair" x1={hoverX.toFixed(2)} x2={hoverX.toFixed(2)} y1={PLOT.top} y2={PLOT.top + plotH} />
           )}
-          {hover != null && (
+          {activeHover != null && (
             <>
-              <circle className="trend-hit" cx={hoverX!.toFixed(2)} cy={y(current[hover]).toFixed(2)} r={4} />
+              <circle className="trend-hit" cx={hoverX!.toFixed(2)} cy={y(current[activeHover]).toFixed(2)} r={4} />
               {pv != null && Number.isFinite(pv) && (
                 <circle className="trend-hit-prev" cx={hoverX!.toFixed(2)} cy={y(pv).toFixed(2)} r={3.5} />
               )}

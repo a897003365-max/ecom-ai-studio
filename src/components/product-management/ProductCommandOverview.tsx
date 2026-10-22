@@ -88,7 +88,7 @@ export function ProductCommandOverview({ pm, channelScoped, focusTarget }: Props
         </div>
       </section>
 
-      <section className="matrix-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(480px, 1fr))", gap: "16px", marginTop: "16px" }}>
+      <section className="matrix-grid">
         <Card title="渠道平台 × 发货仓 销售数量">
           <MatrixTable matrix={model.channelWarehouseMatrix} rowHeader="渠道平台" minWidth={480} />
         </Card>

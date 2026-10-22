@@ -90,4 +90,13 @@ const reportHealthy = scoreChannelHealth(pmHealthy);
 const refundRedLights = reportHealthy.redLights.filter((l) => l.type === "退款率过高");
 assert.equal(refundRedLights.length, 0, `退款率 2% 不应触发红灯，实际 ${refundRedLights.length}`);
 
+// 可见决策卡直接消费健康度结果：完整保留渠道与原始指标，缺失成本仍为 null。
+assert.deepEqual(new Set(report.channels.map((row) => row.channel)), new Set(channelBreakdown.map((row) => row.channel)));
+for (const source of channelBreakdown) {
+  const visible = report.channels.find((row) => row.channel === source.channel);
+  assert.equal(visible.receivedAmount, source.receivedAmount);
+  assert.equal(visible.grossMargin, source.grossMargin);
+}
+assert.ok(reportNull.channels.every((row) => row.grossMargin === null), "成本未覆盖不能显示为零毛利率");
+assert.ok(report.suggestions.every((suggestion) => report.channels.some((row) => row.channel === suggestion.channel)), "每条归因建议必须能定位到当前渠道");
 console.log("channel health scoring: ok");

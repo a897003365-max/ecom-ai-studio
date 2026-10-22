@@ -1,3 +1,4 @@
+import { moneyYuan as money, percent as pct, count } from "./productCommandFormat";
 import { Card } from "../Card";
 import { SortableTable } from "../SortableTable";
 import { StructureMatrixTable } from "./StructureMatrixTable";
@@ -22,12 +23,10 @@ const EMPTY: ProductSizeStructurePages = {
   quality: { status: "unavailable", coverage: null, warnings: ["模块未实现"] },
 };
 
-const pct = (v: number) => `${(v * 100).toFixed(1)}%`;
-const money = (v: number) => `¥${v.toLocaleString("zh-CN", { maximumFractionDigits: 0 })}`;
-const count = (v: number) => v.toLocaleString("zh-CN");
 
 export function SizeStructurePanel({ data }: { data?: ProductSizeStructurePages | null }) {
   const v = data ?? EMPTY;
+  const emptyHint = v.quality.status === "unavailable" ? "当前数据源未覆盖尺寸结构，请检查数据覆盖范围。" : "当前筛选范围没有匹配的尺寸结构数据。";
   return (
     <>
       <Card title="尺寸分布">
@@ -35,7 +34,7 @@ export function SizeStructurePanel({ data }: { data?: ProductSizeStructurePages 
           minWidth={620}
           rowKey={(r) => r.size}
           rows={v.sizes}
-          emptyHint="当前筛选范围无可识别尺寸"
+          emptyHint={emptyHint}
           columns={[
             { key: "size", label: "尺寸", sortValue: (r) => r.size, render: (r) => <span className="font-semibold">{r.size}</span> },
             { key: "salesUnits", label: "销量", align: "right", sortValue: (r) => r.salesUnits, render: (r) => count(r.salesUnits) },
@@ -45,10 +44,10 @@ export function SizeStructurePanel({ data }: { data?: ProductSizeStructurePages 
         />
       </Card>
       <Card title="床垫类别 × 尺寸 订单行占比" className="mt-4">
-        <StructureMatrixTable matrix={v.mattressCategoryMatrix} rowHeader="床垫类别" />
+        <StructureMatrixTable emptyHint={emptyHint} matrix={v.mattressCategoryMatrix} rowHeader="床垫类别" />
       </Card>
       <Card title="TOP15 产品 × 尺寸 订单行占比" className="mt-4">
-        <StructureMatrixTable matrix={v.topProductMatrix} rowHeader="产品名称" />
+        <StructureMatrixTable emptyHint={emptyHint} matrix={v.topProductMatrix} rowHeader="产品名称" />
       </Card>
     </>
   );
