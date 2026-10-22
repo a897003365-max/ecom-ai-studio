@@ -34,6 +34,12 @@ assert(!replica.includes("slice(-16)") && !replica.includes("slice(0, 30)"), "�
 assert(replica.includes('data-testid="powerbi-daily-core-table"'), "每天核心数据缺少 PBIX 一比一复刻标识");
 assert(replica.includes('data-testid="daily-core-year-toggle"') && replica.includes('data-testid="daily-core-month-toggle"'), "每天核心数据缺少 PBIX 年/月展开折叠按钮");
 assert(replica.includes("aria-expanded") && replica.includes("expandedYears") && replica.includes("expandedMonths"), "每天核心数据未维护可访问的年月层级展开状态");
+assert(replica.includes("onSelectDate") && replica.includes("is-day-selectable") && replica.includes('row.hierarchyLevel === "day"'), "每天核心数据日行缺少点击联动筛选交互");
+assert(replica.includes("已选日期：") && replica.includes("selectedDate ?? start"), "天猫明细缺少已选日期清除入口或单日叠加筛选区间");
+assert(styles.includes("is-day-selectable"), "可点日行缺少指针样式");
+const promotionDailyStart = replica.indexOf('data-testid="promotion-daily-spend-table"');
+assert(promotionDailyStart > 0 && replica.slice(promotionDailyStart, replica.indexOf("</table>", promotionDailyStart)).includes("onSelectDate"), "推广费用明细-每日推广费用日行缺少点击联动筛选");
+assert(replica.includes("商品每日推广数据") && replica.includes("fullRangeRows") && replica.includes('labelHeader="日期"'), "商品推广费用-商品每日推广数据缺少点击联动筛选");
 const dailyCoreStart = replica.indexOf('data-testid="powerbi-daily-core-table"');
 const dailyCoreEnd = replica.indexOf("</table>", dailyCoreStart);
 const dailyCoreMarkup = replica.slice(dailyCoreStart, dailyCoreEnd);
@@ -125,13 +131,14 @@ const competitorSummaryStart = replica.indexOf('data-testid="competitor-brand-su
 const competitorSummaryEnd = replica.indexOf("</table>", competitorSummaryStart);
 const competitorSummaryMarkup = replica.slice(competitorSummaryStart, competitorSummaryEnd);
 // 品牌汇总表同样将 4 列人群成本合并为 hover 浮窗列，以线上组件为准
-const competitorSummaryColumns = ["品牌", "消耗(万)", "ROI(公式)", "展现量(万)", "点击量(万)", "点击率(竞品)", "成交金额(万)"];
+const competitorSummaryColumns = ["品牌", "消耗(万)", "ROI(公式)", "展现量(万)", "点击量(万)", "平均点击成本", "点击率(竞品)", "成交金额(万)"];
 previousColumnIndex = -1;
 for (const column of competitorSummaryColumns) {
   const columnIndex = competitorSummaryMarkup.indexOf(`label="${column}"`);
   assert(columnIndex > previousColumnIndex, `竞品品牌汇总表列缺失或顺序不符合 PBIX：${column}`);
   previousColumnIndex = columnIndex;
 }
+assert(replica.includes("spendWan / clicksWan") && replica.includes("cpc"), "竞品品牌汇总缺少平均点击成本（消耗/点击，万元÷万点击=元）");
 assert(types.includes("interface PowerBiCompetitorDaily") && types.includes("competitorDaily: PowerBiCompetitorDaily[]"), "前端类型未接入竞品推广数据集 competitorDaily");
 assert(warehouse.includes("_build_competitor_daily") && warehouse.includes('"competitorDaily"'), "数仓未生成 competitorDaily 页面数据");
 assert(warehouse.includes('_model_view(connection, "14-推广竞品数据")'), "竞品数据未引用 PBIX 14-推广竞品数据 模型视图");
@@ -159,10 +166,37 @@ assert(replica.includes("previousRangeFor") && replica.includes("较上期环比
 assert(replica.includes('data-testid="tmall-service-agent-table"') && replica.indexOf("onClick={() => setSelectedAgent") > -1, "客服明细行缺少点击联动回调");
 assert(replica.includes("pb-selected-agent-chip") && replica.includes("is-selected"), "客服联动缺少筛选 chip 或选中行高亮样式类");
 assert(replica.includes("unavailable") && replica.includes('value={current == null ? "—"'), "客服联动 KPI 缺少客服维度占位（unavailable 显示 —）");
-assert(replica.includes('"salesAmountWan"') && replica.includes('"inquiryConvRate"') && replica.includes('"inquiryConversionRate"'), "客服整体/客服模式趋势图字段映射缺失");
+assert(replica.includes('"netSalesWan"') && replica.includes('"inquiryConvRate"') && replica.includes('"inquiryConversionRate"'), "客服整体/客服模式趋势图字段映射缺失");
+// 天猫客服页销售额口径唯一：KPI 卡与明细表都必须走净销售额，禁止毛额 salesAmountWan 回归
+assert(!replica.includes("salesAmountWan") && !warehouse.includes("salesAmountWan"), "天猫客服页残留毛额字段 salesAmountWan，销售额口径不统一");
+assert(warehouse.includes('sum(coalesce(try_cast("净销售额" AS DOUBLE), 0)) / 10000 AS netSalesWan'), "客服按客服聚合未使用净销售额口径");
 assert(types.includes("interface PowerBiCustomerService") && types.includes("customerService: PowerBiCustomerService"), "前端类型未接入客服数据 customerService");
 assert(warehouse.includes("_build_customer_service") && warehouse.includes('"customerService"'), "数仓未生成 customerService 客服页面数据");
 assert(styles.includes("pb-chart-tooltip") && styles.includes("translateX(-50%)"), "客服趋势图 tooltip 缺少本地坐标居中样式");
+
+// ===== 抖音每日客服（飞鸽客服数据导出）契约 =====
+assert(replica.includes("抖音每日客服") && replica.includes("DouyinServicePage"), "客服看板缺少抖音子看板 tab 或 DouyinServicePage");
+assert(replica.includes('data-testid="douyin-service-agent-table"'), "抖音客服明细表缺少测试标识 douyin-service-agent-table");
+assert(types.includes("douyin?:") && types.includes("onlineSeconds?:"), "前端类型未接入 customerService.douyin 结构");
+assert(warehouse.includes("_build_douyin_customer_service") && warehouse.includes('"douyin"'), "数仓未生成 customerService.douyin 页面数据");
+assert(warehouse.includes('_model_view(connection, "16-抖音每日客服")'), "抖音客服未引用 PBIX 16-抖音每日客服 模型视图");
+assert(warehouse.includes('"退款后销售额"'), "抖音客服净销售额未使用飞鸽「退款后销售额」口径");
+const douyinStart = replica.indexOf("function DouyinServicePage");
+const douyinEnd = replica.indexOf("function CustomerServiceWorkspace", douyinStart);
+const douyinMarkup = replica.slice(douyinStart, douyinEnd);
+assert(douyinMarkup.includes("usePagination(tableRows") && douyinMarkup.includes(", 10)"), "抖音客服明细表未启用每页 10 行翻页");
+assert(!douyinMarkup.includes("选择客服日期"), "抖音客服模块不应内置日期筛选（应联动全局筛选器）");
+assert(!douyinMarkup.includes("退款金额") && !douyinMarkup.includes("询单支付"), "抖音客服页不应展示询单支付金额/退款金额（只保留净销售额=退款后销售额）");
+assert(douyinMarkup.includes("在线时长") && douyinMarkup.includes("接待会话量") && douyinMarkup.includes("平均响应") && douyinMarkup.includes("全天满意率"), "抖音客服明细表缺少 在线时长/接待会话量/平均响应/全天满意率 列");
+
+// 客服明细表升降序排序 + 实际数据覆盖日期标注（2026-09-12 运营反馈：三源最新日不一致，筛选区间尾端可能无数据）
+const tmallServiceMarkup = replica.slice(replica.indexOf("function TmallServicePage"), replica.indexOf("function JdServicePage"));
+const jdServiceMarkup = replica.slice(replica.indexOf("function JdServicePage"), replica.indexOf("function DouyinServicePage"));
+for (const [name, markup] of [["天猫", tmallServiceMarkup], ["京东", jdServiceMarkup], ["抖音", douyinMarkup]]) {
+  assert(markup.includes("useColumnSort") && markup.includes("SortHeader") && markup.includes("sortRows(aggregatedRows"), `${name}客服明细表缺少升降序排序按钮`);
+  assert(markup.includes("serviceCoverageNote(range, detailRows)"), `${name}客服明细缺少实际数据覆盖日期标注`);
+}
+assert(replica.includes("function serviceCoverageNote") && replica.includes("实际数据"), "客服模块缺少实际数据覆盖日期标注辅助函数");
 
 // ===== 天猫明细按需重算（快照 60 天窗口外的全局筛选区间）契约 =====
 assert(cli.includes("query-powerbi-pages") && cli.includes("_build_powerbi_pages"), "CLI 缺少 query-powerbi-pages 按需重算子命令");
@@ -188,5 +222,12 @@ assert(
   replica.includes("coverageSummary") && replica.includes("数仓缺口") && replica.includes("数仓覆盖完整"),
   "天猫明细标签缺少数仓覆盖缺口说明",
 );
+
+// ===== mds 天猫店铺日汇总（钉钉同源 postgres 直读）契约 =====
+assert(warehouse.includes("_sync_postgres_query") && warehouse.includes("TMALL_SHOP_SUMMARY_QUERY"), "数仓缺少 postgres 源同步分支（故障隔离）");
+assert(warehouse.includes("_build_shop_summary_daily") && warehouse.includes('"shopSummaryDaily"'), "数仓 powerbiPages 缺少 shopSummaryDaily 数据键");
+assert(types.includes("interface PowerBiShopSummaryDaily") && types.includes("shopSummaryDaily?:"), "前端类型未接入 mds 店铺日汇总");
+assert(replica.includes("店铺日汇总（钉钉同源）") && replica.includes('data-testid="shop-summary-mds-table"'), "天猫明细页缺少店铺日汇总卡片");
+assert(replica.includes("pages.shopSummaryDaily ?? []"), "店铺日汇总未对旧快照做 ?? [] 容错");
 
 console.log("powerbi replica contract ok");

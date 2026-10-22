@@ -6,6 +6,7 @@ export type PageId =
   | "content"
   | "images"
   | "analytics"
+  | "customer-service"
   | "intelligence"
   | "sentiment"
   | "tasks"
@@ -22,7 +23,7 @@ export type Tone =
   | "pink"
   | "muted";
 
-export type Platform = "天猫" | "京东" | "抖音" | "快手" | "小红书" | "拼多多" | "唯品" | "TikTok";
+export type Platform = "天猫" | "淘宝" | "京东" | "抖音" | "快手" | "小红书" | "拼多多" | "唯品" | "TikTok";
 
 export type TaskType =
   | "content_generate"

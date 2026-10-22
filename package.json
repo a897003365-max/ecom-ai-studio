@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "node server/index.mjs",
     "dev:ui": "vite --host 127.0.0.1",
-    "build": "tsc --noEmit && vite build",
+    "build": "tsc --noEmit && vite build && node scripts/export-price-snapshots.mjs",
     "lint": "eslint src server scripts vite.config.ts",
     "typecheck": "tsc --noEmit",
     "test": "npm run test:dashboard-ui && npm run test:select-theme && npm run test:ux-polish",
@@ -18,6 +18,8 @@
     "schedule:devserver": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/register-devserver-schedule.ps1",
     "export:jushuitan": "node scripts/sync-jushuitan-export.mjs",
     "schedule:jushuitan": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/register-jushuitan-export-schedule.ps1",
+    "check:coze": "node scripts/check-coze-api.mjs",
+    "schedule:coze": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/register-coze-health-check-schedule.ps1",
     "extract:power-query": "node scripts/extract-power-query.mjs",
     "test:dingtalk": "node scripts/test-dingtalk-import.mjs",
     "test:dingtalk-api": "node scripts/test-dingtalk-api.mjs",
@@ -25,9 +27,10 @@
     "test:dingtalk-unattended": "node scripts/test-dingtalk-unattended-contract.mjs",
     "test:dashboard-ui": "node scripts/test-dashboard-ui-contract.mjs",
     "test:channel-health": "node --experimental-strip-types scripts/test-channel-health.mjs",
+    "test:channel-snapshot": "node --experimental-strip-types scripts/test-channel-snapshot.mjs",
     "test:products": "node scripts/test-product-management-current-contract.mjs",
     "test:analytics-sync": "node scripts/test-analytics-sync-contract.mjs",
-    "test:analytics-dashboard": "node scripts/test-warehouse-dashboard-metrics.mjs && node scripts/test-dingtalk-api.mjs && node scripts/test-dashboard-ui-contract.mjs",
+    "test:analytics-dashboard": "node scripts/test-warehouse-dashboard-metrics.mjs && node scripts/test-dingtalk-api.mjs && node --experimental-strip-types scripts/test-channel-snapshot.mjs && node scripts/test-dashboard-ui-contract.mjs",
     "test:ux-polish": "node scripts/test-ux-polish-contract.mjs",
     "test:powerbi-replica": "node scripts/test-powerbi-replica-contract.mjs",
     "test:powerbi-images": "node scripts/test-powerbi-image-contract.mjs",
@@ -35,7 +38,9 @@
     "test:auth": "node scripts/test-auth-service.mjs && node scripts/test-auth-http-contract.mjs && node scripts/test-auth-http-e2e.mjs",
     "test:global-search": "node scripts/test-global-search-contract.mjs && node scripts/test-global-search-api.mjs",
     "test:smoke": "node scripts/smoke-local.mjs",
-    "test:intelligence-report": "node scripts/test-intelligence-report.mjs"
+    "test:sentiment": "node --experimental-strip-types scripts/test-sentiment-classifier.mjs",
+    "test:intelligence-report": "node scripts/test-intelligence-report.mjs",
+    "test:price-snapshots": "node --test scripts/test-price-snapshots.mjs"
   },
   "dependencies": {
     "@fontsource/space-grotesk": "^5.2.10",

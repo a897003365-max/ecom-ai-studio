@@ -27,6 +27,7 @@ export const navItems: NavItem[] = [
   { id: "images", label: "图片处理工坊", icon: "🖼️", group: "内容生产" },
   { id: "tasks", label: "任务队列", icon: "✅", group: "内容生产" },
   { id: "analytics", label: "运营数据看板", icon: "📊", group: "数据与监控" },
+  { id: "customer-service", label: "客服数据", icon: "🎧", group: "数据与监控" },
   { id: "intelligence", label: "竞品情报 / TOP100", icon: "🕸️", group: "数据与监控" },
   { id: "sentiment", label: "小红书舆情分析", icon: "📡", group: "数据与监控" },
 

@@ -5,6 +5,7 @@ import json
 import os
 import sys
 from datetime import date
+from pathlib import Path
 
 import duckdb
 
@@ -44,6 +45,10 @@ def build_parser() -> argparse.ArgumentParser:
     qp.add_argument("--status", action="append", dest="statuses", default=None, help="订单状态筛选（可重复）")
     qp.add_argument("--channel", action="append", dest="channels", default=None, help="渠道平台筛选（可重复）")
     qp.add_argument("--store-short-name", action="append", dest="store_short_names", default=None, help="店铺简称筛选（可重复）")
+    qp.add_argument("--product-code", action="append", dest="product_codes", default=None, help="商品编码筛选（仅保留，可重复）")
+    qp.add_argument("--exclude-product-code", action="append", dest="exclude_product_codes", default=None, help="商品编码排除（可重复）")
+    qp.add_argument("--product-id", action="append", dest="product_ids", default=None, help="商品ID筛选（仅保留，可重复）")
+    qp.add_argument("--exclude-product-id", action="append", dest="exclude_product_ids", default=None, help="商品ID排除（可重复）")
     pp = subparsers.add_parser(
         "query-powerbi-pages",
         help="Query PowerBI replica page aggregates for an explicit date range (on-demand, bypasses the 60-day snapshot window)",
@@ -79,11 +84,32 @@ def build_parser() -> argparse.ArgumentParser:
         default=os.environ.get("JUSHUITAN_WRITE_PASSWORD", ""),
         help="Write/edit password for document encryption (default: $JUSHUITAN_WRITE_PASSWORD)",
     )
+    jst = subparsers.add_parser(
+        "build-jst-db",
+        help="Build jst order layer tables in mds-postgres-1 from public.jst_order_item_daily",
+    )
+    jst.add_argument("--refresh-aux", action="store_true", help="从日更 Excel 重建辅助维表")
+    jst.add_argument("--data-root", default=None, help="日更数据根目录（默认 ECOM_DATA_ROOT）")
+    jst.add_argument("--source-csv", default=None, help="复用已导出的源表 CSV（调试用）")
+    jst.add_argument("--web-only", action="store_true")
+    jst.add_argument("--export-only", action="store_true")
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     arguments = build_parser().parse_args(argv)
+    if arguments.command == "build-jst-db":
+        from .jst_db_layer import refresh
+
+        result = refresh(
+            refresh_aux=arguments.refresh_aux,
+            data_root=Path(arguments.data_root) if arguments.data_root else None,
+            source_csv=Path(arguments.source_csv) if arguments.source_csv else None,
+            web_only=arguments.web_only,
+            export_only=arguments.export_only,
+        )
+        print(json.dumps(result, ensure_ascii=False, default=str))
+        return 0
     if arguments.command == "status":
         print(json.dumps(warehouse_status(), ensure_ascii=False, indent=2, default=str))
         return 0
@@ -98,6 +124,10 @@ def main(argv: list[str] | None = None) -> int:
                 statuses=arguments.statuses,
                 channels=arguments.channels,
                 store_short_names=arguments.store_short_names,
+                product_codes=arguments.product_codes,
+                exclude_product_codes=arguments.exclude_product_codes,
+                product_ids=arguments.product_ids,
+                exclude_product_ids=arguments.exclude_product_ids,
             )
         finally:
             connection.close()
@@ -119,8 +149,6 @@ def main(argv: list[str] | None = None) -> int:
         sys.stdout.buffer.write(json.dumps({"powerbiPages": pages}, ensure_ascii=False, default=str).encode("utf-8"))
         return 0
     if arguments.command == "export-jushuitan":
-        from pathlib import Path
-
         target = Path(arguments.target)
         health_path = Path(arguments.health_file)
         if arguments.sync:

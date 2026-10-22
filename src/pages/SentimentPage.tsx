@@ -594,13 +594,17 @@ export function SentimentPage({ canManage, onAction }: SentimentPageProps) {
   );
 
   const result = currentReport?.result ?? null;
+  // 声量最高笔记：优先展示「当前仍判负」的笔记（按赞+评降序），避免历史报告里因词典边界/
+  // 旧版算法误判入集的正面、中性笔记被顶到负面声量榜首；全部非负时才回退到最高互动。
   const topNote = useMemo(() => {
     if (!currentReport) return null;
     const ids = new Set(currentReport.noteIds);
     const matched = libNotes.filter((n) => ids.has(n.noteId));
     if (!matched.length) return null;
-    return [...matched].sort((a, b) => (b.liked + b.comment) - (a.liked + a.comment))[0];
-  }, [currentReport, libNotes]);
+    const negativeNow = matched.filter((n) => sentimentMap.get(`${n.noteId}|${n.keyword}`)?.label === "negative");
+    const pool = negativeNow.length ? negativeNow : matched;
+    return [...pool].sort((a, b) => (b.liked + b.comment) - (a.liked + a.comment))[0];
+  }, [currentReport, libNotes, sentimentMap]);
 
   return (
     <div data-ui="sentiment-page">

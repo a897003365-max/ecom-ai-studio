@@ -1,20 +1,17 @@
 import { useMemo, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
-import { BarChart3, BadgeDollarSign, CircleGauge, Megaphone, RefreshCcw, Share2, Target } from "lucide-react";
+import { BarChart3, BadgeDollarSign, CircleGauge, Lightbulb, Megaphone, RefreshCcw, Share2, Target } from "lucide-react";
 import type { Platform } from "../types";
 import type {
   DingTalkMetricTrend,
   DingTalkMetricTotals,
   DingTalkSnapshot,
-  ProductManagementPages,
 } from "../types/integration";
-import { Card } from "./Card";
 import { ChannelRevenueChart } from "./ChannelRevenueChart";
 import { ComparisonTicker } from "./ComparisonTicker";
 import { PlatformBadge } from "./PlatformBadge";
 
 interface ExecutiveCommerceOverviewProps {
   dingtalk: DingTalkSnapshot;
-  productManagement: ProductManagementPages | null;
   selectedChannel?: string;
 }
 
@@ -419,12 +416,37 @@ function ChannelQualityTable({ platforms }: { platforms: DingTalkSnapshot["platf
   );
 }
 
-function StoreQualityTable({ stores, totalsYoy }: { stores: DingTalkSnapshot["stores"]; totalsYoy?: number | null }) {
+function StoreQualityTable({
+  stores,
+  totalsYoy,
+  storeTargets,
+  completionMonth,
+}: {
+  stores: DingTalkSnapshot["stores"];
+  totalsYoy?: number | null;
+  storeTargets?: Record<string, Record<string, number>>;
+  completionMonth?: string;
+}) {
+  // 展示顺序：按渠道分组，固定顺序 天猫 → 抖音 → 京东 → 拼多多 → 唯品，其余渠道放最后；组内按净回款降序
+  const channelOrder = ["天猫", "抖音", "京东", "拼多多", "唯品"];
+  const channelRank = (platform: string) => {
+    const rank = channelOrder.indexOf(platform);
+    return rank === -1 ? channelOrder.length : rank;
+  };
   const rows = [...stores]
-    .sort((left, right) => right.netRevenue - left.netRevenue)
+    .sort((left, right) => {
+      const leftRank = channelRank(left.platform);
+      const rightRank = channelRank(right.platform);
+      if (leftRank !== rightRank) return leftRank - rightRank;
+      return right.netRevenue - left.netRevenue;
+    })
     .map(withRates);
   const maxGmv = Math.max(...rows.map((item) => item.gmv), 1);
   const totalNetRevenue = rows.reduce((sum, item) => sum + item.netRevenue, 0);
+  // 店铺月目标：key 为「platform|store」，取所选结束日所在月份；无对应目标的店铺月完成率显示 —。
+  const monthTargets = (completionMonth && storeTargets?.[completionMonth]) || {};
+  const storeKey = (item: { platform: string; store: string }) => `${item.platform}|${item.store}`;
+  const overallTarget = rows.reduce((sum, item) => sum + (monthTargets[storeKey(item)] || 0), 0);
   const summary = rows.reduce((total, item) => ({
     gmv: total.gmv + item.gmv,
     netRevenue: total.netRevenue + item.netRevenue,
@@ -446,7 +468,7 @@ function StoreQualityTable({ stores, totalsYoy }: { stores: DingTalkSnapshot["st
         <table className="exec-channel-table">
           <thead>
             <tr>
-              <th>排名</th><th>渠道</th><th>店铺</th><th>GMV</th><th>净回款</th><th>净回款同比</th><th>回款率</th><th>推广费</th><th>费比</th><th>退款率</th><th>小红书推广费</th><th>占比</th>
+              <th>排名</th><th>渠道</th><th>店铺</th><th>GMV</th><th>净回款</th><th>净回款同比</th><th>回款率</th><th>推广费</th><th>费比</th><th>退款率</th><th>小红书推广费</th><th>占比</th><th>月完成率</th>
             </tr>
           </thead>
           <tbody>
@@ -473,6 +495,9 @@ function StoreQualityTable({ stores, totalsYoy }: { stores: DingTalkSnapshot["st
                   </td>
                   <td>{item.offsiteSpend ? money(item.offsiteSpend) : "—"}</td>
                   <td>{percent(totalNetRevenue ? item.netRevenue / totalNetRevenue : 0)}</td>
+                  <td className={monthTargets[storeKey(item)] > 0 && item.netRevenue / monthTargets[storeKey(item)] >= 1 ? "is-net" : ""}>
+                    {monthTargets[storeKey(item)] > 0 ? percent(item.netRevenue / monthTargets[storeKey(item)]) : "—"}
+                  </td>
                 </tr>
               );
             })}
@@ -489,38 +514,11 @@ function StoreQualityTable({ stores, totalsYoy }: { stores: DingTalkSnapshot["st
               <td>{percent(rate(summary.refund, summary.gmv))}</td>
               <td>{summary.offsiteSpend ? money(summary.offsiteSpend) : "—"}</td>
               <td>{percent(1)}</td>
+              <td>{overallTarget > 0 ? percent(rate(summary.netRevenue, overallTarget)) : "—"}</td>
             </tr>
           </tfoot>
         </table>
       </div>
-    </section>
-  );
-}
-
-function CategoryPerformance({ productManagement }: { productManagement: ProductManagementPages | null }) {
-  const rows = [...(productManagement?.mattressCategoryBreakdown ?? [])]
-    .sort((left, right) => right.salesAmount - left.salesAmount);
-  const maxValue = Math.max(...rows.map((item) => item.salesAmount), 1);
-  return (
-    <section className="exec-panel exec-category-panel" data-search-anchor="analytics-category-performance" data-testid="executive-category-performance">
-      <header className="exec-panel-head">
-        <div>
-          <span className="exec-panel-kicker"><Target size={14} />商品结构</span>
-          <h2>核心品类销售额</h2>
-          <p>{productManagement?.period ? `${productManagement.period.start} 至 ${productManagement.period.end}` : "商品经营数据暂未同步"}</p>
-        </div>
-      </header>
-      {rows.length ? (
-        <div className="exec-category-list">
-          {rows.map((item, index) => (
-            <div className="exec-category-row" key={item.category}>
-              <span><em>{String(index + 1).padStart(2, "0")}</em>{item.category}</span>
-              <div><i style={{ width: `${item.salesAmount / maxValue * 100}%` }} /></div>
-              <b>{money(item.salesAmount)}</b>
-            </div>
-          ))}
-        </div>
-      ) : <div className="exec-empty">暂无可用的品类销售数据</div>}
     </section>
   );
 }
@@ -634,7 +632,7 @@ function buildChannelDailyTrend(
   });
 }
 
-export function ExecutiveCommerceOverview({ dingtalk, productManagement, selectedChannel }: ExecutiveCommerceOverviewProps) {
+export function ExecutiveCommerceOverview({ dingtalk, selectedChannel }: ExecutiveCommerceOverviewProps) {
   const totals = withRates(dingtalk.totals);
   const reporting = dingtalk.reporting;
   const monthly = reporting?.monthlyOverview?.metrics;
@@ -738,25 +736,35 @@ export function ExecutiveCommerceOverview({ dingtalk, productManagement, selecte
           <section className="exec-panel exec-channel-trend-panel" data-testid="executive-channel-trend">
             <ChannelRevenueChart daily={channelDailyTrend} selectedChannel={selectedChannel ?? "all"} />
           </section>
-          <CategoryPerformance productManagement={productManagement} />
           <PromotionFunnelPanel totals={dingtalk.totals} scope={scope} />
+          <section className="exec-panel exec-insight-panel" data-testid="executive-insight">
+            <header className="exec-panel-head">
+              <div>
+                <span className="exec-panel-kicker"><Lightbulb size={14} />智能提示</span>
+                <h2>当前经营提示</h2>
+                <p>回款贡献 · 退款风险 · 费比异常</p>
+              </div>
+            </header>
+            <div className="exec-insight-list">
+              <div className="insight-row"><span>回款贡献最高</span><b>{leadingChannel?.platform ?? "-"} · {percent(leadingChannel?.channelShare)}</b></div>
+              <div className="insight-row"><span>退款率最高渠道</span><b className="text-[var(--red)]">{highestRefund?.platform ?? "-"} · {percent(highestRefund?.refundRate)}</b></div>
+              <div className="insight-row"><span>费比最高店铺</span><b className="text-[var(--orange)]">{highestFeeStore?.store ?? "-"} · {percent(highestFeeStore?.feeRate)}</b></div>
+              <div className="insight-note">月度概览按所选结束日累计；最新播报使用最近完整日期。</div>
+            </div>
+          </section>
         </div>
       )}
-
-      <Card title="当前经营提示">
-        <div className="insight-grid">
-          <div className="insight-row"><span>回款贡献最高</span><b>{leadingChannel?.platform ?? "-"} · {percent(leadingChannel?.channelShare)}</b></div>
-          <div className="insight-row"><span>退款率最高渠道</span><b className="text-[var(--red)]">{highestRefund?.platform ?? "-"} · {percent(highestRefund?.refundRate)}</b></div>
-          <div className="insight-row"><span>费比最高店铺</span><b className="text-[var(--orange)]">{highestFeeStore?.store ?? "-"} · {percent(highestFeeStore?.feeRate)}</b></div>
-          <div className="insight-note">月度概览按所选结束日累计；最新播报使用最近完整日期。</div>
-        </div>
-      </Card>
 
       <div className="exec-bottom-grid">
         <ChannelQualityTable platforms={dingtalk.platforms} />
         <ChannelSpendEfficiency platforms={dingtalk.platforms} />
       </div>
-      <StoreQualityTable stores={dingtalk.stores} totalsYoy={reporting?.metricTrends?.netRevenue?.yoy} />
+      <StoreQualityTable
+        stores={dingtalk.stores}
+        totalsYoy={reporting?.metricTrends?.netRevenue?.yoy}
+        storeTargets={reporting?.monthlyTargetsByStore}
+        completionMonth={dingtalk.period?.end?.slice(0, 7) ?? undefined}
+      />
     </div>
   );
 }

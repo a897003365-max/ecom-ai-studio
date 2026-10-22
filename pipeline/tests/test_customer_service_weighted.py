@@ -47,7 +47,7 @@ class CustomerServiceWeightedSatisfactionTests(unittest.TestCase):
                 ("10-4客服员工日报统计", "jd_staff_model"),
             ],
         )
-        # 天猫 10-1：建空表，test 自己灌数据
+        # 天猫 10-1：建空表，test 自己灌数据；列含新结构(2026-06-29 起)原子字段
         self.connection.execute(
             """
             CREATE TABLE tmall_service_model (
@@ -66,6 +66,13 @@ class CustomerServiceWeightedSatisfactionTests(unittest.TestCase):
               "客户满意率" DOUBLE,
               "销售额" DOUBLE,
               "询单最终付款转化率" DOUBLE,
+              "满意" DOUBLE,
+              "很满意" DOUBLE,
+              "收到评价数" DOUBLE,
+              "询单人数" DOUBLE,
+              "询单最终付款人数" DOUBLE,
+              "客服消息条数" DOUBLE,
+              "买家消息条数" DOUBLE,
               "_source_mtime_ns" BIGINT,
               "_source_path" VARCHAR
             )
@@ -115,10 +122,44 @@ class CustomerServiceWeightedSatisfactionTests(unittest.TestCase):
             """
         )
 
-    def _insert_tmall(self, agent: str, satisfaction: float, received: int) -> None:
+    def _insert_tmall(
+        self,
+        agent: str,
+        satisfaction: float,
+        received: int,
+        net_sales: float = 0,
+        gross_sales: float = 0,
+        day: date = date(2026, 8, 19),
+    ) -> None:
+        """旧结构行：新结构原子列全为 NULL，走「平台预制」回退口径。"""
         self.connection.execute(
-            "INSERT INTO tmall_service_model VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-            (date(2026, 8, 19), agent, "售前组", received, 0, 0, 0, 0, 0, 30, 60, 1.2, satisfaction, 0, 0, 1, "a.csv"),
+            'INSERT INTO tmall_service_model ("日期","旺旺昵称","旺旺分组","有效接待人数","当日询单人数",'
+            '"销售人数","净销售额","客单价","询单流失人数","首次响应时长（秒)","平均响应时长（秒)","淘宝答问比",'
+            '"客户满意率","销售额","询单最终付款转化率","_source_mtime_ns","_source_path") '
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (day, agent, "售前组", received, 0, 0, net_sales, 0, 0, 30, 60, 1.2, satisfaction, gross_sales, 0, 1, "a.csv"),
+        )
+
+    def _insert_tmall_new(
+        self,
+        agent: str,
+        day: date,
+        final_pay: int,
+        consult: int,
+        satisfied: int = 0,
+        very_satisfied: int = 0,
+        evaluation: int = 0,
+        agent_msg: int = 0,
+        buyer_msg: int = 0,
+        loss: int = 0,
+    ) -> None:
+        """新结构(2026-06-29 起)行：原子分子分母齐全，满足「严格按列名」口径。"""
+        self.connection.execute(
+            'INSERT INTO tmall_service_model ("日期","旺旺昵称","旺旺分组","有效接待人数","当日询单人数",'
+            '"净销售额","询单流失人数","销售人数","询单人数","询单最终付款人数","满意","很满意",'
+            '"收到评价数","客服消息条数","买家消息条数","_source_mtime_ns","_source_path") '
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (day, agent, "售前组", 10, consult, 10000, loss, 0, consult, final_pay, satisfied, very_satisfied, evaluation, agent_msg, buyer_msg, 1, "b.csv"),
         )
 
     def _insert_jd_staff(self, uid: str, good: int, bad: int) -> None:
@@ -163,6 +204,30 @@ class CustomerServiceWeightedSatisfactionTests(unittest.TestCase):
         self.assertAlmostEqual(by_agent["客服A"], 0.80, places=4)
         self.assertAlmostEqual(by_agent["客服B"], 1.00, places=4)
 
+    def test_tmall_by_agent_sales_uses_net_and_ties_to_daily(self) -> None:
+        """天猫 byAgent 销售额走「净销售额」，且与 daily.netSales 同源可对账。
+
+        页面上 KPI 卡「净销售额」读 daily.netSales、明细表读 byAgent，
+        两者必须是同一口径 —— 否则同一页出现净额/毛额两个「销售额合计」
+        （2026-09-09 现场：卡片 73.1 万 vs 表格 109.4 万，差额即成功退款）。
+
+        构造：毛额刻意大于净额，若误取「销售额」则断言失败。
+        """
+        self._insert_tmall("客服A", 0.80, 10, net_sales=60000, gross_sales=90000)
+        self._insert_tmall("客服B", 1.00, 1, net_sales=13000, gross_sales=19000)
+        result = _build_tmall_customer_service(self.connection, self.START, self.END)
+        by_agent = {row["agent"]: row for row in result["byAgent"]}
+        # 取净额（6.0 / 1.3 万），不是毛额（9.0 / 1.9 万）
+        self.assertAlmostEqual(by_agent["客服A"]["netSalesWan"], 6.0, places=4)
+        self.assertAlmostEqual(by_agent["客服B"]["netSalesWan"], 1.3, places=4)
+        # 毛额字段不得回归
+        self.assertNotIn("salesAmountWan", by_agent["客服A"])
+        # 页面不变量：表格合计 == KPI 卡合计
+        table_total = sum(row["netSalesWan"] for row in result["byAgent"])
+        kpi_total = sum(row["netSales"] for row in result["daily"]) / 10000
+        self.assertAlmostEqual(table_total, kpi_total, places=4)
+        self.assertAlmostEqual(table_total, 7.3, places=4)
+
     def test_jd_daily_satisfaction_is_good_over_total_reviews(self) -> None:
         """京东 daily = Σ(好评) / (Σ(好评) + Σ(差评))。
 
@@ -194,6 +259,84 @@ class CustomerServiceWeightedSatisfactionTests(unittest.TestCase):
         by_agent = {row["agent"]: row["satisfactionRate"] for row in result["byAgent"]}
         self.assertAlmostEqual(by_agent["jd_001"], 0.5, places=4)
         self.assertAlmostEqual(by_agent["jd_002"], 1.0, places=4)
+
+
+# ── 新结构（2026-06-29 起）严格口径：按列名 SUM(分子)/SUM(分母) ──
+
+    def test_tmall_new_strict_inquiry_conv_uses_final_pay_over_consult(self) -> None:
+        """公式①严格口径：询单最终付款转化率 = SUM(询单最终付款人数)/SUM(询单人数)。"""
+        self._insert_tmall_new("客服A", date(2026, 9, 1), final_pay=10, consult=35)
+        self._insert_tmall_new("客服B", date(2026, 9, 1), final_pay=6, consult=17)
+        result = _build_tmall_customer_service(self.connection, "2026-09-01", "2026-09-01")
+        daily = result["daily"][0]
+        self.assertAlmostEqual(daily["inquiryConversionRate"], (10 + 6) / (35 + 17), places=4)
+        self.assertEqual(daily["metricsCaliber"], "strict")
+        self.assertEqual(daily["finalPayCusNum"], 16)
+        self.assertEqual(daily["consultNum"], 52)
+        by_agent = {row["agent"]: row for row in result["byAgent"]}
+        self.assertAlmostEqual(by_agent["客服A"]["inquiryConvRate"], 10 / 35, places=4)
+        self.assertEqual(by_agent["客服A"]["metricsCaliber"], "strict")
+
+    def test_tmall_new_strict_satisfaction_formula(self) -> None:
+        """公式②严格口径：客户满意率 = (满意+很满意)/收到评价数。"""
+        self._insert_tmall_new("客服A", date(2026, 9, 1), final_pay=5, consult=20, satisfied=0, very_satisfied=1, evaluation=1)
+        self._insert_tmall_new("客服B", date(2026, 9, 1), final_pay=5, consult=20, satisfied=1, very_satisfied=3, evaluation=5)
+        result = _build_tmall_customer_service(self.connection, "2026-09-01", "2026-09-01")
+        self.assertAlmostEqual(result["daily"][0]["satisfactionRate"], (1 + 1 + 3) / (1 + 5), places=4)
+
+    def test_tmall_new_strict_answer_ratio_formula(self) -> None:
+        """公式③严格口径：答问比 = SUM(客服消息条数)/SUM(买家消息条数)。"""
+        self._insert_tmall_new("客服A", date(2026, 9, 1), final_pay=5, consult=20, agent_msg=1116, buyer_msg=353)
+        self._insert_tmall_new("客服B", date(2026, 9, 1), final_pay=5, consult=20, agent_msg=923, buyer_msg=268)
+        result = _build_tmall_customer_service(self.connection, "2026-09-01", "2026-09-01")
+        self.assertAlmostEqual(result["daily"][0]["answerRatio"], (1116 + 923) / (353 + 268), places=4)
+        by_agent = {row["agent"]: row for row in result["byAgent"]}
+        self.assertAlmostEqual(by_agent["客服A"]["answerRatio"], 1116 / 353, places=4)
+
+    def test_tmall_mixed_period_splits_caliber_per_date(self) -> None:
+        """05-29 前旧结构/precomputed 与 09-01 新结构/strict 同日并存时按日期分叉标记。"""
+        self._insert_tmall("客服A", satisfaction=1.0, received=10)
+        self._insert_tmall_new("客服B", date(2026, 9, 1), final_pay=5, consult=20)
+        result = _build_tmall_customer_service(self.connection, "2026-08-19", "2026-09-01")
+        daily = {str(row["date"]): row for row in result["daily"]}
+        self.assertEqual(daily["2026-08-19"]["metricsCaliber"], "precomputed")
+        self.assertEqual(daily["2026-09-01"]["metricsCaliber"], "strict")
+
+    def test_tmall_new_by_agent_exposes_atom_fields(self) -> None:
+        """byAgent 暴露原子字段与口径标记，供前端区间 SUM/SUM 与「预置口径」角标。"""
+        self._insert_tmall_new("客服A", date(2026, 9, 1), final_pay=10, consult=35, satisfied=0, very_satisfied=1, evaluation=1, agent_msg=1116, buyer_msg=353)
+        result = _build_tmall_customer_service(self.connection, "2026-09-01", "2026-09-01")
+        row = result["byAgent"][0]
+        self.assertEqual(row["finalPayCusNum"], 10)
+        self.assertEqual(row["consultNum"], 35)
+        self.assertEqual(row["satisfiedNum"], 0)
+        self.assertEqual(row["verySatisfiedNum"], 1)
+        self.assertEqual(row["evaluationNum"], 1)
+        self.assertEqual(row["agentMsgNum"], 1116)
+        self.assertEqual(row["buyerMsgNum"], 353)
+        self.assertEqual(row["metricsCaliber"], "strict")
+
+    def test_tmall_missing_new_columns_falls_back_to_precomputed(self) -> None:
+        """过渡安全：model 视图尚无新结构列时，整体回落预制口径并标记 precomputed（不崩、不改旧数值）。"""
+        # 用一个不含新原子列的表模拟「新文件未入仓」的旧 model 视图
+        self.connection.execute("DROP TABLE IF EXISTS tmall_old_model")
+        self.connection.execute(
+            'CREATE TABLE tmall_old_model AS '
+            'SELECT * EXCLUDE ("满意","很满意","收到评价数","询单人数","询单最终付款人数","客服消息条数","买家消息条数") '
+            'FROM tmall_service_model WHERE 1=0'
+        )
+        self.connection.execute(
+            'INSERT INTO tmall_old_model VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+            (date(2026, 8, 19), "客服A", "售前组", 10, 5, 3, 60000, 2000, 0, 30, 60, 1.2, 0.8, 90000, 0.3, 1, "a.csv"),
+        )
+        self.connection.execute("UPDATE warehouse_query_catalog SET model_view = 'tmall_old_model' WHERE query_name = '10-1淘宝客服绩效明细'")
+        result = _build_tmall_customer_service(self.connection, "2026-08-19", "2026-08-19")
+        daily = result["daily"][0]
+        self.assertEqual(daily["metricsCaliber"], "precomputed")
+        # 旧口径：转化率 = 1 − 流失/查询单 = 1 − 0/5 = 1.0
+        self.assertAlmostEqual(daily["inquiryConversionRate"], 1.0, places=4)
+        self.assertIsNone(daily["finalPayCusNum"])  # 原子字段回退为空值占位(None → 前端渲染「—」)
+        self.assertEqual(result["byAgent"][0]["metricsCaliber"], "precomputed")
 
 
 if __name__ == "__main__":

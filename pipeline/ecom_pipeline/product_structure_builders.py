@@ -555,6 +555,9 @@ def build_spu_sales_trend(
     """
     has_q18 = bool(q18_view and "SPU产品商编" in q18_columns and "商家规编（后台）" in q18_columns)
     has_pm = bool(pm_view and "商品编码" in pm_columns)
+    # 日期维度与商品页筛选一致：付款日期；旧数据/测试数据缺该列时回退订单日期。
+    source_columns = {row[0] for row in connection.execute(f"DESCRIBE {view}").fetchall()}
+    date_expr = 'cast(s."付款日期" AS VARCHAR)' if "付款日期" in source_columns else 'cast(s."订单日期" AS VARCHAR)'
     q18_spu_expr = 'trim(cast(q18."SPU产品商编" AS VARCHAR))' if has_q18 else "NULL::VARCHAR"
     q18_name_expr = 'q18."产品名称"' if (has_q18 and "产品名称" in q18_columns) else "NULL::VARCHAR"
     pm_cat_expr = 'pm."床垫类别"' if (has_pm and "床垫类别" in pm_columns) else "NULL::VARCHAR"
@@ -576,7 +579,7 @@ def build_spu_sales_trend(
         SELECT
           try_cast(s."商家实收" AS DOUBLE) AS recv,
           try_cast(s."销售数量" AS DOUBLE) AS qty,
-          cast(s."订单日期" AS VARCHAR) AS dt,
+          {date_expr} AS dt,
           coalesce(nullif(trim(cast(s."渠道平台" AS VARCHAR)), ''), '(未设定)') AS channel,
           coalesce(nullif({q18_spu_expr}, ''), '未识别 SPU') AS spu,
           coalesce(nullif(trim(cast({q18_name_expr} AS VARCHAR)), ''), '') AS spu_product_name,

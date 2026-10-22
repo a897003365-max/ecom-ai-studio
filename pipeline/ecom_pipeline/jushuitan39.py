@@ -12,7 +12,7 @@ M 代码基线存档在 ``migration/powerbi-tmdl/jushuitan-expressions/*.pq``，
 
 目标
 ====
-每天 9:45 基于最新源文件（``15-聚水潭商品数据/销售主题分析_明细订单商品.xlsx``）
+每天 9:45 基于最新源文件（``15-聚水潭商品数据/聚水潭订单明细_全量.xlsx``）
 输出与 PBIX 一致的 39 列（含过滤、产品 join、年月/周/单件价格/毛利额派生、去重）。
 """
 
@@ -26,6 +26,7 @@ import pandas as pd
 import polars as pl
 
 from .config import configured_data_root
+from .jushuitan_source import SOURCE_FILENAME, normalize_jushuitan_columns
 
 # 输出 39 列，顺序与 PBIX 最终 Table.SelectColumns 一致
 OUTPUT_COLUMNS = [
@@ -46,7 +47,6 @@ EXCLUDED_STORES = {
 
 # M 第 9 步：手动置零的精确商品名
 MANUAL_ZERO_EXACT = {
-    "0.01入会专拍链接",
     "1",
     "【3支-紫杆（黑）】【禾硕新5度+东米605刷题能量笔+知心k181】",
     "【3支-蓝杆（黑）】【禾硕新5度+东米605刷题能量笔+知心k181】",
@@ -379,7 +379,7 @@ def _date_text_conversion(column: str) -> pl.Expr:
         pl.when(pl.col(column).is_null() | (pl.col(column).cast(pl.String, strict=False) == ""))
         .then(None)
         .otherwise(
-            pl.col(column).cast(pl.String, strict=False).str.strptime(pl.Datetime, "%Y/%m/%d %H:%M:%S", strict=False)
+            pl.col(column).cast(pl.String, strict=False).str.replace_all("-", "/", literal=True).str.strptime(pl.Datetime, "%Y/%m/%d %H:%M:%S", strict=False)
         )
     ).alias(column)
 
@@ -390,6 +390,15 @@ def transform_jushuitan_39(frame: pl.DataFrame, aux: dict[str, pl.DataFrame]) ->
     ``frame`` 是源文件 Sheet1 提升表头后的全量数据（105+ 列）。
     ``aux`` 由 :func:`load_auxiliary_tables` 提供。
     """
+    frame = normalize_jushuitan_columns(frame)
+    required = {
+        "订单类型", "买家实付", "线上商品名", "店铺", "买家留言", "售后分类",
+        "发货日期", "确认收货日期", "小旗", "订单状态", "付款日期", "销售数量",
+        "商品编码", "线上订单号", "线上子订单编号", "商店站点", "商家实收", "销售金额",
+    }
+    missing = sorted(required - set(frame.columns))
+    if missing:
+        raise ValueError(f"聚水潭源文件缺少必需列: {', '.join(missing)}")
     aux_辅10 = aux["辅10产品编码"]
     aux_京东自营 = aux["京东自营商品表"]
     aux_线下 = aux["线下"]
@@ -421,7 +430,7 @@ def transform_jushuitan_39(frame: pl.DataFrame, aux: dict[str, pl.DataFrame]) ->
     if "订单类型" in frame.columns:
         frame = frame.filter(pl.col("订单类型").cast(pl.String, strict=False) == "普通订单")
     # 买家实付 >= 50 硬过滤已取消（2026-08-19 业务决策，与看板 transforms.py 同步），
-    # 低金额订单也纳入导出；0.01 链接等垃圾单仍由第 9 步 manual_zero 置零剔除。
+    # 低金额订单也纳入导出；链接等垃圾单仍由第 9 步 manual_zero 置零剔除（0.01 过滤已于 2026-10-06 取消）。
     if "店铺" in frame.columns:
         frame = frame.filter(~pl.col("店铺").cast(pl.String, strict=False).is_in(list(EXCLUDED_STORES)))
     if "买家留言" in frame.columns:
@@ -484,7 +493,6 @@ def transform_jushuitan_39(frame: pl.DataFrame, aux: dict[str, pl.DataFrame]) ->
             | product_name.is_in(list(MANUAL_ZERO_EXACT))
             | product_name.str.contains("皮革", literal=True)
             | product_name.str.contains("单拍不发货", literal=True)
-            | product_name.str.contains("0.01", literal=True)
             | product_name.str.contains("链接", literal=True)
             | product_name.str.contains("入会", literal=True)
             | product_name.str.contains("袋子", literal=True)
@@ -687,7 +695,7 @@ def transform_jushuitan_39(frame: pl.DataFrame, aux: dict[str, pl.DataFrame]) ->
     # M 第 24 步：去重
     final = final.unique(keep="first")
     # PBIX 最终查询 `15-聚水潭商品数据` = 全量处理 + 排除手动置零（销售数量 <> 0）。
-    # 第 9 步手动置零后，把销售数量为 0 的行剔除（0.01链接/补差/入会等）。
+    # 第 9 步手动置零后，把销售数量为 0 的行剔除（链接/补差/入会等；0.01 过滤已于 2026-10-06 取消）。
     if "销售数量" in final.columns:
         final = final.filter(pl.col("销售数量") != 0)
     return final
@@ -696,16 +704,12 @@ def transform_jushuitan_39(frame: pl.DataFrame, aux: dict[str, pl.DataFrame]) ->
 def build_jushuitan_39(source_path: Path | None = None, data_root: Path | None = None) -> pl.DataFrame:
     """读取最新源文件并按 M 生成 39 列（含辅助表加载）。"""
     root = data_root or configured_data_root()
-    source_dir = root / "天猫旗舰店" / "15-聚水潭商品数据"
-    if source_path is not None:
-        frame = _read_excel_sheet1(Path(source_path))
-    else:
-        candidates = _discover_source_files(source_dir)
-        if not candidates:
-            raise FileNotFoundError(f"15-聚水潭商品数据 目录无源文件: {source_dir}")
-        # M 用 Folder.Files 合并目录全部文件（当前目录仅 1 个，未来多文件时对齐 M）
-        frames = [_read_excel_sheet1(path) for path in candidates]
-        frame = pl.concat(frames, how="diagonal_relaxed") if len(frames) > 1 else frames[0]
+    source = Path(source_path) if source_path is not None else (
+        root / "天猫旗舰店" / "15-聚水潭商品数据" / SOURCE_FILENAME
+    )
+    if not source.is_file():
+        raise FileNotFoundError(f"聚水潭全量源文件不存在: {source}")
+    frame = _read_excel_sheet1(source)
     aux = load_auxiliary_tables(root)
     return transform_jushuitan_39(frame, aux)
 

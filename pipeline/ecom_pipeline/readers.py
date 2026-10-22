@@ -13,6 +13,12 @@ from .catalog import QuerySpec
 SUPPORTED_SUFFIXES = {".csv", ".xls", ".xlsx"}
 HEADERLESS_QUERIES = {"03-1-各渠道目标金额"}
 ALL_SHEETS_QUERIES = {"07-旗舰店商品销售数据"}
+# 生意参谋 2026-09 起的新版导出（商品_全部 / 品类_商品排行）表头上方带 4 行
+# 空行/说明，旧版表头在第 0 行；按「首个同时含日期列与必需列的行」动态定位表头。
+HEADER_DETECT_QUERIES: dict[str, tuple[str, ...]] = {
+    "07-旗舰店商品销售数据": ("商品ID",),
+}
+HEADER_DETECT_DATE_TOKENS = ("日期", "统计日期")
 
 
 class SourceReadError(RuntimeError):
@@ -135,6 +141,34 @@ def _looks_like_html(path: Path) -> bool:
     return prefix.startswith((b"<html", b"<!doctype", b"<table")) or b"<table" in prefix
 
 
+def _detect_header_row(frame: pd.DataFrame, required: tuple[str, ...]) -> int | None:
+    for row_index in range(min(len(frame), 20)):
+        # 单元格去空格后比对：「商品 ID」「日期范围」等写法也能命中必需列/日期列
+        values = {
+            re.sub(r"[\s　]+", "", str(value))
+            for value in frame.iloc[row_index].tolist()
+            if not pd.isna(value) and str(value).strip()
+        }
+        if any(any(token in cell for token in HEADER_DETECT_DATE_TOKENS) for cell in values) and all(
+            any(token in cell for cell in values) for token in required
+        ):
+            return row_index
+    return None
+
+
+def _promote_detected_header(frame: pd.DataFrame, spec: QuerySpec) -> pd.DataFrame:
+    required = HEADER_DETECT_QUERIES.get(spec.name)
+    if not required or frame.empty:
+        return frame
+    header_row = _detect_header_row(frame, required)
+    if header_row is None:
+        header_row = 0
+    header = ["" if pd.isna(value) else value for value in frame.iloc[header_row].tolist()]
+    promoted = frame.iloc[header_row + 1 :].copy()
+    promoted.columns = header
+    return promoted.reset_index(drop=True)
+
+
 def _read_excel_xlsx2csv(path: Path) -> pl.DataFrame:
     """大 xlsx 文件快速路径：xlsx2csv 转 csv 再 Polars 读。
 
@@ -160,10 +194,11 @@ def _read_excel_xlsx2csv(path: Path) -> pl.DataFrame:
 
 
 def _read_excel(path: Path, spec: QuerySpec) -> list[tuple[str, pl.DataFrame]]:
-    header = None if spec.name in HEADERLESS_QUERIES else 0
+    detect_header = spec.name in HEADER_DETECT_QUERIES
+    header = None if spec.name in HEADERLESS_QUERIES or detect_header else 0
     if _looks_like_html(path):
         tables = pd.read_html(path, header=header, encoding=_detect_text_encoding(path))
-        return [("Table1", _pandas_to_polars(frame)) for frame in tables[:1]]
+        return [("Table1", _pandas_to_polars(_promote_detected_header(frame, spec))) for frame in tables[:1]]
 
     sheet_name: str | int | None = spec.sheet_name or 0
     if spec.name in ALL_SHEETS_QUERIES:
@@ -173,6 +208,7 @@ def _read_excel(path: Path, spec: QuerySpec) -> list[tuple[str, pl.DataFrame]]:
         sheet_name in (0, None)
         and path.suffix.lower() == ".xlsx"
         and spec.name not in HEADERLESS_QUERIES
+        and not detect_header
         and path.stat().st_size > 20 * 1024 * 1024
     ):
         try:
@@ -184,8 +220,11 @@ def _read_excel(path: Path, spec: QuerySpec) -> list[tuple[str, pl.DataFrame]]:
     except Exception as error:
         raise SourceReadError(f"无法读取 {path.name}: {error}") from error
     if isinstance(result, dict):
-        return [(name, _pandas_to_polars(frame)) for name, frame in result.items()]
-    return [(str(sheet_name), _pandas_to_polars(result))]
+        return [
+            (name, _pandas_to_polars(_promote_detected_header(frame, spec)))
+            for name, frame in result.items()
+        ]
+    return [(str(sheet_name), _pandas_to_polars(_promote_detected_header(result, spec)))]
 
 
 def read_source_file(path: Path, spec: QuerySpec) -> pl.DataFrame:

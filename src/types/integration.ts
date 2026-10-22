@@ -231,6 +231,23 @@ export interface PowerBiCompetitorDaily {
   cartCost?: number | null;
 }
 
+/** mds 库天猫店铺日汇总（与钉钉填表同一真值源，独立于生意参谋导出文件链）；
+ *  店铺级 11 字段，口径与钉钉「全渠道目标进度表」一致（浏览量≠访客数、GMV≠支付金额，勿与 04 链混排）。 */
+export interface PowerBiShopSummaryDaily {
+  date: string;
+  pageViews: number | null;
+  shopCustomers: number | null;
+  gmv: number | null;
+  refundAmount: number | null;
+  addToCart: number | null;
+  keywordSpend: number | null;
+  audienceSpend: number | null;
+  fullSiteSpend: number | null;
+  taokeCommission: number | null;
+  contentSceneSpend: number | null;
+  storeRank: string | null;
+}
+
 export interface PowerBiCustomerServiceDaily {
   date: string;
   /** 京东客服按店铺拆分（京东自营/京东POP/全部）；旧快照无此字段时视为自营口径 */
@@ -252,6 +269,22 @@ export interface PowerBiCustomerServiceDaily {
   conversionRate?: number | null;
   goodReviews?: number;
   badReviews?: number;
+  /** 抖音客服：在线总时长（秒，日内合计） */
+  onlineSeconds?: number;
+  /** 抖音客服：询单转化率 = 支付人数 / 询单人数（SUM/SUM 重算） */
+  inquiryConvRate?: number | null;
+  /** 天猫新结构(2026-06-29 起)原子字段：询单人数 / 询单最终付款人数 */
+  consultNum?: number;
+  finalPayCusNum?: number;
+  /** 天猫新结构原子字段：收到评价数 / 满意数 / 很满意数 */
+  evaluationNum?: number;
+  satisfiedNum?: number;
+  verySatisfiedNum?: number;
+  /** 天猫新结构原子字段：客服消息条数 / 买家消息条数 */
+  agentMsgNum?: number;
+  buyerMsgNum?: number;
+  /** 天线口径标记：strict=严格公式(原子字段齐全)；precomputed=平台预制(旧结构)。strict 区间比率按分母加权=SUM/SUM。 */
+  metricsCaliber?: "strict" | "precomputed";
 }
 
 export interface PowerBiCustomerServiceAgent {
@@ -262,7 +295,8 @@ export interface PowerBiCustomerServiceAgent {
   groupName?: string;
   skillGroup?: string;
   effectiveReceived?: number;
-  salesAmountWan?: number;
+  /** 天猫客服净销售额（万元，已扣成功退款），与 PowerBiCustomerServiceDaily.netSales 同源字段 */
+  netSalesWan?: number;
   firstResponse?: number;
   answerRatio?: number | null;
   avgResponse?: number;
@@ -274,6 +308,25 @@ export interface PowerBiCustomerServiceAgent {
   conversionRate?: number | null;
   goodReviews?: number;
   badReviews?: number;
+  /** 抖音客服：在线总时长（秒） */
+  onlineSeconds?: number;
+  /** 抖音客服：净销售额（元）= 飞鸽「退款后销售额」，与 netSalesWan 同源 */
+  netSales?: number;
+  inquiryCount?: number;
+  payCount?: number;
+  evalCount?: number;
+  /** 天猫新结构(2026-06-29 起)原子字段：询单人数 / 询单最终付款人数 */
+  consultNum?: number;
+  finalPayCusNum?: number;
+  /** 天猫新结构原子字段：收到评价数 / 满意数 / 很满意数 */
+  evaluationNum?: number;
+  satisfiedNum?: number;
+  verySatisfiedNum?: number;
+  /** 天猫新结构原子字段：客服消息条数 / 买家消息条数 */
+  agentMsgNum?: number;
+  buyerMsgNum?: number;
+  /** 天猫口径标记：strict=严格公式(原子字段齐全)；precomputed=平台预制(旧结构)。strict 区间比率按分母加权=SUM/SUM。 */
+  metricsCaliber?: "strict" | "precomputed";
 }
 
 export interface PowerBiCustomerService {
@@ -286,6 +339,11 @@ export interface PowerBiCustomerService {
   jd: {
     daily: PowerBiCustomerServiceDaily[];
     serviceDaily: PowerBiCustomerServiceDaily[];
+    byAgent: PowerBiCustomerServiceAgent[];
+    groups: string[];
+  } | null;
+  douyin?: {
+    daily: PowerBiCustomerServiceDaily[];
     byAgent: PowerBiCustomerServiceAgent[];
     groups: string[];
   } | null;
@@ -318,6 +376,8 @@ export interface PowerBiPages {
   promotionSceneDaily: PowerBiPromotionDaily[];
   promotionProductDaily: PowerBiPromotionDaily[];
   competitorDaily: PowerBiCompetitorDaily[];
+  /** mds 天猫店铺日汇总（钉钉同源）；2026-10 前的旧快照无此字段，前端按 ?? [] 容错 */
+  shopSummaryDaily?: PowerBiShopSummaryDaily[];
   customerService: PowerBiCustomerService;
   products: Array<{
     productId: string;
@@ -805,6 +865,7 @@ export interface ProductsPayload {
   productManagement: ProductManagementPages | null;
   refreshedAt: string | null;
   status: "ok" | "stale";
+  error?: string;
 }
 
 export interface WarehouseSnapshot {
@@ -1002,6 +1063,11 @@ export interface DingTalkMetricTrend {
   mom: number | null;
 }
 
+export type DingTalkMetricTrends = Record<
+  "gmv" | "netRevenue" | "recoveryRate" | "addToCart" | "spend" | "feeRate" | "refund" | "refundRate",
+  DingTalkMetricTrend
+>;
+
 export interface DingTalkMonthlyAchievement {
   month: string;
   netRevenue: number;
@@ -1040,9 +1106,13 @@ export interface DingTalkSnapshot {
     targetYears?: string[];
     // 月度渠道级目标：{ [YYYY-MM]: { [platform]: 目标金额 } }，供前端切渠道取该渠道当月目标。
     monthlyTargetsByPlatform?: Record<string, Record<string, number>>;
+    // 月度店铺级目标：{ [YYYY-MM]: { [platform|store]: 目标金额 } }，供店铺明细表计算月完成率。
+    monthlyTargetsByStore?: Record<string, Record<string, number>>;
     monthlyOverview?: DingTalkMonthlyOverview;
     monthlyAchievement?: DingTalkMonthlyAchievement[];
-    metricTrends?: Record<"gmv" | "netRevenue" | "recoveryRate" | "addToCart" | "spend" | "feeRate" | "refund" | "refundRate", DingTalkMetricTrend>;
+    metricTrends?: DingTalkMetricTrends;
+    // 渠道级同比/环比，key 为渠道名；服务端预聚合，前端切渠道时取对应渠道的 trends。
+    metricTrendsByPlatform?: Record<string, DingTalkMetricTrends>;
     latestComparison?: DingTalkLatestComparison;
     formulaLineage?: { summary: string; monthlyRollup: string; target: string };
   };

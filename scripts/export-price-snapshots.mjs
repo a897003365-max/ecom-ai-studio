@@ -1,39 +1,94 @@
-// 把 src/data/tmallCompetitorData.ts 中生成的 tmallPricePeriods 导出为服务端价格快照，
-// 落盘到 <dataDir>/intelligence/price-snapshots/<period>.json，供 /api/intelligence/price-trend 聚合。
-// 之后每次抓取流程把新周期 JSON 追加到同一目录即可积累历史。
-import { mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+// Build the current API price snapshot from the same data served by the UI.
+// Preserve historical files, which can include products outside today's TOP100.
+// 多类目：床垫类输出 <period>.json，儿童床垫输出 <period>_儿童床垫.json（与 server 类目后缀口径一致）
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { randomUUID } from "node:crypto";
 
-const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const dataDir = process.env.ECOM_DATA_DIR || join(root, "local-data");
+const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+if (existsSync(join(root, ".env"))) process.loadEnvFile(join(root, ".env"));
+const dataDir = resolve(root, process.env.DATA_DIR || "local-data");
 const outDir = join(dataDir, "intelligence", "price-snapshots");
 
-const ts = readFileSync(join(root, "src", "data", "tmallCompetitorData.ts"), "utf8");
-const constStart = ts.indexOf("export const tmallPricePeriods");
-if (constStart < 0) throw new Error("找不到 tmallPricePeriods 定义");
-const arrStart = ts.indexOf("= [", constStart) + 2;
-// 用括号配对找数组结束（文件内字符串不含换行，逐字符扫描即可）
-let depth = 0;
-let arrEnd = -1;
-for (let i = arrStart; i < ts.length; i++) {
-  const ch = ts[i];
-  if (ch === "[") depth += 1;
-  else if (ch === "]") {
-    depth -= 1;
-    if (depth === 0) { arrEnd = i; break; }
+const CATEGORIES = [
+  { name: "mattress", tsFile: "tmallCompetitorData.ts", fileSuffix: "" },
+  { name: "kids", tsFile: "tmallCompetitorData.kids.ts", fileSuffix: "_儿童床垫" },
+];
+
+// 周期键两种形态：采集日期型（2026-09-16 / 2026-08-14_~_2026-08-20）与业务期次（26.10.13（双11预售预热））。
+// 两者都会成为快照文件名，必须排除路径分隔符等非法字符。
+const PERIOD_KEY = /^(?:\d{4}-\d{2}-\d{2}[\w~-]*|\d{2}\.\d{2}\.\d{2}（[^）]+）)$/;
+
+function indexItems(items) {
+  if (!Array.isArray(items)) throw new Error("Snapshot items must be an array");
+  const indexed = new Map();
+  for (const item of items) {
+    if (!item || !/^tmall-\d+$/.test(item.id) || indexed.has(item.id)) {
+      throw new Error("Missing, invalid or duplicate product ID");
+    }
+    indexed.set(item.id, item);
+  }
+  return indexed;
+}
+
+function exportCategory({ name, tsFile, fileSuffix }) {
+  const tsPath = join(root, "src", "data", tsFile);
+  if (!existsSync(tsPath)) {
+    console.log(`[export-price-snapshots] skip ${name}: ${tsFile} not found`);
+    return { written: 0, current: null, products: 0 };
+  }
+  const ts = readFileSync(tsPath, "utf8");
+  function readExport(exportName) {
+    // Exports are JSON followed by a semicolon; escaped string brackets are data.
+    const match = ts.match(new RegExp(`export const ${exportName}[^\\n]*?=\\s*([\\s\\S]*?);(?:\\r?\\n|$)`));
+    if (!match) throw new Error(`Missing generated export: ${exportName}`);
+    return JSON.parse(match[1]);
+  }
+  const periods = readExport("tmallPricePeriods");
+  const prices = indexItems(readExport("tmallCompetitorPrices"));
+  const dataset = readExport("tmallTop100Fallback");
+  const current = String(dataset.samplePeriod || "").trim().replace(/[\\/:*?"<>|\s]+/g, "_");
+  if (!Array.isArray(periods) || !periods.length || periods[0].period !== current || !dataset.generatedAt) {
+    throw new Error(`[${name}] Current price snapshot and TOP100 period do not agree`);
+  }
+  const seen = new Set();
+  for (const entry of periods) {
+    if (!PERIOD_KEY.test(entry.period) || seen.has(entry.period)) {
+      throw new Error(`[${name}] Invalid or duplicate period: ${entry.period}`);
+    }
+    seen.add(entry.period);
+    const indexed = indexItems(entry.items);
+    if (entry.period === current && (indexed.size !== prices.size || !prices.size ||
+        [...prices].some(([id, item]) => !indexed.has(id) ||
+          indexed.get(id).couponPrice !== item.couponPrice ||
+          indexed.get(id).originalPrice !== item.originalPrice))) {
+      throw new Error(`[${name}] Current snapshot prices differ from the root price list`);
+    }
+  }
+  // Validate every entry before creating any files.
+  mkdirSync(outDir, { recursive: true });
+  let written = 0;
+  for (const entry of periods) {
+    const target = join(outDir, `${entry.period}${fileSuffix}.json`);
+    if (entry.period !== current && existsSync(target)) continue;
+    const snapshot = { period: entry.period, label: entry.label ?? null,
+      generatedAt: dataset.generatedAt, items: entry.items.map((it) => ({ ...it, imageFile: null })) };
+    const temporary = `${target}.${randomUUID()}.tmp`;
+    writeFileSync(temporary, JSON.stringify(snapshot, null, 2) + "\n");
+    renameSync(temporary, target);
+    written += 1;
+  }
+  return { written, current, products: prices.size };
+}
+
+let totalWritten = 0;
+for (const category of CATEGORIES) {
+  const result = exportCategory(category);
+  totalWritten += result.written;
+  if (result.current) {
+    console.log(`[export-price-snapshots] ${category.name}: wrote ${result.written} snapshots, current ${result.current}: ${result.products} products`);
   }
 }
-if (arrStart < 2 || arrEnd < 0) throw new Error("无法定位 tmallPricePeriods 数组边界");
-// 生成文件里数据是带引号 key 的纯 JSON，可直接解析
-const periods = JSON.parse(ts.slice(arrStart, arrEnd + 1));
-
-mkdirSync(outDir, { recursive: true });
-let written = 0;
-for (const entry of periods) {
-  if (!entry?.period || !Array.isArray(entry.items)) continue;
-  writeFileSync(join(outDir, `${entry.period}.json`), JSON.stringify({ period: entry.period, label: entry.label ?? null, items: entry.items.map((it) => ({ ...it, imageFile: null })) }, null, 2) + "\n");
-  written += 1;
-}
 const existing = readdirSync(outDir).filter((f) => f.endsWith(".json")).length;
-console.log(`[export-price-snapshots] 写入 ${written} 份快照 → ${outDir}（目录共 ${existing} 份）`);
+console.log(`[export-price-snapshots] wrote ${totalWritten} snapshots (${existing} total)`);

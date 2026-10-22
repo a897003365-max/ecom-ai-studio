@@ -122,8 +122,15 @@ function pick(row, prefix) {
 }
 
 function pickString(row, prefix) {
-  const v = pick(row, prefix);
-  return v === undefined || v === null ? "" : String(v);
+  const v = pick(row, prefix);  return v === undefined || v === null ? "" : String(v);
+}
+
+// CP 综合分不直接采用模型直出的 1-5 整数（约 80% 商品扎堆 4 分），改为 8 个子维度
+// 等权平均并保留两位小数；任一子维度缺失时回退模型直出 CP。同分决胜见排序处。
+function fineCpTotal(analysis) {
+  const dims = ["CH", "CI", "CJ", "CK", "CL", "CM", "CN", "CO"].map((k) => toNumber(pick(analysis, k)));
+  if (dims.some((v) => typeof v !== "number")) return toNumber(pick(analysis, "CP"));
+  return Math.round((dims.reduce((s, v) => s + v, 0) / dims.length) * 100) / 100;
 }
 
 // ---------- 3. 生成 top100.json ----------
@@ -159,7 +166,7 @@ function buildTop100() {
         CM_trust: toNumber(pick(analysis, "CM")),
         CN_urgency: toNumber(pick(analysis, "CN")),
         CO_visual: toNumber(pick(analysis, "CO")),
-        CP_total: toNumber(pick(analysis, "CP")),
+        CP_total: fineCpTotal(analysis),
       },
       // 精选 25 关键字段（主表列 + 抽屉展示用）
       headline: pickString(analysis, "X主标题"),
@@ -190,12 +197,16 @@ function buildTop100() {
       worthLearning: pickString(analysis, "CS最值得借鉴"),
       // 保留完整原始字段供抽屉查看
       raw: analysis,
-      isOwnBrand: row === 16 || row === 19 || row === 21,
+      isOwnBrand: String(ctx.shop ?? "").includes("麻大师") || String(ctx.name ?? "").includes("麻大师"),
     };
   });
 
-  // 按综合 CP 降序排（有分数的排前面，null 排最后）
-  items.sort((a, b) => (b.scores.CP_total ?? 0) - (a.scores.CP_total ?? 0));
+  // 按综合 CP 降序排（有分数的排前面，null 排最后）；同分按 CI 卖点 → CJ 差异 → CK 价格决胜，再按榜单行号
+  items.sort((a, b) => (b.scores.CP_total ?? 0) - (a.scores.CP_total ?? 0)
+    || (b.scores.CI_sellpoint ?? 0) - (a.scores.CI_sellpoint ?? 0)
+    || (b.scores.CJ_diff ?? 0) - (a.scores.CJ_diff ?? 0)
+    || (b.scores.CK_price ?? 0) - (a.scores.CK_price ?? 0)
+    || a.row - b.row);
   items.forEach((item, idx) => {
     item.cpRank = idx + 1;
   });
@@ -311,16 +322,16 @@ function buildInsights() {
         {
           id: "p0-1",
           title: "增加大促时间窗口/倒计时",
-          issue: "3/3 主图 CN=2（唯一评分低于 3 的维度）",
+          issue: "3 张主图的紧迫感都只拿到 2 分（唯一低于 3 分的维度）",
           action: '右上角红色飘带 "88超品｜7/7 20点-7/9 24点" 或 "限时500单赠护脊枕"',
-          expectedGain: "CN 紧迫感 2→4，综合评分 4→4.5，进入 TOP5",
+          expectedGain: "紧迫感从 2 分提到 4 分，综合评分从 4 提到 4.5，进入 TOP5",
         },
         {
           id: "p0-2",
           title: "优化豆7款主标题差异化",
           issue: '"适配多种睡感"过于宽泛，差异化评分 3 分',
           action: '改为 "久坐族腰痛必备｜黄麻硬护脊" 或 "父母房专用｜A类抑菌黄麻"',
-          expectedGain: "CJ 差异化 3→4，CI 卖点表达 4→5",
+          expectedGain: "差异化从 3 分提到 4 分，卖点表达从 4 分提到 5 分",
         },
       ],
       p1: [
@@ -329,7 +340,7 @@ function buildInsights() {
           title: "豆芽款促销标签合并",
           issue: "促销标签分散，视觉噪音较高",
           action: "3 档赠品换购合并为 1 个组合标签，主图信息密度下降",
-          expectedGain: "视觉完成度 CO 提升 0.5 分",
+          expectedGain: "视觉完成度提升 0.5 分",
         },
       ],
     },

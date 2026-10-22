@@ -16,6 +16,7 @@ interface Props {
 export const SPU_TREND_COLORS = [
   "#12695f", "#356da7", "#8a5a22", "#875f9b", "#177b8b",
   "#b25f38", "#6a7180", "#4f8b72", "#a54d68", "#8a6f2b",
+  "#2f4858", "#c1666b", "#7aa95c", "#5c4d7d",
 ];
 
 /** Catmull-Rom 平滑曲线（与运营数据看板 ChannelRevenueChart 一致）。 */

@@ -18,7 +18,7 @@ const EMPTY: ProductPriceStructurePages = {
 };
 
 const pct = (v: number) => `${(v * 100).toFixed(1)}%`;
-const money = (v: number) => `¥${v.toLocaleString("zh-CN", { maximumFractionDigits: 0 })}`;
+const money = (v: number) => `¥${(v / 10000).toLocaleString("zh-CN", { maximumFractionDigits: 1 })}万`;
 const count = (v: number) => v.toLocaleString("zh-CN");
 
 export function PriceStructurePanel({ data }: { data?: ProductPriceStructurePages | null }) {

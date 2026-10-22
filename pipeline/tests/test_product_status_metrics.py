@@ -289,6 +289,240 @@ class ProductStatusMetricTests(unittest.TestCase):
             self.assertEqual(filtered["shippedOrderCount"], 0)
             self.assertIsNone(filtered["avgShippingDays"])
             self.assertAlmostEqual(filtered["within15DayShare"], 0.0)
+
+            ship_matrix = pages["dailyShipWarehouseMatrix"]
+            self.assertEqual(ship_matrix["columns"], ["华东仓"])
+            ship_rows = {row["rowKey"]: row["values"] for row in ship_matrix["rows"]}
+            self.assertEqual(len(ship_rows), 3)  # 未发货订单（发货日期为空）不计入
+            self.assertEqual(ship_rows["2026-07-04"]["华东仓"], 2.0)
+            self.assertEqual(ship_rows["2026-07-06"]["华东仓"], 1.0)
+            self.assertEqual(ship_rows["2026-07-12"]["华东仓"], 1.0)
+            # 筛选后仅剩待发货订单（无发货日期），矩阵为空
+            self.assertEqual(filtered_pages["dailyShipWarehouseMatrix"]["rows"], [])
+
+            # 纯发货日期口径：07-05~07-10 内无订单（订单日期为 07-01/07-02），
+            # 但 07-06 有发货，矩阵应只含该日（不受订单日期窗口截断）
+            ship_window_pages = _build_product_management_pages(connection, start="2026-07-05", end="2026-07-10")
+            ship_window_rows = {row["rowKey"]: row["values"] for row in ship_window_pages["dailyShipWarehouseMatrix"]["rows"]}
+            self.assertEqual(ship_window_rows, {"2026-07-06": {"华东仓": 1.0}})
+        finally:
+            connection.close()
+
+    def test_product_scope_filters_product_codes_and_ids(self) -> None:
+        """商品编码/商品ID 的仅保留与排除在订单行过滤，仓配履约按过滤后订单重算。"""
+
+        orders = pl.DataFrame(
+            {
+                "线上订单号": ["ORDER-A1", "ORDER-A2", "ORDER-B1", "ORDER-C1"],
+                "线上子订单编号": ["A1-1", "A2-1", "B1-1", "C1-1"],
+                "内部订单号": ["INNER-A1", "INNER-A2", "INNER-B1", "INNER-C1"],
+                "订单状态明细": ["已发货"] * 4,
+                "订单状态": ["已发货"] * 4,
+                "订单日期": [date(2026, 7, 1)] * 4,
+                "发货日期": [date(2026, 7, 4), date(2026, 7, 5), date(2026, 7, 6), date(2026, 7, 7)],
+                "商品编码": ["SKU-A1", "SKU-A2", "SKU-B", "SKU-C"],
+                "商品简称": ["产品 A", "产品 A", "产品 B", "产品 C"],
+                "产品分类": ["床垫"] * 4,
+                "品牌": ["麻大师"] * 4,
+                "销售数量": [1.0] * 4,
+                "销售金额": [100.0] * 4,
+                "退货数量": [0.0] * 4,
+                "退货金额": [0.0] * 4,
+                "商家实收": [90.0] * 4,
+                "买家实付": [100.0] * 4,
+                "平台补贴金额": [0.0] * 4,
+                "店铺": ["店铺甲"] * 4,
+                "店铺简称": ["店铺甲"] * 4,
+                "渠道平台": ["渠道甲"] * 4,
+                "达人名称": [None] * 4,
+                "发货仓": ["华东仓"] * 4,
+            }
+        )
+        product_master = pl.DataFrame(
+            {
+                "商品编码": ["SKU-A1", "SKU-A2", "SKU-B"],
+                "商品ID": ["1001", "1002.0", "2001"],
+                "产品名称": ["产品 A", "产品 A", "产品 B"],
+                "成本": [10.0, 10.0, 10.0],
+                "床垫类别": ["弹簧床垫", "弹簧床垫", "黄麻薄垫"],
+            }
+        )
+
+        connection = duckdb.connect()
+        try:
+            for name, frame in {"jt_source": orders, "product_master": product_master}.items():
+                connection.register(f"{name}_rows", frame.to_arrow())
+                connection.execute(f"CREATE VIEW {name} AS SELECT * FROM {name}_rows")
+            connection.execute(
+                "CREATE TABLE warehouse_query_catalog (query_name VARCHAR, source_view VARCHAR, model_view VARCHAR)"
+            )
+            connection.executemany(
+                "INSERT INTO warehouse_query_catalog VALUES (?, ?, ?)",
+                [
+                    ("15-聚水潭商品数据", "jt_source", "jt_source"),
+                    ("product-master", "product_master", "product_master"),
+                ],
+            )
+
+            def fulfillment_by_name(**kwargs):
+                pages = _build_product_management_pages(connection, **kwargs)
+                return {row["productName"]: row["orderCount"] for row in pages["fulfillmentByProduct"]}
+
+            self.assertEqual(fulfillment_by_name(), {"产品 A": 2, "产品 B": 1, "产品 C": 1})
+            self.assertEqual(fulfillment_by_name(product_codes=["SKU-A1", " SKU-A1 ", "SKU-B"]), {"产品 A": 1, "产品 B": 1})
+            self.assertEqual(fulfillment_by_name(exclude_product_codes=["SKU-A2"]), {"产品 A": 1, "产品 B": 1, "产品 C": 1})
+            self.assertEqual(fulfillment_by_name(product_ids=["1002"]), {"产品 A": 1})
+            # 主数据存 1002.0、用户输入 1002.0：两侧都归一后再匹配
+            self.assertEqual(fulfillment_by_name(product_ids=["1002.0"]), {"产品 A": 1})
+            # 未匹配产品主数据的 SKU-C 不会被商品ID 排除误删
+            self.assertEqual(fulfillment_by_name(exclude_product_ids=["2001"]), {"产品 A": 2, "产品 C": 1})
+            self.assertEqual(fulfillment_by_name(product_ids=["9999"]), {})
+            empty_pages = _build_product_management_pages(connection, product_ids=["9999"])
+            # 过滤后无订单时展示周期回退到未过滤数据，避免页面误报“尚未同步”
+            self.assertEqual(empty_pages["period"], {"start": date(2026, 7, 1), "end": date(2026, 7, 1)})
+            # 同一编码同时出现在保留与排除：排除优先
+            self.assertEqual(fulfillment_by_name(product_codes=["SKU-A1"], exclude_product_codes=["SKU-A1"]), {})
+
+            excluded_pages = _build_product_management_pages(connection, exclude_product_ids=["1001"])
+            self.assertEqual({row["productCode"] for row in excluded_pages["productOverview"]}, {"SKU-A2", "SKU-B", "SKU-C"})
+            hierarchy_names = {row["name"] for row in excluded_pages["fulfillmentByProductHierarchy"]["rows"]}
+            self.assertEqual(hierarchy_names, {"产品 A", "产品 B", "产品 C"})
+
+            # 商品范围作用于整页：仓配矩阵与发货趋势同样按过滤后订单重算
+            scoped_pages = _build_product_management_pages(connection, product_codes=["SKU-A1"])
+            self.assertEqual(sum(row["total"] for row in scoped_pages["warehouseStatusMatrix"]["rows"]), 1.0)
+            self.assertEqual(sum(row["total"] for row in scoped_pages["dailyShipWarehouseMatrix"]["rows"]), 1.0)
+            # 可选切片器值仍取未过滤数据
+            self.assertIn("已发货", scoped_pages["availableStatuses"])
+        finally:
+            connection.close()
+
+    def test_product_id_filter_uses_undeduped_master_source(self) -> None:
+        """商品ID 映射走 product-master 的 source 视图，不能因 model 视图按编码去重而丢 ID。"""
+
+        orders = pl.DataFrame(
+            {
+                "线上订单号": ["ORDER-D1"],
+                "线上子订单编号": ["D1-1"],
+                "内部订单号": ["INNER-D1"],
+                "订单状态明细": ["已发货"],
+                "订单状态": ["已发货"],
+                "订单日期": [date(2026, 7, 1)],
+                "发货日期": [date(2026, 7, 4)],
+                "商品编码": ["SKU-D"],
+                "商品简称": ["产品 D"],
+                "产品分类": ["床垫"],
+                "品牌": ["麻大师"],
+                "销售数量": [1.0],
+                "销售金额": [100.0],
+                "退货数量": [0.0],
+                "退货金额": [0.0],
+                "商家实收": [90.0],
+                "买家实付": [100.0],
+                "平台补贴金额": [0.0],
+                "店铺": ["店铺甲"],
+                "店铺简称": ["店铺甲"],
+                "渠道平台": ["渠道甲"],
+                "达人名称": [None],
+                "发货仓": ["华东仓"],
+            }
+        )
+        # 同一商品编码在不同平台文件里有两个商品ID；model 视图按编码去重后只剩 ID-D1。
+        product_master_source = pl.DataFrame(
+            {
+                "商品编码": ["SKU-D", "SKU-D"],
+                "商品ID": ["ID-D1", "ID-D2"],
+                "产品名称": ["产品 D", "产品 D"],
+                "成本": [10.0, 10.0],
+                "床垫类别": ["弹簧床垫", "弹簧床垫"],
+            }
+        )
+        product_master_model = product_master_source.filter(pl.col("商品ID") == "ID-D1")
+
+        connection = duckdb.connect()
+        try:
+            for name, frame in {
+                "jt_source": orders,
+                "pm_source": product_master_source,
+                "pm_model": product_master_model,
+            }.items():
+                connection.register(f"{name}_rows", frame.to_arrow())
+                connection.execute(f"CREATE VIEW {name} AS SELECT * FROM {name}_rows")
+            connection.execute(
+                "CREATE TABLE warehouse_query_catalog (query_name VARCHAR, source_view VARCHAR, model_view VARCHAR)"
+            )
+            connection.executemany(
+                "INSERT INTO warehouse_query_catalog VALUES (?, ?, ?)",
+                [
+                    ("15-聚水潭商品数据", "jt_source", "jt_source"),
+                    ("product-master", "pm_source", "pm_model"),
+                ],
+            )
+
+            for included_id in ("ID-D1", "ID-D2"):
+                pages = _build_product_management_pages(connection, product_ids=[included_id])
+                self.assertEqual(
+                    [(row["productName"], row["orderCount"]) for row in pages["fulfillmentByProduct"]],
+                    [("产品 D", 1)],
+                    f"商品ID {included_id} 必须映射到未去重的 source 视图",
+                )
+
+            excluded = _build_product_management_pages(connection, exclude_product_ids=["ID-D2"])
+            self.assertEqual(excluded["fulfillmentByProduct"], [])
+        finally:
+            connection.close()
+
+    def test_product_scope_without_master_keeps_unmatched_codes(self) -> None:
+        """主数据缺失时 ID 保留为空集、ID 排除不生效；排除编码不误删无编码订单。"""
+
+        orders = pl.DataFrame(
+            {
+                "线上订单号": ["ORDER-X", "ORDER-NULL"],
+                "线上子订单编号": ["X-1", "NULL-1"],
+                "内部订单号": ["INNER-X", "INNER-NULL"],
+                "订单状态明细": ["已发货", "已发货"],
+                "订单状态": ["已发货", "已发货"],
+                "订单日期": [date(2026, 7, 1), date(2026, 7, 1)],
+                "发货日期": [date(2026, 7, 3), date(2026, 7, 4)],
+                "商品编码": ["SKU-X", None],
+                "商品简称": ["产品 X", "无编码商品"],
+                "产品分类": ["床垫", "床垫"],
+                "品牌": ["麻大师", "麻大师"],
+                "销售数量": [1.0, 1.0],
+                "销售金额": [100.0, 100.0],
+                "退货数量": [0.0, 0.0],
+                "退货金额": [0.0, 0.0],
+                "商家实收": [90.0, 90.0],
+                "买家实付": [100.0, 100.0],
+                "平台补贴金额": [0.0, 0.0],
+                "店铺": ["店铺甲", "店铺甲"],
+                "店铺简称": ["店铺甲", "店铺甲"],
+                "渠道平台": ["渠道甲", "渠道甲"],
+                "达人名称": [None, None],
+                "发货仓": ["华东仓", "华东仓"],
+            }
+        )
+
+        connection = duckdb.connect()
+        try:
+            connection.register("jt_rows", orders.to_arrow())
+            connection.execute("CREATE VIEW jt_source AS SELECT * FROM jt_rows")
+            connection.execute(
+                "CREATE TABLE warehouse_query_catalog (query_name VARCHAR, source_view VARCHAR, model_view VARCHAR)"
+            )
+            connection.execute(
+                "INSERT INTO warehouse_query_catalog VALUES ('15-聚水潭商品数据', 'jt_source', 'jt_source')"
+            )
+
+            def counts(**kwargs):
+                pages = _build_product_management_pages(connection, **kwargs)
+                return {row["productName"]: row["orderCount"] for row in pages["fulfillmentByProduct"]}
+
+            self.assertEqual(counts(), {"产品 X": 1, "无编码商品": 1})
+            self.assertEqual(counts(product_ids=["1001"]), {})
+            self.assertEqual(counts(exclude_product_ids=["1001"]), {"产品 X": 1, "无编码商品": 1})
+            # 无编码订单不满足“排除 SKU-X”，必须保留
+            self.assertEqual(counts(exclude_product_codes=["SKU-X"]), {"无编码商品": 1})
         finally:
             connection.close()
 

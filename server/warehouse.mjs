@@ -242,7 +242,8 @@ export async function syncWarehouse() {
   return activeSync;
 }
 
-async function runQueryProductsOnDemand({ start, end, statuses, channels, storeShortNames }) {
+async function runQueryProductsOnDemand(opts) {
+  const { start, end, statuses, channels, storeShortNames } = opts;
   const python = process.env.PYTHON || "python";
   const args = [syncScript, "query-products"];
   if (start) args.push("--start", start);
@@ -250,6 +251,10 @@ async function runQueryProductsOnDemand({ start, end, statuses, channels, storeS
   for (const status of statuses ?? []) args.push("--status", status);
   for (const channel of channels ?? []) args.push("--channel", channel);
   for (const storeShortName of storeShortNames ?? []) args.push("--store-short-name", storeShortName);
+  for (const productCode of opts.productCodes ?? []) args.push("--product-code", productCode);
+  for (const productCode of opts.excludeProductCodes ?? []) args.push("--exclude-product-code", productCode);
+  for (const productId of opts.productIds ?? []) args.push("--product-id", productId);
+  for (const productId of opts.excludeProductIds ?? []) args.push("--exclude-product-id", productId);
   const { stdout } = await execFileAsync(python, args, {
     cwd: projectRoot,
     timeout: 60 * 1000,
@@ -263,6 +268,22 @@ async function runQueryProductsOnDemand({ start, end, statuses, channels, storeS
 // 按需查询结果缓存：相同筛选 + 快照未变时直接复用，避免重复 spawn Python（~12.6s/次）。
 // single-flight 防并发击穿；mtime 变化（sync 后）自动失效。
 const productQueryCache = new Map();
+// 商品范围是自由文本筛选，键空间无界；单条结果数 MB，必须设上限避免进程内存持续增长。
+const PRODUCT_QUERY_CACHE_LIMIT = 10;
+
+function trimProductQueryCache() {
+  while (productQueryCache.size > PRODUCT_QUERY_CACHE_LIMIT) {
+    let victim = null;
+    for (const [key, entry] of productQueryCache) {
+      if (!entry.inflight) {
+        victim = key;
+        break;
+      }
+    }
+    if (victim === null) victim = productQueryCache.keys().next().value;
+    productQueryCache.delete(victim);
+  }
+}
 
 // PowerBI 天猫明细页按需重算：快照固定 60 天滚动窗口（POWERBI_PAGE_WINDOW_DAYS），
 // 窗口外区间由前端触发本查询实时聚合（30 天 ~18s、8 个月 ~70s），响应不含客服数据
@@ -340,11 +361,19 @@ export async function prewarmPowerbiPagesOnDemand() {
   }
 }
 
-function productQueryKey({ start, end, statuses, channels, storeShortNames }) {
-  const s = [...(statuses ?? [])].sort().join(",");
-  const c = [...(channels ?? [])].sort().join(",");
-  const st = [...(storeShortNames ?? [])].sort().join(",");
-  return `${start || ""}|${end || ""}|${s}|${c}|${st}`;
+function productQueryKey(opts) {
+  // JSON.stringify 保留数组边界，避免自由文本筛选值里的逗号/竖线与拼接分隔符碰撞。
+  return JSON.stringify([
+    opts.start || "",
+    opts.end || "",
+    [...(opts.statuses ?? [])].sort(),
+    [...(opts.channels ?? [])].sort(),
+    [...(opts.storeShortNames ?? [])].sort(),
+    [...(opts.productCodes ?? [])].sort(),
+    [...(opts.excludeProductCodes ?? [])].sort(),
+    [...(opts.productIds ?? [])].sort(),
+    [...(opts.excludeProductIds ?? [])].sort(),
+  ]);
 }
 
 export async function queryProductsOnDemand(opts) {
@@ -361,6 +390,7 @@ export async function queryProductsOnDemand(opts) {
   const inflight = runQueryProductsOnDemand(opts)
     .then((value) => {
       productQueryCache.set(key, { value, mtime, inflight: null, inflightMtime: null });
+      trimProductQueryCache();
       return value;
     })
     .catch((error) => {
@@ -375,5 +405,6 @@ export async function queryProductsOnDemand(opts) {
   } else {
     productQueryCache.set(key, { value: null, mtime: null, inflight, inflightMtime: mtime });
   }
+  trimProductQueryCache();
   return inflight;
 }

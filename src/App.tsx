@@ -15,6 +15,7 @@ import { clsx } from "./utils/format";
 
 const AccessManagementPage = lazy(() => import("./pages/AccessManagementPage").then((m) => ({ default: m.AccessManagementPage })));
 const AnalyticsPage = lazy(() => import("./pages/AnalyticsPage").then((m) => ({ default: m.AnalyticsPage })));
+const CustomerServicePage = lazy(() => import("./pages/CustomerServicePage").then((m) => ({ default: m.CustomerServicePage })));
 const ContentProductionPage = lazy(() => import("./pages/ContentProductionPage").then((m) => ({ default: m.ContentProductionPage })));
 const DashboardPage = lazy(() => import("./pages/DashboardPage").then((m) => ({ default: m.DashboardPage })));
 const ImageProcessingPage = lazy(() => import("./pages/ImageProcessingPage").then((m) => ({ default: m.ImageProcessingPage })));
@@ -36,32 +37,18 @@ function PageSuspenseFallback() {
 
 type Theme = "light" | "dark";
 
-const DAY_THEME_START_HOUR = 7;
-const DAY_THEME_END_HOUR = 19;
-
-function getTimeBasedTheme(now = new Date()): Theme {
-  const hour = now.getHours();
-  return hour >= DAY_THEME_START_HOUR && hour < DAY_THEME_END_HOUR ? "light" : "dark";
-}
-
-function millisecondsUntilThemeBoundary(now = new Date()) {
-  const nextBoundary = new Date(now);
-  const hour = now.getHours();
-
-  if (hour < DAY_THEME_START_HOUR) {
-    nextBoundary.setHours(DAY_THEME_START_HOUR, 0, 0, 0);
-  } else if (hour < DAY_THEME_END_HOUR) {
-    nextBoundary.setHours(DAY_THEME_END_HOUR, 0, 0, 0);
-  } else {
-    nextBoundary.setDate(nextBoundary.getDate() + 1);
-    nextBoundary.setHours(DAY_THEME_START_HOUR, 0, 0, 0);
-  }
-
-  return Math.max(1000, nextBoundary.getTime() - now.getTime());
-}
-
-const initialTheme = getTimeBasedTheme();
+// 已关闭“按时间段自动切换暗色模式”：固定初始使用亮色主题。
+// 用户仍可通过侧边栏/顶栏的主题切换按钮手动在亮色/暗色间切换。
+const initialTheme: Theme = "light";
 document.documentElement.dataset.theme = initialTheme;
+
+// Hash 路由支持：允许通过 #pageId 直接打开指定页面（用于服务器反向代理嵌入）
+const VALID_HASH_PAGES: PageId[] = ["dashboard", "assets", "content", "images", "analytics", "customer-service", "intelligence", "sentiment", "tasks", "products", "settings", "access"];
+function getPageFromHash(): PageId | null {
+  const hash = window.location.hash.replace(/^#\/?/, "");
+  if (!hash) return null;
+  return VALID_HASH_PAGES.includes(hash as PageId) ? (hash as PageId) : null;
+}
 
 const pagePermissions: Record<PageId, string> = {
   dashboard: "dashboard.view",
@@ -69,6 +56,7 @@ const pagePermissions: Record<PageId, string> = {
   content: "content.view",
   images: "images.view",
   analytics: "analytics.view",
+  "customer-service": "analytics.view",
   intelligence: "intelligence.view",
   sentiment: "intelligence.view",
   tasks: "tasks.view",
@@ -77,8 +65,17 @@ const pagePermissions: Record<PageId, string> = {
   access: "admin.users",
 };
 
+// 嵌入模式检测：当页面在 iframe 中运行时，隐藏导航栏和用户栏，只显示内容区域
+const isEmbedded = (() => {
+  try {
+    return window.self !== window.top;
+  } catch {
+    return true;
+  }
+})();
+
 export default function App() {
-  const [activePage, setActivePage] = useState<PageId>("dashboard");
+  const [activePage, setActivePage] = useState<PageId>(() => getPageFromHash() ?? "dashboard");
   const [theme, setTheme] = useState<Theme>(initialTheme);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [tasks, setTasks] = useState<QueueTask[]>([]);
@@ -88,21 +85,6 @@ export default function App() {
   const [searchTarget, setSearchTarget] = useState<SearchTarget | null>(null);
   const toastSeed = useRef(0);
   const searchSeqRef = useRef(0);
-
-  useEffect(() => {
-    let timeoutId = 0;
-
-    const syncTheme = () => {
-      const now = new Date();
-      const nextTheme = getTimeBasedTheme(now);
-      document.documentElement.dataset.theme = nextTheme;
-      setTheme(nextTheme);
-      timeoutId = window.setTimeout(syncTheme, millisecondsUntilThemeBoundary(now));
-    };
-
-    syncTheme();
-    return () => window.clearTimeout(timeoutId);
-  }, []);
 
   useEffect(() => {
     getAuthStatus()
@@ -122,6 +104,24 @@ export default function App() {
     window.addEventListener("ecom:session-expired", expireSession);
     return () => window.removeEventListener("ecom:session-expired", expireSession);
   }, []);
+
+  // Hash 路由：监听 URL hash 变化，同步到 activePage
+  useEffect(() => {
+    const handleHashChange = () => {
+      const page = getPageFromHash();
+      if (page) setActivePage(page);
+    };
+    window.addEventListener("hashchange", handleHashChange);
+    return () => window.removeEventListener("hashchange", handleHashChange);
+  }, []);
+
+  // Hash 路由：当 activePage 变化时，同步更新 URL hash（不触发新的 hashchange 循环）
+  useEffect(() => {
+    const expected = `#${activePage}`;
+    if (window.location.hash !== expected) {
+      window.history.replaceState(null, "", expected);
+    }
+  }, [activePage]);
 
   const currentUser = authStatus?.user ?? null;
   const hasPermission = (permission: string) => Boolean(currentUser && (currentUser.role === "admin" || currentUser.permissions.includes(permission)));
@@ -332,6 +332,9 @@ export default function App() {
     if (activePage === "analytics") {
       return <AnalyticsPage canManage={hasPermission("analytics.manage")} onAction={showToast} onCreateTask={createTaskFromSuggestion} searchTarget={searchTarget?.page === "analytics" ? searchTarget : null} onSearchConsumed={consumeSearchTarget} />;
     }
+    if (activePage === "customer-service") {
+      return <CustomerServicePage canManage={hasPermission("analytics.manage")} onAction={showToast} />;
+    }
     if (activePage === "intelligence") {
       return <IntelligencePage canManage={hasPermission("intelligence.manage")} onAction={showToast} onCreateTask={createTask} />;
     }
@@ -369,35 +372,41 @@ export default function App() {
   if (!currentUser) return <div className="auth-loading-screen"><b>免登录模式初始化失败</b><button className="btn-primary" onClick={() => window.location.reload()} type="button">重新连接</button></div>;
 
   return (
-    <div className="app-shell" data-ui="app-shell">
+    <div className={clsx("app-shell", isEmbedded && "app-embedded")} data-ui="app-shell" data-embedded={isEmbedded ? "true" : "false"}>
       <TopProgressBar />
-      <Sidebar activePage={activePage} items={allowedNavItems} onNavigate={handleNavigate} onToggleTheme={handleThemeToggle} theme={theme} />
+      {!isEmbedded && (
+        <Sidebar activePage={activePage} items={allowedNavItems} onNavigate={handleNavigate} onToggleTheme={handleThemeToggle} theme={theme} />
+      )}
       <div className="flex min-w-0 flex-1 flex-col">
-        <Topbar
-          onAction={showToast}
-          onLogout={() => void handleLogout()}
-          onOpenSettings={hasPermission("settings.view") ? () => handleNavigate("settings") : undefined}
-          onSearchNavigate={handleSearchNavigate}
-          onToggleTheme={handleThemeToggle}
-          searchAllowedPages={new Set(allowedNavItems.map((item) => item.id))}
-          searchCanData={hasPermission("analytics.view") || hasPermission("products.view")}
-          theme={theme}
-          user={currentUser}
-        />
-        <div className="border-b border-[var(--border)] bg-[var(--bg-2)] px-4 py-3 lg:hidden" data-ui="mobile-navigation">
-          <div className="flex gap-2 overflow-x-auto">
-            {allowedNavItems.map((item) => (
-              <button
-                className={clsx("btn whitespace-nowrap", activePage === item.id && "border-[var(--brand)] text-[var(--text)]")}
-                key={item.id}
-                onClick={() => handleNavigate(item.id)}
-                type="button"
-              >
-                <NavIcon page={item.id} /> {item.label}
-              </button>
-            ))}
+        {!isEmbedded && (
+          <Topbar
+            onAction={showToast}
+            onLogout={() => void handleLogout()}
+            onOpenSettings={hasPermission("settings.view") ? () => handleNavigate("settings") : undefined}
+            onSearchNavigate={handleSearchNavigate}
+            onToggleTheme={handleThemeToggle}
+            searchAllowedPages={new Set(allowedNavItems.map((item) => item.id))}
+            searchCanData={hasPermission("analytics.view") || hasPermission("products.view")}
+            theme={theme}
+            user={currentUser}
+          />
+        )}
+        {!isEmbedded && (
+          <div className="border-b border-[var(--border)] bg-[var(--bg-2)] px-4 py-3 lg:hidden" data-ui="mobile-navigation">
+            <div className="flex gap-2 overflow-x-auto">
+              {allowedNavItems.map((item) => (
+                <button
+                  className={clsx("btn whitespace-nowrap", activePage === item.id && "border-[var(--brand)] text-[var(--text)]")}
+                  key={item.id}
+                  onClick={() => handleNavigate(item.id)}
+                  type="button"
+                >
+                  <NavIcon page={item.id} /> {item.label}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
         <main className="content-shell" data-ui="page-content">
           <Suspense fallback={<PageSuspenseFallback />}>
             {renderPage()}

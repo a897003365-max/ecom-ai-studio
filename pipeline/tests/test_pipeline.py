@@ -75,6 +75,7 @@ class TransformTests(unittest.TestCase):
             ("低实付", "普通订单", 49, "麻大师床垫", "正常店", "", None, None, None, None, "已发货", "2026/7/1 10:00:00"),
             ("排除店", "普通订单", 100, "麻大师床垫", "伊凯琳家具旗舰店-周飞-猫1", "", None, None, None, None, "已发货", "2026/7/1 10:00:00"),
             ("返修", "普通订单", 100, "麻大师床垫", "正常店", "请返修", None, None, None, None, "已发货", "2026/7/1 10:00:00"),
+            ("纯0.01", "普通订单", 100, "0.01试用装", "正常店", "", None, None, None, None, "已发货", "2026/7/1 10:00:00"),
         ]
         frame = pl.DataFrame(
             {
@@ -104,18 +105,19 @@ class TransformTests(unittest.TestCase):
         transformed = transform_source_file(frame, spec, source)
 
         # 买家实付 >= 50 硬过滤已取消（2026-08-19 业务决策），低实付行保留；
-        # 其余剔除规则不变（非普通订单、0.01链接、排除店铺、返修单）。
-        retained = rows[:7] + [rows[9]]
+        # 0.01 过滤已取消（2026-10-06 业务决策），纯 0.01 名称行保留（"促销零"仍被 入会/链接 规则剔除）；
+        # 其余剔除规则不变（非普通订单、排除店铺、返修单）。
+        retained = rows[:7] + [rows[9]] + [rows[12]]
         self.assertEqual(transformed["内部订单号"].to_list(), [row[0] for row in retained])
         self.assertEqual(
             transformed["订单状态明细"].to_list(),
-            ["已发货", "交易关闭（仅退款）", "交易关闭（退货退款）", "等通知", "指定日", "待发货", "未付款", "已发货"],
+            ["已发货", "交易关闭（仅退款）", "交易关闭（退货退款）", "等通知", "指定日", "待发货", "未付款", "已发货", "已发货"],
         )
         self.assertEqual(
             transformed["订单状态汇总"].to_list(),
-            ["已发", "未付款或交易关闭", "未付款或交易关闭", "待发", "待发", "待发", "未付款或交易关闭", "已发"],
+            ["已发", "未付款或交易关闭", "未付款或交易关闭", "待发", "待发", "待发", "未付款或交易关闭", "已发", "已发"],
         )
-        self.assertEqual(transformed["销售数量"].to_list(), [2.0] * 8)
+        self.assertEqual(transformed["销售数量"].to_list(), [2.0] * 9)
         self.assertTrue({"买家留言", "售后分类", "小旗"}.isdisjoint(transformed.columns))
 
 
@@ -124,8 +126,10 @@ class CatalogTests(unittest.TestCase):
         paths = WarehousePaths.discover()
         manifest, queries = load_catalog(paths.manifest)
         # 25 个 PowerBI 推广报表 M 查询 + 1 个手写的聚水潭商品数据查询（来自另一个 pbix）
-        self.assertEqual(manifest["queryCount"], 27)
-        self.assertEqual(len(queries), 27)
+        # + 1 个飞鸽客服导出（16-抖音每日客服，2026-09-10 接入）
+        # + 4 个 mds 库天猫查询（postgres 直读，2026-10-09 接入：店铺日汇总/商品日明细/场景日明细/商品推广日明细）
+        self.assertEqual(manifest["queryCount"], 32)
+        self.assertEqual(len(queries), 32)
         self.assertTrue(all(query.source_paths for query in queries))
 
     def test_default_sync_excludes_queries_already_owned_by_dingtalk(self) -> None:
@@ -140,8 +144,8 @@ class CatalogTests(unittest.TestCase):
         )
         self.assertEqual({item.name for item in excluded}, set(DINGTALK_COVERED_QUERIES))
         self.assertFalse(set(DINGTALK_COVERED_QUERIES) & {item.name for item in selected})
-        # 27 总查询 - 2 钉钉权威排除 = 25 个活跃查询
-        self.assertEqual(len(selected), 25)
+        # 32 总查询 - 2 钉钉权威排除 = 30 个活跃查询
+        self.assertEqual(len(selected), 30)
 
     def test_explicit_sync_cannot_reintroduce_dingtalk_owned_queries(self) -> None:
         paths = WarehousePaths.discover()

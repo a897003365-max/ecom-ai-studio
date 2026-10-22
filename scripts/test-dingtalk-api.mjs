@@ -185,6 +185,32 @@ assert.equal(
 );
 assert.equal(filtered.reporting.metricTrends.netRevenue.yoy, null, "没有去年同期数据时不得生成随机同比");
 assert.equal(filtered.reporting.metricTrends.netRevenue.mom, null, "没有上月同期数据时不得生成随机环比");
+
+// 渠道级同比/环比：前端切渠道时 KPI 同比徽标与店铺表 footer 取对应渠道的 trends
+assert.ok(filtered.reporting.metricTrendsByPlatform, "应暴露渠道级同比/环比 metricTrendsByPlatform 供前端切渠道");
+assert.equal(filtered.reporting.metricTrendsByPlatform.天猫?.netRevenue?.yoy, null, "渠道无去年同期数据时同比应为 null");
+const platformTrendSnapshot = structuredClone(snapshot);
+const trendBaseRow = platformTrendSnapshot.reporting.dailyPlatforms.find((row) => row.platform === "天猫");
+platformTrendSnapshot.reporting.dailyPlatforms.push(
+  { ...trendBaseRow, date: "2023-12-01", netRevenue: 100 },
+  { ...trendBaseRow, date: "2023-12-02", netRevenue: 200 },
+);
+const platformTrendFiltered = filterDingTalkSnapshot(platformTrendSnapshot, { start: "2024-12-01", end: "2024-12-02" });
+assert.equal(
+  platformTrendFiltered.reporting.metricTrendsByPlatform.天猫.netRevenue.yoy,
+  920 / 300 - 1,
+  "渠道级同比应按该渠道当前期与去年同期净回款计算",
+);
+assert.equal(
+  platformTrendFiltered.reporting.metricTrendsByPlatform.抖音.netRevenue.yoy,
+  null,
+  "无去年同期数据的渠道同比应为 null",
+);
+assert.equal(
+  platformTrendFiltered.reporting.metricTrends.netRevenue.yoy,
+  1560 / 300 - 1,
+  "全渠道同比应聚合所有渠道，与渠道级值区分",
+);
 assert.equal(filtered.reporting.latestComparison.asOf, "2024-12-02");
 assert.equal(filtered.reporting.latestComparison.previousDate, "2024-12-01");
 assert.equal(

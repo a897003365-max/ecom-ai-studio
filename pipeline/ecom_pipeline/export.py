@@ -21,12 +21,11 @@ from __future__ import annotations
 import os
 import time
 from dataclasses import dataclass, asdict
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any, Callable
 
 import duckdb
-import xlsxwriter
 
 from .config import WarehousePaths
 
@@ -48,6 +47,7 @@ class ExportResult:
     error: str | None = None
     max_payment_date: str | None = None
     data_fresh: bool = True
+    source: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -76,6 +76,9 @@ def _atomic_write_xlsx(target: Path, build_workbook: Callable[["xlsxwriter.Workb
     target = Path(target)
     target.parent.mkdir(parents=True, exist_ok=True)
     temp_path = target.with_name(f"{target.name}.{os.getpid()}.tmp")
+    # 延迟导入：query-products 等只读查询不需要 Excel 依赖，避免缺包时整条 CLI 不可用。
+    import xlsxwriter
+
     try:
         # xlsxwriter 自身没有 atomic 模式，需要我们控制临时文件路径
         with xlsxwriter.Workbook(str(temp_path)) as workbook:
@@ -185,27 +188,46 @@ def export_jushuitan_to_xlsx(
     传 ``open_password`` / ``write_password`` 时输出带文档加密的 xlsx
     （打开密码 + 编辑密码），否则输出普通 xlsx。
 
-    数据源改为 :func:`jushuitan39.build_jushuitan_39`（复现 PBIX M 的 39 列），
-    不再使用旧的 DuckDB model_q26 48 列视图。
+    数据源优先 mds 物化表 ``public.jst_order_item_export``（2026-10-22 起，
+    与网站同源、已按 39 列去重）；mds 不可用/表为空时回退本地 Excel 转换，
+    保证定时任务不断档。
     """
     from .jushuitan39 import build_jushuitan_39
 
     target_path = Path(target) if target else DEFAULT_TARGET
 
     started = time.time()
+    frame = None
+    source = ""
     try:
-        frame = build_jushuitan_39()
-    except FileNotFoundError as error:
-        return ExportResult(
-            ok=False,
-            query=QUERY_NAME,
-            target=str(target_path),
-            rows=0,
-            columns=0,
-            file_size=0,
-            duration_seconds=time.time() - started,
-            error=str(error),
-        )
+        from .mds_source import fetch_jst_order_item_export
+
+        frame = fetch_jst_order_item_export()
+        if frame.height == 0:
+            raise RuntimeError("mds 导出层为空（ETL 尚未运行）")
+        # 滞后保护：ETL 没跑时回退 Excel，避免把昨天的数据当今天导出。
+        if "付款日期" in frame.columns:
+            latest = frame["付款日期"].drop_nulls().max()
+            if latest is not None and latest < date.today() - timedelta(days=1):
+                raise RuntimeError(f"mds 导出层最新付款日期 {latest} 滞后")
+        source = "mds:public.jst_order_item_export"
+    except Exception:
+        frame = None
+    if frame is None:
+        try:
+            frame = build_jushuitan_39()
+            source = "excel:聚水潭订单明细_全量.xlsx"
+        except FileNotFoundError as error:
+            return ExportResult(
+                ok=False,
+                query=QUERY_NAME,
+                target=str(target_path),
+                rows=0,
+                columns=0,
+                file_size=0,
+                duration_seconds=time.time() - started,
+                error=str(error),
+            )
 
     if frame.height == 0:
         return ExportResult(
@@ -244,8 +266,6 @@ def export_jushuitan_to_xlsx(
 
     duration = time.time() - started
     # 数据新鲜度：最新付款日期是否已到"昨天"（否则源文件/导出滞后，需通知）
-    from datetime import date, timedelta
-
     max_payment, data_fresh = None, True
     if "付款日期" in frame.columns:
         max_value = frame["付款日期"].drop_nulls().max()
@@ -263,6 +283,7 @@ def export_jushuitan_to_xlsx(
         duration_seconds=duration,
         max_payment_date=max_payment,
         data_fresh=data_fresh,
+        source=source,
     )
 
 
@@ -279,6 +300,7 @@ def write_health(result: ExportResult, health_path: Path) -> None:
         "durationSeconds": round(result.duration_seconds, 3),
         "finishedAt": datetime.now().isoformat(timespec="seconds"),
         "error": result.error,
+        "source": result.source,
     }
     temp = health_path.with_suffix(f".{os.getpid()}.tmp")
     temp.write_text(

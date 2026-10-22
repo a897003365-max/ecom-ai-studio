@@ -83,20 +83,6 @@ function dateTime(value?: string | null) {
   }).format(new Date(value)).replaceAll("/", "-");
 }
 
-function isProductPeriodAligned(
-  productPeriod: { start: string; end: string } | null | undefined,
-  globalPeriod: { start: string; end: string } | null,
-) {
-  return Boolean(
-    productPeriod?.start
-    && productPeriod?.end
-    && globalPeriod?.start
-    && globalPeriod?.end
-    && productPeriod.start === globalPeriod.start
-    && productPeriod.end === globalPeriod.end,
-  );
-}
-
 export function AnalyticsPage({ onAction, canManage, searchTarget, onSearchConsumed }: AnalyticsPageProps) {
   const [integration, setIntegration] = useState<AnalyticsIntegrationPayload | null>(null);
   const [loading, setLoading] = useState(true);
@@ -144,10 +130,6 @@ export function AnalyticsPage({ onAction, canManage, searchTarget, onSearchConsu
   const reporting = dingtalk?.reporting;
   const globalPeriod = dingtalk?.period.start && dingtalk.period.end
     ? { start: dingtalk.period.start, end: dingtalk.period.end }
-    : null;
-  const productManagement = integration?.warehouse?.productManagement ?? null;
-  const alignedProductManagement = isProductPeriodAligned(productManagement?.period, globalPeriod)
-    ? productManagement
     : null;
   const dataStatus = integration?.dataStatus;
   const channelDingtalk = useMemo(
@@ -219,13 +201,18 @@ export function AnalyticsPage({ onAction, canManage, searchTarget, onSearchConsu
             )}
             {dataStatus && (
               <span
-                aria-label={`${dataStatus.label}，检查日期 ${dataStatus.expectedDate}`}
-                className={`dashboard-data-status is-${dataStatus.tone}`}
+                aria-label={dataStatus.tone === "green"
+                  ? `${dataStatus.label}，检查日期 ${dataStatus.expectedDate}`
+                  : `截止 ${dataStatus.expectedDate}（T-1）还差 ${dataStatus.missing.length} 项数据，悬浮查看明细`}
+                className={`dashboard-data-status is-${dataStatus.tone}${dataStatus.tone !== "green" ? " is-dot-only" : ""}`}
                 data-testid="dashboard-data-status"
-                title={dataStatus.missing.length ? dataStatus.missing.join("；") : `所有应更新的 T-1 数据已完成同步（${dataStatus.expectedDate}）`}
+                data-tone={dataStatus.tone}
+                title={dataStatus.missing.length
+                  ? `截止 ${dataStatus.expectedDate}（T-1）还差：\n${dataStatus.missing.join("\n")}`
+                  : `所有应更新的 T-1 数据已完成同步（${dataStatus.expectedDate}）`}
               >
                 <i aria-hidden="true" />
-                {dataStatus.tone === "green" ? "T-1 已更新" : "数据缺失"}
+                {dataStatus.tone === "green" ? "T-1 已更新" : null}
               </span>
             )}
           </>
@@ -241,7 +228,6 @@ export function AnalyticsPage({ onAction, canManage, searchTarget, onSearchConsu
           viewMode === "layered" ? (
             <ExecutiveCommerceOverview
               dingtalk={viewDingtalk!}
-              productManagement={alignedProductManagement}
               selectedChannel={activeChartChannel}
             />
           ) : (

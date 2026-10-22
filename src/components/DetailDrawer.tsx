@@ -28,7 +28,7 @@ export function DetailDrawer({ item, onClose }: DetailDrawerProps) {
               {item.isOwnBrand && <StatusTag label="⭐ 我方品牌" tone="green" />}
             </div>
             <h3 className="text-base font-bold leading-tight">{item.productName}</h3>
-            <div className="mt-1 text-xs text-[var(--muted)]">{item.shop} · {item.priceRange} · 月销 {item.salesRange}</div>
+            <div className="mt-1 text-xs text-[var(--muted)]">{item.shop} · 支付买家数 {item.salesRange || item.priceRange || "-"}</div>
           </div>
           <button className="btn shrink-0" onClick={onClose} aria-label="关闭">✕</button>
         </div>

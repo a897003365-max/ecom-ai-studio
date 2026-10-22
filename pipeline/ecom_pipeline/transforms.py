@@ -10,6 +10,7 @@ import pandas as pd
 import polars as pl
 
 from .catalog import QuerySpec
+from .jushuitan_source import normalize_jushuitan_columns
 from .readers import QuarantinedSourceError
 
 SUMMARY_LABELS = {
@@ -21,6 +22,8 @@ SUMMARY_LABELS = {
     "汇总值",
     "均值",
     "总值",
+    "店铺汇总值",
+    "店铺平均值",
 }
 
 MANUAL_RENAMES: dict[str, dict[str, str]] = {
@@ -51,6 +54,21 @@ MANUAL_RENAMES: dict[str, dict[str, str]] = {
     "辅5-床类编码": {"主型号": "SPU产品商编", "id": "商品ID", "商家编码（后台）": "商家规编（后台）"},
 }
 
+SCHEMA_ALIASES: dict[str, dict[str, str]] = {
+    # 生意参谋 2026-09 新版导出（商品_全部 / 品类_商品排行）的改名列，归一到 PBIX 既有口径；
+    # 在 _align_schema_columns/_apply_types 之前应用，保证日期与数值类型正常解析。
+    "07-旗舰店商品销售数据": {
+        "统计日期": "日期",
+        "商品加购人数": "加购人数",
+        "商品加购件数": "加购件数",
+        "商品收藏人数": "收藏人数",
+        "商品详情页跳出率": "跳失率",
+        "商品支付转化率": "支付转化率",
+        "访客平均价值": "UV价值",
+        "成功退款金额": "退款金额",
+    },
+}
+
 FILTER_COLUMNS: dict[str, str] = {
     "06-旗舰店流量数据": "三级来源",
     "10-1淘宝客服绩效明细": "旺旺昵称",
@@ -60,6 +78,7 @@ FILTER_COLUMNS: dict[str, str] = {
     "考勤数据": "客服",
     "营销数据": "客服",
     "营销数据改版": "客服",
+    "16-抖音每日客服": "客服昵称",
 }
 
 DEDUPE_KEYS: dict[str, tuple[str, ...]] = {
@@ -73,6 +92,7 @@ DEDUPE_KEYS: dict[str, tuple[str, ...]] = {
     "10-3京东客服绩效数据": ("客服", "日期"),
     "10-4客服员工日报统计": ("日期", "UID", "技能组", "服务商"),
     "14-推广竞品数据": ("时间", "品牌", "渠道", "时间段"),
+    "16-抖音每日客服": ("日期", "客服昵称"),
 }
 
 FILENAME_DATE_QUERIES = {
@@ -80,6 +100,7 @@ FILENAME_DATE_QUERIES = {
     "10-2京东客服营销明细",
     "10-3京东客服绩效数据",
     "考勤数据",
+    "16-抖音每日客服",
 }
 
 # 京东pop 日报（接待数据文件夹新格式）高置信判定所需的必需列
@@ -92,7 +113,6 @@ JUSHUITAN_EXCLUDED_STORES = {
 }
 
 JUSHUITAN_MANUAL_ZERO_EXACT_NAMES = {
-    "0.01入会专拍链接",
     "1",
     "【3支-紫杆（黑）】【禾硕新5度+东米605刷题能量笔+知心k181】",
     "【3支-蓝杆（黑）】【禾硕新5度+东米605刷题能量笔+知心k181】",
@@ -105,6 +125,11 @@ JUSHUITAN_MANUAL_ZERO_EXACT_NAMES = {
     "麻大师瑜伽茶道黄麻坐垫蒲团坐垫客厅阳台飘窗榻榻米日式坐垫 麻大师坐垫:6CM厚 34cm*40cm",
     "麻大师瑜伽茶道黄麻坐垫蒲团坐垫客厅阳台飘窗榻榻米日式坐垫40cm*40cm 麻大师坐垫:6CM厚 40cm*40cm",
 }
+
+# 聚水潭转换额外读取的辅助源（相对主源文件上两级目录）。
+# warehouse 的增量签名复用同一份定义，避免转换路径与签名范围漂移。
+JUSHUITAN_OFFLINE_RELATIVE_DIR = Path("02-商品明细库存表") / "线下"
+JUSHUITAN_ERP_MAPPING_RELATIVE_PATH = Path("商品信息文件") / "ERP店铺对照表.xlsx"
 
 
 def _normalize_order_id(value: object) -> str | None:
@@ -151,7 +176,7 @@ def _read_offline_suborder_ids(offline_directory: str) -> frozenset[str]:
 def _offline_suborder_ids(jushuitan_source: Path) -> frozenset[str]:
     """Resolve the PBIX sibling 线下 folder relative to a 聚水潭 source file."""
 
-    offline_directory = jushuitan_source.parent.parent / "02-商品明细库存表" / "线下"
+    offline_directory = jushuitan_source.parent.parent / JUSHUITAN_OFFLINE_RELATIVE_DIR
     return _read_offline_suborder_ids(str(offline_directory.resolve()))
 
 
@@ -187,7 +212,7 @@ def _read_store_short_name_mapping(mapping_file: str) -> dict[str, str]:
 def _store_short_name_mapping(jushuitan_source: Path) -> dict[str, str]:
     """Resolve the PBIX 店铺名称对应表 source next to 聚水潭 data files."""
 
-    mapping_file = jushuitan_source.parent.parent / "商品信息文件" / "ERP店铺对照表.xlsx"
+    mapping_file = jushuitan_source.parent.parent / JUSHUITAN_ERP_MAPPING_RELATIVE_PATH
     return _read_store_short_name_mapping(str(mapping_file.resolve()))
 
 
@@ -197,6 +222,15 @@ def canonical_column(value: str) -> str:
 
 
 def _align_schema_columns(frame: pl.DataFrame, spec: QuerySpec) -> pl.DataFrame:
+    aliases = SCHEMA_ALIASES.get(spec.name, {})
+    existing = set(frame.columns)
+    alias_renames = {
+        source: target
+        for source, target in aliases.items()
+        if source in existing and target not in existing
+    }
+    if alias_renames:
+        frame = frame.rename(alias_renames)
     targets = {canonical_column(item.name): item.name for item in spec.schema}
     existing = set(frame.columns)
     renames: dict[str, str] = {}
@@ -398,12 +432,21 @@ def _drop_empty_rows(frame: pl.DataFrame) -> pl.DataFrame:
     return frame.filter(pl.any_horizontal(populated))
 
 
-def _transform_jushuitan(frame: pl.DataFrame, path: Path) -> pl.DataFrame:
+def _transform_jushuitan(
+    frame: pl.DataFrame,
+    path: Path | None,
+    *,
+    store_mapping: dict[str, str] | None = None,
+    offline_ids: frozenset[str] | None = None,
+) -> pl.DataFrame:
     """Reproduce the business rules of PBIX query ``15-聚水潭商品数据``.
 
     The source export has more than 100 columns.  We use the raw helper fields only
     long enough to reproduce the PBIX filters and status priority, then drop them so
     customer messages and after-sales annotations never enter the local warehouse.
+
+    ``store_mapping`` / ``offline_ids`` 允许数据库 ETL 直接注入辅助维表，跳过
+    文件系统读取；不传时仍按原逻辑从 ``path`` 同级的 Excel 读取。
     """
 
     required = {
@@ -467,7 +510,8 @@ def _transform_jushuitan(frame: pl.DataFrame, path: Path) -> pl.DataFrame:
 
     # PBIX 的店铺名称对应表来自 ERP店铺对照表.xlsx。先映射原始店铺，再按抖音达人和
     # 新零售规则覆盖，确保网站筛选项与 PBIX 最终 [店铺简称] 同口径。
-    store_mapping = _store_short_name_mapping(path)
+    if store_mapping is None:
+        store_mapping = _store_short_name_mapping(path) if path is not None else {}
     if store_mapping:
         mapping_frame = pl.DataFrame(
             {
@@ -503,7 +547,8 @@ def _transform_jushuitan(frame: pl.DataFrame, path: Path) -> pl.DataFrame:
     # 都优先归入新零售。辅助订单号和备注原文仅在此处参与判断，不会进入最终数据集。
     new_retail = pl.lit(False)
     if "线上子订单编号" in frame.columns:
-        offline_ids = _offline_suborder_ids(path)
+        if offline_ids is None:
+            offline_ids = _offline_suborder_ids(path) if path is not None else frozenset()
         if offline_ids:
             new_retail = (
                 pl.col("线上子订单编号")
@@ -579,7 +624,6 @@ def _transform_jushuitan(frame: pl.DataFrame, path: Path) -> pl.DataFrame:
         | product_name.is_in(JUSHUITAN_MANUAL_ZERO_EXACT_NAMES).fill_null(False)
         | product_name.str.contains("皮革", literal=True).fill_null(False)
         | product_name.str.contains("单拍不发货", literal=True).fill_null(False)
-        | product_name.str.contains("0.01", literal=True).fill_null(False)
         | product_name.str.contains("链接", literal=True).fill_null(False)
         | product_name.str.contains("入会", literal=True).fill_null(False)
         | product_name.str.contains("袋子", literal=True).fill_null(False)
@@ -777,6 +821,46 @@ def _transform_product_master(frame: pl.DataFrame) -> pl.DataFrame:
     return frame
 
 
+# 07 查询中的身份/文本列：不参与数值归一，其余指标列统一按数值解析
+TMALL_PRODUCT_TEXT_COLUMNS = {
+    "日期", "日期范围", "商品ID", "主商品ID", "商品名称", "标准类目", "商品类目", "商品状态", "商品类型",
+    "货号", "商品标签", "品牌", "Source.Name", "_source_sheet", "_source_path", "_source_mtime_ns",
+    # 生意参谋「一键导出」格式的元数据/链接列（2026-09 起用于补齐历史日期）
+    "栏目", "菜单", "数据点", "维度", "类目", "选择类型", "搜索商品",
+    "商品链接", "商品图片链接", "商品编码", "导出时间",
+}
+
+
+def _normalize_tmall_product_metrics(frame: pl.DataFrame, spec: QuerySpec) -> pl.DataFrame:
+    # 新版导出所有指标都是文本（含千分位/百分号），旧版是数值单元格；统一转成 Float64，
+    # 保证新旧分区在 union_by_name 合并时列类型一致。
+    typed = {item.name for item in spec.schema}
+    expressions = [
+        _numeric_expression(column)
+        for column in frame.columns
+        if column not in TMALL_PRODUCT_TEXT_COLUMNS
+        and column not in typed
+        and frame[column].dtype == pl.String
+    ]
+    return frame.with_columns(expressions) if expressions else frame
+
+
+def _duration_seconds(column: str, alias: str) -> pl.Expr:
+    # 飞鸽时长格式:「8小时41分34秒」「3分25秒」「25秒」,空值为「-」
+    text = pl.col(column).cast(pl.String, strict=False).str.strip_chars()
+    hours = text.str.extract(r"(\d+)\s*小时", 1).cast(pl.Float64, strict=False).fill_null(0)
+    minutes = text.str.extract(r"(\d+)\s*分", 1).cast(pl.Float64, strict=False).fill_null(0)
+    seconds = text.str.extract(r"(\d+)\s*秒", 1).cast(pl.Float64, strict=False).fill_null(0)
+    matched = text.str.contains(r"\d+\s*(小时|分|秒)")
+    return pl.when(matched).then(hours * 3600 + minutes * 60 + seconds).otherwise(None).alias(alias)
+
+
+def _apply_douyin_kefu_metrics(frame: pl.DataFrame) -> pl.DataFrame:
+    mapping = {"客服在线总时长": "在线时长秒", "工作时间平响时长": "平响秒", "全天首响时长": "首响秒"}
+    expressions = [_duration_seconds(source, alias) for source, alias in mapping.items() if source in frame.columns]
+    return frame.with_columns(expressions) if expressions else frame
+
+
 def _apply_query_rules(frame: pl.DataFrame, spec: QuerySpec, path: Path) -> pl.DataFrame:
     if spec.name == "03-1-各渠道目标金额":
         return _transform_targets(frame, path)
@@ -789,6 +873,7 @@ def _apply_query_rules(frame: pl.DataFrame, spec: QuerySpec, path: Path) -> pl.D
 
     if spec.name == "07-旗舰店商品销售数据":
         frame = frame.drop([column for column in ("Column4", "Column37", "Column38") if column in frame.columns])
+        frame = _normalize_tmall_product_metrics(frame, spec)
 
     filter_column = FILTER_COLUMNS.get(spec.name)
     if filter_column in frame.columns:
@@ -839,6 +924,9 @@ def _apply_query_rules(frame: pl.DataFrame, spec: QuerySpec, path: Path) -> pl.D
                 .alias("商品ID")
             )
 
+    if spec.name == "16-抖音每日客服":
+        frame = _apply_douyin_kefu_metrics(frame)
+
     keys = [column for column in DEDUPE_KEYS.get(spec.name, ()) if column in frame.columns]
     if keys:
         frame = frame.unique(subset=keys, keep="first", maintain_order=True)
@@ -848,6 +936,13 @@ def _apply_query_rules(frame: pl.DataFrame, spec: QuerySpec, path: Path) -> pl.D
 def transform_source_file(frame: pl.DataFrame, spec: QuerySpec, path: Path) -> pl.DataFrame:
     if spec.name in {"营销数据改版", "淘宝客服排班表"} and any(column.startswith("Column") for column in frame.columns):
         frame = _promote_first_row(frame)
+    # 生意参谋「一键导出」格式无日期列，日期在「日期范围」单元格内（如 2026-09-02|2026-09-02）
+    if spec.name == "07-旗舰店商品销售数据" and "日期范围" in frame.columns and "日期" not in frame.columns:
+        frame = frame.with_columns(
+            pl.col("日期范围").cast(pl.String, strict=False).str.split("|").list.get(0).alias("日期")
+        )
+    if spec.name == "15-聚水潭商品数据":
+        frame = normalize_jushuitan_columns(frame)
     frame = _align_schema_columns(frame, spec)
     frame = _apply_types(frame, spec)
     frame = _apply_query_rules(frame, spec, path)

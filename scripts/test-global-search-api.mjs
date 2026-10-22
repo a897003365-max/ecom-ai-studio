@@ -16,6 +16,18 @@ const ctx = {
   warehouseMtime: Date.now(),
   warehouseRefreshedAt: warehouse.refreshedAt,
 };
+
+// 最新完整数据日与自然月边界：随真实钉钉快照滚动，避免断言硬编码日期在跨月后过期
+const latestComplete = dingtalk.reporting?.completedThrough;
+const monthStart = `${latestComplete.slice(0, 7)}-01`;
+function prevMonthRange(iso) {
+  const [year, month] = iso.split("-").map(Number);
+  const prevYear = month === 1 ? year - 1 : year;
+  const prevMonth = month === 1 ? 12 : month - 1;
+  const lastDay = new Date(Date.UTC(year, month - 1, 0)).getUTCDate();
+  const mm = String(prevMonth).padStart(2, "0");
+  return { start: `${prevYear}-${mm}-01`, end: `${prevYear}-${mm}-${String(lastDay).padStart(2, "0")}` };
+}
 const admin = { role: "admin", permissions: ["analytics.view", "products.view"] };
 const analyticsOnly = { role: "member", permissions: ["analytics.view"] };
 const nobody = { role: "member", permissions: [] };
@@ -170,25 +182,26 @@ function assertFinite(value, label) {
   // 昨天 → 最新完整数据日，不再静默全周期
   const r1 = await searchSite({ query: "昨天退款率", mode: "answer", user: admin, permissions: admin.permissions }, ctx);
   assert.equal(r1.status, "ok", "昨天退款率应 ok");
-  assert.equal(r1.interpretation.period?.start, "2026-08-03", "昨天应落到最新完整数据日");
-  assert.equal(r1.interpretation.period?.end, "2026-08-03");
-  assert.equal(r1.answers[0]?.period?.start, "2026-08-03", "答案卡应回填实际周期");
+  assert.equal(r1.interpretation.period?.start, latestComplete, "昨天应落到最新完整数据日");
+  assert.equal(r1.interpretation.period?.end, latestComplete);
+  assert.equal(r1.answers[0]?.period?.start, latestComplete, "答案卡应回填实际周期");
   // 上个月 → 完整上月
   const r2 = await searchSite({ query: "上个月GMV", mode: "answer", user: admin, permissions: admin.permissions }, ctx);
-  assert.equal(r2.interpretation.period?.start, "2026-07-01", "上个月应为 7 月 1 日起");
-  assert.equal(r2.interpretation.period?.end, "2026-07-31", "上个月应为 7 月 31 日止");
+  const prev = prevMonthRange(latestComplete);
+  assert.equal(r2.interpretation.period?.start, prev.start, "上个月应为上月 1 日起");
+  assert.equal(r2.interpretation.period?.end, prev.end, "上个月应为上月最后一日止");
   // 这个月 → 本月 MTD
   const r3 = await searchSite({ query: "这个月回款", mode: "answer", user: admin, permissions: admin.permissions }, ctx);
-  assert.equal(r3.interpretation.period?.start, "2026-08-01", "这个月应为本月起");
-  assert.equal(r3.interpretation.period?.end, "2026-08-03", "这个月应到最新数据日");
+  assert.equal(r3.interpretation.period?.start, monthStart, "这个月应为本月起");
+  assert.equal(r3.interpretation.period?.end, latestComplete, "这个月应到最新数据日");
   // 单日不再静默扩成整月
   const r4 = await searchSite({ query: "8月1日天猫退款率", mode: "answer", user: admin, permissions: admin.permissions }, ctx);
   assert.equal(r4.interpretation.period?.start, "2026-08-01");
   assert.equal(r4.interpretation.period?.end, "2026-08-01", "8月1日应为单日");
   // 裸指标默认本月 MTD，答案卡带实际周期
   const r5 = await searchSite({ query: "退款率", mode: "answer", user: admin, permissions: admin.permissions }, ctx);
-  assert.equal(r5.answers[0]?.period?.start, "2026-08-01", "裸指标应默认本月");
-  assert.equal(r5.answers[0]?.period?.end, "2026-08-03");
+  assert.equal(r5.answers[0]?.period?.start, monthStart, "裸指标应默认本月");
+  assert.equal(r5.answers[0]?.period?.end, latestComplete);
 }
 
 // ---------------------------------------------------------------------------
@@ -202,7 +215,7 @@ function assertFinite(value, label) {
   assert.ok(r.answers[0].scopeLabel !== "全渠道", "排名首卡应为具体渠道而非全渠道");
   // 与快照口径对账：默认周期（本月 MTD）各平台退款率最大值
   const { filterDingTalkSnapshot } = await import("../server/dingtalk-api.mjs");
-  const filtered = filterDingTalkSnapshot(dingtalk, { start: "2026-08-01", end: "2026-08-03" });
+  const filtered = filterDingTalkSnapshot(dingtalk, { start: monthStart, end: latestComplete });
   const expected = Math.max(...filtered.platforms.map((p) => p.refundRate ?? p.refund / p.gmv));
   assert.ok(Math.abs(r.answers[0].rawValue - expected) < 1e-9, `排名第一应与快照平台行一致 ${r.answers[0].rawValue} vs ${expected}`);
   // 商品维度排名：明示导航，不给静默错答

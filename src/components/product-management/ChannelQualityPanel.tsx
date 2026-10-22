@@ -28,6 +28,11 @@ const priceFmt = (v: number | null | undefined) =>
     ? "-"
     : v.toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+/** 金额（元）-> ¥X.X万：与重点商品表「商家实收」列同口径，避免同页两套刻度 */
+const moneyFmt = new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 1 });
+const moneyWan = (v: number | null | undefined) =>
+  v === null || v === undefined || !Number.isFinite(v) ? "-" : `¥${moneyFmt.format(v / 10000)}万`;
+
 const pctFmt = (v: number | null | undefined, digits = 1) =>
   v === null || v === undefined || !Number.isFinite(v)
     ? "-"
@@ -272,7 +277,7 @@ export function ChannelQualityPanel({ pm }: { pm: ProductManagementPages }) {
               <Th>评级</Th>
               <Th>风险</Th>
               <Th right>销售数量</Th>
-              <Th right>商家实收</Th>
+              <Th right>商家实收(万)</Th>
               <Th right>毛利率</Th>
               <Th right>占比</Th>
               <Th right>件单价</Th>
@@ -288,7 +293,7 @@ export function ChannelQualityPanel({ pm }: { pm: ProductManagementPages }) {
                     <Td>—</Td>
                     <Td>—</Td>
                     <Td right>{intFmt(r.salesUnits)}</Td>
-                    <Td right>{intFmt(r.receivedAmount)}</Td>
+                    <Td right>{moneyWan(r.receivedAmount)}</Td>
                     <Td right>{pctFmt(r.grossMargin)}</Td>
                     <Td right>{pctFmt(r.amountShare)}</Td>
                     <Td right>{priceFmt(r.avgUnitPrice)}</Td>
@@ -319,7 +324,7 @@ export function ChannelQualityPanel({ pm }: { pm: ProductManagementPages }) {
                       )}
                     </Td>
                     <Td right>{intFmt(r.salesUnits)}</Td>
-                    <Td right>{intFmt(r.receivedAmount)}</Td>
+                    <Td right>{moneyWan(r.receivedAmount)}</Td>
                     <Td right>{pctFmt(r.grossMargin)}</Td>
                     <Td right>{pctFmt(r.amountShare)}</Td>
                     <Td right>{priceFmt(r.avgUnitPrice)}</Td>
@@ -361,7 +366,7 @@ export function ChannelQualityPanel({ pm }: { pm: ProductManagementPages }) {
             <tr>
               <Th>床垫类别</Th>
               <Th right>销售数量</Th>
-              <Th right>销售额</Th>
+              <Th right>销售额(万)</Th>
               <Th right>退款率</Th>
               <Th right>件单价</Th>
               <Th right>类目销售金额占比</Th>
@@ -374,7 +379,7 @@ export function ChannelQualityPanel({ pm }: { pm: ProductManagementPages }) {
               <tr key={r.category}>
                 <Td>{r.category}</Td>
                 <Td right>{intFmt(r.salesUnits)}</Td>
-                <Td right>{intFmt(r.salesAmount)}</Td>
+                <Td right>{moneyWan(r.salesAmount)}</Td>
                 <Td right>{pctFmt(r.refundRate)}</Td>
                 <Td right>{priceFmt(r.unitPrice)}</Td>
                 <Td right>{pctFmt(r.amountShare)}</Td>
@@ -394,7 +399,7 @@ export function ChannelQualityPanel({ pm }: { pm: ProductManagementPages }) {
             <tr>
               <Th>产品名称</Th>
               <Th right>销量</Th>
-              <Th right>销售额</Th>
+              <Th right>销售额(万)</Th>
               <Th right>退款率</Th>
               <Th right>件单价</Th>
               <Th right>产品金额占比</Th>
@@ -407,7 +412,7 @@ export function ChannelQualityPanel({ pm }: { pm: ProductManagementPages }) {
               <tr key={`${r.productName}__${r.productCode ?? idx}`}>
                 <Td>{r.productName}</Td>
                 <Td right>{intFmt(r.salesUnits)}</Td>
-                <Td right>{intFmt(r.receivedAmount)}</Td>
+                <Td right>{moneyWan(r.receivedAmount)}</Td>
                 <Td right>{pctFmt(r.refundRate)}</Td>
                 <Td right>{priceFmt(r.avgUnitPrice)}</Td>
                 <Td right>{pctFmt(r.amountShare)}</Td>

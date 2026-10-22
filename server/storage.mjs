@@ -77,7 +77,45 @@ export function finishSync(runId, { status, recordCount = 0, detail = "", snapsh
     SET status = ?, finished_at = ?, record_count = ?, detail = ?, snapshot_json = ?
     WHERE id = ?
   `).run(status, finishedAt, recordCount, detail, snapshot ? JSON.stringify(snapshot) : null, runId);
+  pruneSyncRuns();
   return { runId, status, finishedAt, recordCount, detail };
+}
+
+// sync_runs 历史保留策略：每个 source 只保证最新一份成功快照（latestSnapshot 的唯一读取对象），
+// 其余成功行的 snapshot_json 置空、仅保留元数据；元数据行保留近 keepDays 天供 /api/history 展示，
+// 更早的行删除。旧 snapshot_json 单份 2-5MB，不清理会让 sqlite 无限膨胀。
+// 同步进程崩溃遗留的僵尸 running 行超过 1 天一并清理。
+export function pruneSyncRuns({ keepDays = 14 } = {}) {
+  const cutoff = new Date(Date.now() - keepDays * 86400_000).toISOString();
+  db.prepare(`
+    UPDATE sync_runs
+    SET snapshot_json = NULL
+    WHERE snapshot_json IS NOT NULL
+      AND id NOT IN (
+        SELECT id FROM sync_runs AS s
+        WHERE s.status = 'success' AND s.snapshot_json IS NOT NULL
+          AND s.started_at = (
+            SELECT MAX(t.started_at) FROM sync_runs AS t
+            WHERE t.source_id = s.source_id AND t.status = 'success' AND t.snapshot_json IS NOT NULL
+          )
+      )
+  `).run();
+  db.prepare(`
+    DELETE FROM sync_runs
+    WHERE started_at < ?
+      AND id NOT IN (
+        SELECT id FROM sync_runs AS s
+        WHERE s.status = 'success' AND s.snapshot_json IS NOT NULL
+          AND s.started_at = (
+            SELECT MAX(t.started_at) FROM sync_runs AS t
+            WHERE t.source_id = s.source_id AND t.status = 'success' AND t.snapshot_json IS NOT NULL
+          )
+      )
+  `).run(cutoff);
+  db.prepare(`
+    DELETE FROM sync_runs
+    WHERE status = 'running' AND started_at < ?
+  `).run(new Date(Date.now() - 86400_000).toISOString());
 }
 
 export function latestSnapshot(sourceId) {

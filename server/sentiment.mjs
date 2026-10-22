@@ -371,7 +371,7 @@ async function fillNoteBodies(queue) {
   }
 }
 
-// ---------- LLM 综合分析（DashScope 通义千问优先，Ark 兜底，任一可用 key 即可） ----------
+// ---------- LLM 综合分析（DashScope 通义千问优先，Ark 兜底，Kimi 备用；任一可用 key 即可） ----------
 
 const DASHSCOPE_TEXT_ENDPOINT = "https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation";
 // 方舟 Anthropic 兼容端点（x-api-key）与 OpenAI 兼容端点（Bearer）鉴权方式不同：
@@ -457,7 +457,38 @@ async function callArk(apiKey, material) {
       model: process.env.ARK_SENTIMENT_MODEL || "deepseek-v4-flash-ga-260731",
       max_tokens: 16384,
       temperature: 0.3,
-      reasoning_effort: "max",
+      // 推理强度可调：max 质量高但慢（实测 ~17s），medium ~7.5s；按需用 ARK_SENTIMENT_REASONING 覆盖
+      reasoning_effort: process.env.ARK_SENTIMENT_REASONING || "max",
+      messages: [
+        { role: "system", content: ANALYSIS_SYSTEM_PROMPT },
+        { role: "user", content: material },
+      ],
+    },
+    { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+  );
+  if (res.status !== 200) throw new Error(`上游返回 ${res.status}：${res.body.slice(0, 160)}`);
+  let parsed;
+  try {
+    parsed = JSON.parse(res.body);
+  } catch {
+    throw new Error("响应非 JSON");
+  }
+  const text = parsed?.choices?.[0]?.message?.content ?? "";
+  if (typeof text !== "string" || !text.trim()) throw new Error("未返回分析文本");
+  return text;
+}
+
+async function callKimi(apiKey, material) {
+  // 月之暗面 Kimi（备用 LLM，OpenAI 兼容端点、Bearer 鉴权）
+  // 平台：https://platform.moonshot.cn；端点默认 https://api.moonshot.cn/v1/chat/completions（KIMI_BASE_URL 可覆盖）
+  const baseUrl = (process.env.KIMI_BASE_URL || "https://api.moonshot.cn").replace(/\/+$/, "");
+  const res = await httpsPostJson(
+    `${baseUrl}/v1/chat/completions`,
+    {
+      model: process.env.SENTIMENT_KIMI_MODEL || "kimi-k2.7-code-highspeed",
+      max_tokens: 16384,
+      // k2.6/k3 等推理模型只允许 temperature=1（实测传 0.3 返回 HTTP 400）
+      temperature: 1,
       messages: [
         { role: "system", content: ANALYSIS_SYSTEM_PROMPT },
         { role: "user", content: material },
@@ -478,10 +509,24 @@ async function callArk(apiKey, material) {
 }
 
 async function synthesizeAnalysis(notes) {
-  const dashscopeKey = process.env.DASHSCOPE_API_KEY?.trim();
-  const arkKey = process.env.ARK_API_KEY?.trim();
-  if (!dashscopeKey && !arkKey) {
-    throw new Error("未配置 LLM key：请在 .env 填入 DASHSCOPE_API_KEY 或 ARK_API_KEY 后重启服务");
+  // 候选 key（主 → 备用）与降级顺序：SENTIMENT_PROVIDER_ORDER（逗号分隔 provider 名）控制，
+  // 默认 kimi → ark → dashscope（2026-09-07 实测响应速度排序：kimi-k2.7-code-highspeed ~6s，
+  // ark(max 推理) ~17s，dashscope 账户欠费暂不可用）。provider 内部再按 主 key → 备用 key 依次尝试。
+  const CALLERS = { dashscope: callDashScope, ark: callArk, kimi: callKimi };
+  const keysByProvider = {
+    dashscope: [process.env.DASHSCOPE_API_KEY, process.env.DASHSCOPE_API_KEY_BACKUP],
+    ark: [process.env.ARK_API_KEY, process.env.ARK_API_KEY_BACKUP],
+    kimi: [process.env.KIMI_API_KEY, process.env.KIMI_API_KEY_BACKUP],
+  };
+  const providerOrder = (process.env.SENTIMENT_PROVIDER_ORDER || "kimi,ark,dashscope")
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter((s) => s.length && CALLERS[s]);
+  // 防呆：order 全被过滤掉时回退默认，避免 provider 循环空转
+  if (providerOrder.length === 0) providerOrder.push("kimi", "ark", "dashscope");
+  const hasAnyKey = Object.values(keysByProvider).some((keys) => keys.some((k) => k?.trim()));
+  if (!hasAnyKey) {
+    throw new Error("未配置 LLM key：请在 .env 填入 DASHSCOPE_API_KEY / ARK_API_KEY / KIMI_API_KEY 任一后重启服务");
   }
 
   const material = notes
@@ -491,21 +536,23 @@ async function synthesizeAnalysis(notes) {
     })
     .join("\n\n");
 
-  // DashScope 优先，失败降级 Ark；两路都失败时报出各自原因
+  // 按 providerOrder 依次尝试；每个 provider 内部按 主 key → 备用 key 切换
   const errors = [];
   let text = null;
-  if (dashscopeKey) {
-    try {
-      text = await callDashScope(dashscopeKey, material);
-    } catch (error) {
-      errors.push(`DashScope 失败：${error instanceof Error ? error.message : String(error)}`);
-    }
-  }
-  if (!text && arkKey) {
-    try {
-      text = await callArk(arkKey, material);
-    } catch (error) {
-      errors.push(`Ark 失败：${error instanceof Error ? error.message : String(error)}`);
+  for (const provider of providerOrder) {
+    if (text) break;
+    const keys = keysByProvider[provider].map((k) => k?.trim()).filter(Boolean);
+    if (keys.length === 0) continue;
+    const call = CALLERS[provider];
+    for (let i = 0; i < keys.length && !text; i += 1) {
+      try {
+        text = await call(keys[i], material);
+      } catch (error) {
+        if (i < keys.length - 1) {
+          console.warn(`[sentiment] ${provider} 第 ${i + 1} 个 key 调用失败，自动切换备用 key 重试`);
+        }
+        errors.push(`${provider} 失败：${error instanceof Error ? error.message : String(error)}`);
+      }
     }
   }
   if (!text) throw new Error(errors.join("；"));

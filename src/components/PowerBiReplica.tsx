@@ -12,6 +12,7 @@ import type {
   PowerBiPages,
   PowerBiProductDaily,
   PowerBiPromotionDaily,
+  PowerBiShopSummaryDaily,
   WarehouseSnapshot,
 } from "../types/integration";
 import type { SearchTarget } from "../types/search";
@@ -37,7 +38,7 @@ function toggleExpanded(setter: Dispatch<SetStateAction<Set<string>>>, key: stri
   });
 }
 
-type Workspace = "overview" | "diagnosis" | "service";
+type Workspace = "overview" | "diagnosis";
 type ReplicaPage = "overall" | "promotion" | "product" | "competitor";
 type DatePeriod = { start: string; end: string };
 
@@ -87,6 +88,14 @@ function pbixWan(value: number) {
 
 function rate(numerator: number, denominator: number) {
   return denominator ? numerator / denominator : 0;
+}
+
+function countOrDash(value: number | null) {
+  return value == null ? "—" : number(value);
+}
+
+function wanOrDash(value: number | null) {
+  return value == null ? "—" : pbixWan(value);
 }
 
 function subsidizedAmount(row: PowerBiOverallDaily) {
@@ -328,7 +337,7 @@ function KpiTile({ label, value, current, previous, note, index = 0 }: { label: 
   );
 }
 
-function PromotionTable({ rows, labelKey, variant = "default", showProductImages = false, labelHeader }: { rows: PowerBiPromotionDaily[]; labelKey: "scene" | "productId"; variant?: "default" | "product-detail"; showProductImages?: boolean; labelHeader?: string }) {
+function PromotionTable({ rows, labelKey, variant = "default", showProductImages = false, labelHeader, selectedDate, onSelectDate }: { rows: PowerBiPromotionDaily[]; labelKey: "scene" | "productId"; variant?: "default" | "product-detail"; showProductImages?: boolean; labelHeader?: string; selectedDate?: string | null; onSelectDate?: (date: string | null) => void }) {
   const sort = useColumnSort("spend", "desc");
   const totalSpend = rows.reduce((sum, item) => sum + item.spend, 0);
   const accessors: Record<string, (row: PowerBiPromotionDaily) => SortValue> = {
@@ -371,10 +380,12 @@ function PromotionTable({ rows, labelKey, variant = "default", showProductImages
             {pagination.pagedItems.map((row, index) => {
             const feeRate = rate(row.spend, row.revenue);
             const label = String(row.displayLabel || row[labelKey] || "未分类");
+            const rowDate = onSelectDate ? row.date : "";
             return (
               <tr
-                className={clsx("pb-table-row", variant === "product-detail" && "pb-promotion-product-row")}
+                className={clsx("pb-table-row", variant === "product-detail" && "pb-promotion-product-row", rowDate && "is-day-selectable", rowDate && rowDate === selectedDate && "is-selected")}
                 key={`${String(row[labelKey])}-${index}`}
+                onClick={rowDate ? () => onSelectDate?.(rowDate === selectedDate ? null : rowDate) : undefined}
                 style={{ "--pb-row-delay": `${180 + Math.min(index, 12) * 34}ms` } as CSSProperties}
               >
                 <td className={clsx("pb-row-label", withImages && "pb-product-label")}>
@@ -416,7 +427,7 @@ function aggregatePromotionDaily(rows: PromotionDailyRow[], level: "year" | "mon
   };
 }
 
-function PromotionDailySpendTable({ rows, start, end }: { rows: PowerBiPromotionDaily[]; start: string; end: string }) {
+function PromotionDailySpendTable({ rows, start, end, selectedDate, onSelectDate }: { rows: PowerBiPromotionDaily[]; start: string; end: string; selectedDate?: string | null; onSelectDate?: (date: string | null) => void }) {
   const dailyRows = useMemo<PromotionDailyRow[]>(() => {
     const output = new Map<string, PromotionDailyRow>();
     rows.forEach((row) => {
@@ -493,7 +504,7 @@ function PromotionDailySpendTable({ rows, start, end }: { rows: PowerBiPromotion
 
   return (
     <section className="pb-daily-spend-table" data-testid="promotion-daily-spend-table">
-      <div className="pb-panel-title">每日推广费用 <small>花费（未含达人）· {start} 至 {end} · 共 {dailyRows.length} 天 · 年度 → 月份 → 日可展开折叠</small></div>
+      <div className="pb-panel-title">每日推广费用 <small>花费（未含达人）· {start} 至 {end} · 共 {dailyRows.length} 天 · 年度 → 月份 → 日可展开折叠 · 点击日行联动本页数据</small></div>
       <div className="pb-table-wrap pb-animated-table">
         <table className="pb-data-table pb-daily-spend-table-table">
           <thead><tr>
@@ -516,7 +527,7 @@ function PromotionDailySpendTable({ rows, start, end }: { rows: PowerBiPromotion
             {pagination.pagedItems.map((row, index) => {
               const feeRate = rate(row.spend, row.revenue);
               return (
-                <tr className={clsx("pb-table-row", row.hierarchyLevel !== "day" && "is-hierarchy-summary")} data-hierarchy-key={row.hierarchyKey} data-hierarchy-level={row.hierarchyLevel} key={`${row.hierarchyLevel}-${row.hierarchyKey}`} style={{ "--pb-row-delay": `${180 + Math.min(index, 12) * 28}ms` } as CSSProperties}>
+                <tr className={clsx("pb-table-row", row.hierarchyLevel !== "day" && "is-hierarchy-summary", row.hierarchyLevel === "day" && "is-day-selectable", row.hierarchyLevel === "day" && row.date === selectedDate && "is-selected")} data-hierarchy-key={row.hierarchyKey} data-hierarchy-level={row.hierarchyLevel} key={`${row.hierarchyLevel}-${row.hierarchyKey}`} onClick={row.hierarchyLevel === "day" ? () => onSelectDate?.(row.date === selectedDate ? null : row.date) : undefined} style={{ "--pb-row-delay": `${180 + Math.min(index, 12) * 28}ms` } as CSSProperties}>
                   <td className="pb-hierarchy-cell">{row.showYear ? <button aria-expanded={expandedYears.has(row.year)} aria-label={`${expandedYears.has(row.year) ? "折叠" : "展开"}年度 ${row.year}`} className="pb-hierarchy-toggle" data-testid="promotion-daily-year-toggle" onClick={() => toggleExpanded(setExpandedYears, row.year)} type="button"><span aria-hidden="true" className="pb-hierarchy-icon">{expandedYears.has(row.year) ? "−" : "+"}</span><span>{row.year}</span></button> : null}</td>
                   <td className="pb-hierarchy-cell">{row.showMonth ? <button aria-expanded={expandedMonths.has(`${row.year}|${row.month}`)} aria-label={`${expandedMonths.has(`${row.year}|${row.month}`) ? "折叠" : "展开"}月份 ${row.month}`} className="pb-hierarchy-toggle" data-testid="promotion-daily-month-toggle" onClick={() => toggleExpanded(setExpandedMonths, `${row.year}|${row.month}`)} type="button"><span aria-hidden="true" className="pb-hierarchy-icon">{expandedMonths.has(`${row.year}|${row.month}`) ? "−" : "+"}</span><span>{row.month}</span></button> : null}</td>
                   <td>{row.hierarchyLevel === "day" ? row.day : ""}</td>
@@ -543,21 +554,24 @@ function PromotionDailySpendTable({ rows, start, end }: { rows: PowerBiPromotion
   );
 }
 
-function OverallPage({ pages, start, end }: { pages: PowerBiPages; start: string; end: string }) {
-  const overallDaily = inPeriod(pages.overallDaily, start, end);
+function OverallPage({ pages, start, end, selectedDate, onSelectDate }: { pages: PowerBiPages; start: string; end: string; selectedDate: string | null; onSelectDate: (date: string | null) => void }) {
+  // 点选每天核心数据日行时，本页其余模块按所选日期过滤；表格自身保持完整区间以便改选
+  const effectiveStart = selectedDate ?? start;
+  const effectiveEnd = selectedDate ?? end;
+  const overallDaily = inPeriod(pages.overallDaily, effectiveStart, effectiveEnd);
   const dailyCore = inPeriod(pages.dailyCore ?? [], start, end);
-  const products = aggregateProductRows(inPeriod(pages.productDaily, start, end));
+  const products = aggregateProductRows(inPeriod(pages.productDaily, effectiveStart, effectiveEnd));
   const productsById = new Map(pages.products.map((item) => [item.productId, item]));
-  const promotionProducts = aggregatePromotion(inPeriod(pages.promotionProductDaily, start, end), "productId");
+  const promotionProducts = aggregatePromotion(inPeriod(pages.promotionProductDaily, effectiveStart, effectiveEnd), "productId");
   const spendByProduct = new Map(promotionProducts.map((item) => [item.productId, item.spend]));
   const priorYearMap = new Map(pages.productDailyPriorYear.map((item) => [item.productId, item]));
   const totalSubsidized = products.reduce((sum, row) => sum + (row.payAmount - row.refund) * 0.85, 0);
   const promotionSpendByDate = new Map<string, number>();
-  inPeriod(pages.promotionSceneDaily, start, end).forEach((row) => {
+  inPeriod(pages.promotionSceneDaily, effectiveStart, effectiveEnd).forEach((row) => {
     promotionSpendByDate.set(row.date, (promotionSpendByDate.get(row.date) || 0) + (row.spend || 0));
   });
 
-  const prev = previousPeriod(start, end);
+  const prev = previousPeriod(effectiveStart, effectiveEnd);
   const previousDaily = inPeriod(pages.overallDaily, prev.start, prev.end);
   const previousPromotionSpendByDate = new Map<string, number>();
   inPeriod(pages.promotionSceneDaily, prev.start, prev.end).forEach((row) => {
@@ -632,11 +646,14 @@ function OverallPage({ pages, start, end }: { pages: PowerBiPages; start: string
   };
   const sortedProducts = sortRows(products, productSort.sortKey, productSort.sortDir, productAccessors);
   const productPagination = usePagination(sortedProducts, `${productSort.sortKey}-${productSort.sortDir}`);
+  // mds 店铺日汇总（钉钉同源）：固定按日降序，不受每天核心数据行点选影响
+  const shopSummaryDaily = inPeriod(pages.shopSummaryDaily ?? [], start, end).sort((a, b) => b.date.localeCompare(a.date));
+  const shopSummaryPagination = usePagination(shopSummaryDaily, `${start}|${end}|${shopSummaryDaily.length}`);
 
   return (
     <div className="pb-overall-layout" data-search-anchor="analytics-tmall-overall">
       <div className="pb-overall-main">
-        <section className="pb-panel-title">店铺基础数据 <small>期间 {start} 至 {end}</small></section>
+        <section className="pb-panel-title">店铺基础数据 <small>期间 {effectiveStart} 至 {effectiveEnd}{selectedDate ? " · 环比对比前一日" : ""}</small></section>
         <div className="pb-kpi-grid">
           <KpiTile current={periodSubsidizedAmount} index={0} label="国补后金额(店铺)" note="(支付金额 - 成功退款金额) × 85%" previous={previousSubsidizedAmount} value={moneyPrecise(periodSubsidizedAmount)} />
           <KpiTile current={period.visitors} index={1} label="访客数" note="到店访客" previous={previousPeriodData?.visitors ?? 0} value={number(period.visitors)} />
@@ -654,8 +671,8 @@ function OverallPage({ pages, start, end }: { pages: PowerBiPages; start: string
         </div>
       </div>
       <section className="pb-daily-matrix">
-        <div className="pb-panel-title">每天核心数据 <small>年度 → 月份 → 日可展开折叠 · 默认按日升序</small></div>
-        <div className="pb-table-wrap pb-animated-table"><table className="pb-data-table pb-daily-core-table" data-testid="powerbi-daily-core-table"><thead><tr><SortHeader columnKey="year" label="年度" sort={dailySort} /><SortHeader columnKey="month" label="月份" sort={dailySort} /><SortHeader columnKey="day" label="日" sort={dailySort} /><SortHeader columnKey="productVisitors" label="商品访客数" sort={dailySort} /><SortHeader columnKey="addToCart" label="加购人数" sort={dailySort} /><SortHeader columnKey="addToCartRate" label="加购率" sort={dailySort} /><SortHeader columnKey="addToCartCost" label="加购成本" sort={dailySort} /><SortHeader columnKey="payAmount" label="支付金额" sort={dailySort} /><SortHeader columnKey="paidUnits" label="支付件数" sort={dailySort} /><SortHeader columnKey="conversionRate" label="访客转化率" sort={dailySort} /><SortHeader columnKey="refundAmount" label="退款金额" sort={dailySort} /><SortHeader columnKey="refundRate" label="退款率" sort={dailySort} /><SortHeader columnKey="spend" label="费额" sort={dailySort} /><SortHeader columnKey="subsidizedAmount" label="国补后金额(万)" sort={dailySort} /><SortHeader columnKey="subsidizedFeeRate" label="国补后费比" sort={dailySort} /><SortHeader columnKey="storeRank" label="店铺排名" sort={dailySort} /></tr></thead><tbody>{dailyPagination.pagedItems.map((row: DailyCoreHierarchyRow, index) => <tr className={clsx("pb-table-row", row.hierarchyLevel !== "day" && "is-hierarchy-summary")} data-hierarchy-key={row.hierarchyKey} data-hierarchy-level={row.hierarchyLevel} key={`${row.hierarchyLevel}-${row.hierarchyKey}`} style={{ "--pb-row-delay": `${260 + Math.min(index, 12) * 28}ms` } as CSSProperties}><td className="pb-hierarchy-cell">{row.showYear ? <button aria-expanded={expandedYears.has(row.year)} aria-label={`${expandedYears.has(row.year) ? "折叠" : "展开"}年度 ${row.year}`} className="pb-hierarchy-toggle" data-testid="daily-core-year-toggle" onClick={() => toggleExpanded(setExpandedYears, row.year)} type="button"><span aria-hidden="true" className="pb-hierarchy-icon">{expandedYears.has(row.year) ? "−" : "+"}</span><span>{row.year}</span></button> : null}</td><td className="pb-hierarchy-cell">{row.showMonth ? <button aria-expanded={expandedMonths.has(`${row.year}|${row.month}`)} aria-label={`${expandedMonths.has(`${row.year}|${row.month}`) ? "折叠" : "展开"}月份 ${row.month}`} className="pb-hierarchy-toggle" data-testid="daily-core-month-toggle" onClick={() => toggleExpanded(setExpandedMonths, `${row.year}|${row.month}`)} type="button"><span aria-hidden="true" className="pb-hierarchy-icon">{expandedMonths.has(`${row.year}|${row.month}`) ? "−" : "+"}</span><span>{row.month}</span></button> : null}</td><td>{row.hierarchyLevel === "day" ? row.day : ""}</td><td>{pbixInteger(row.productVisitors)}</td><td>{pbixInteger(row.addToCart)}</td><td>{pbixPercent(row.addToCartRate)}</td><td>{pbixDecimal(row.addToCartCost)}</td><td>{pbixWan(row.payAmount)}</td><td>{pbixInteger(row.paidUnits)}</td><td>{pbixPercent(row.conversionRate)}</td><td>{countFormat.format(row.refundAmount || 0)}</td><td>{pbixPercent(row.refundRate)}</td><td>{pbixWan(row.spend)}</td><td>{pbixWan(row.subsidizedAmount)}</td><td>{pbixPercent(row.subsidizedFeeRate)}</td><td>{row.storeRank || "—"}</td></tr>)}</tbody></table></div>
+        <div className="pb-panel-title">每天核心数据 <small>年度 → 月份 → 日可展开折叠 · 默认按日升序 · 点击日行联动本页数据{selectedDate ? `（已选 ${selectedDate}）` : ""}</small></div>
+        <div className="pb-table-wrap pb-animated-table"><table className="pb-data-table pb-daily-core-table" data-testid="powerbi-daily-core-table"><thead><tr><SortHeader columnKey="year" label="年度" sort={dailySort} /><SortHeader columnKey="month" label="月份" sort={dailySort} /><SortHeader columnKey="day" label="日" sort={dailySort} /><SortHeader columnKey="productVisitors" label="商品访客数" sort={dailySort} /><SortHeader columnKey="addToCart" label="加购人数" sort={dailySort} /><SortHeader columnKey="addToCartRate" label="加购率" sort={dailySort} /><SortHeader columnKey="addToCartCost" label="加购成本" sort={dailySort} /><SortHeader columnKey="payAmount" label="支付金额" sort={dailySort} /><SortHeader columnKey="paidUnits" label="支付件数" sort={dailySort} /><SortHeader columnKey="conversionRate" label="访客转化率" sort={dailySort} /><SortHeader columnKey="refundAmount" label="退款金额" sort={dailySort} /><SortHeader columnKey="refundRate" label="退款率" sort={dailySort} /><SortHeader columnKey="spend" label="费额" sort={dailySort} /><SortHeader columnKey="subsidizedAmount" label="国补后金额(万)" sort={dailySort} /><SortHeader columnKey="subsidizedFeeRate" label="国补后费比" sort={dailySort} /><SortHeader columnKey="storeRank" label="店铺排名" sort={dailySort} /></tr></thead><tbody>{dailyPagination.pagedItems.map((row: DailyCoreHierarchyRow, index) => <tr className={clsx("pb-table-row", row.hierarchyLevel !== "day" && "is-hierarchy-summary", row.hierarchyLevel === "day" && "is-day-selectable", row.hierarchyLevel === "day" && row.date === selectedDate && "is-selected")} data-hierarchy-key={row.hierarchyKey} data-hierarchy-level={row.hierarchyLevel} key={`${row.hierarchyLevel}-${row.hierarchyKey}`} onClick={row.hierarchyLevel === "day" ? () => onSelectDate(row.date === selectedDate ? null : row.date) : undefined} style={{ "--pb-row-delay": `${260 + Math.min(index, 12) * 28}ms` } as CSSProperties}><td className="pb-hierarchy-cell">{row.showYear ? <button aria-expanded={expandedYears.has(row.year)} aria-label={`${expandedYears.has(row.year) ? "折叠" : "展开"}年度 ${row.year}`} className="pb-hierarchy-toggle" data-testid="daily-core-year-toggle" onClick={() => toggleExpanded(setExpandedYears, row.year)} type="button"><span aria-hidden="true" className="pb-hierarchy-icon">{expandedYears.has(row.year) ? "−" : "+"}</span><span>{row.year}</span></button> : null}</td><td className="pb-hierarchy-cell">{row.showMonth ? <button aria-expanded={expandedMonths.has(`${row.year}|${row.month}`)} aria-label={`${expandedMonths.has(`${row.year}|${row.month}`) ? "折叠" : "展开"}月份 ${row.month}`} className="pb-hierarchy-toggle" data-testid="daily-core-month-toggle" onClick={() => toggleExpanded(setExpandedMonths, `${row.year}|${row.month}`)} type="button"><span aria-hidden="true" className="pb-hierarchy-icon">{expandedMonths.has(`${row.year}|${row.month}`) ? "−" : "+"}</span><span>{row.month}</span></button> : null}</td><td>{row.hierarchyLevel === "day" ? row.day : ""}</td><td>{pbixInteger(row.productVisitors)}</td><td>{pbixInteger(row.addToCart)}</td><td>{pbixPercent(row.addToCartRate)}</td><td>{pbixDecimal(row.addToCartCost)}</td><td>{pbixWan(row.payAmount)}</td><td>{pbixInteger(row.paidUnits)}</td><td>{pbixPercent(row.conversionRate)}</td><td>{pbixWan(row.refundAmount)}</td><td>{pbixPercent(row.refundRate)}</td><td>{pbixWan(row.spend)}</td><td>{pbixWan(row.subsidizedAmount)}</td><td>{pbixPercent(row.subsidizedFeeRate)}</td><td>{row.storeRank || "—"}</td></tr>)}</tbody></table></div>
         <Pagination onPage={dailyPagination.setPage} page={dailyPagination.page} totalItems={dailyPagination.totalItems} totalPages={dailyPagination.totalPages} />
       </section>
       <section className="pb-product-table">
@@ -663,24 +680,38 @@ function OverallPage({ pages, start, end }: { pages: PowerBiPages; start: string
         <div className="pb-table-wrap pb-animated-table"><table className="pb-data-table pb-business-product-table"><thead><tr><SortHeader columnKey="product" label="商品" sort={productSort} /><SortHeader columnKey="visitors" label="访客" sort={productSort} /><SortHeader columnKey="payBuyers" label="支付买家" sort={productSort} /><SortHeader columnKey="convRate" label="转化率" sort={productSort} /><SortHeader columnKey="payAmount" label="支付金额" sort={productSort} /><SortHeader columnKey="subsidized" label="国补后金额(万)" sort={productSort} /><SortHeader columnKey="amountShare" label="销额占比" sort={productSort} /><SortHeader columnKey="yoy" label="国补后金额同比" sort={productSort} /><SortHeader columnKey="paidUnits" label="支付件数" sort={productSort} /><SortHeader columnKey="refund" label="退款额" sort={productSort} /><SortHeader columnKey="refundShare" label="退款占比" sort={productSort} /><SortHeader columnKey="addToCart" label="加购" sort={productSort} /><SortHeader columnKey="cartRate" label="加购率" sort={productSort} /><SortHeader columnKey="spend" label="推广花费" sort={productSort} /><SortHeader columnKey="subsidizedFeeRate" label="国补后费比" sort={productSort} /><SortHeader columnKey="unitPrice" label="件单价" sort={productSort} /></tr></thead><tbody>{productPagination.pagedItems.map((row, index) => { const spend = spendByProduct.get(row.productId) || 0; const product = productsById.get(row.productId); const shortName = product?.merchantCode || row.productId || "未匹配商品"; const subsidized = (row.payAmount - row.refund) * 0.85; const amountShare = totalSubsidized ? subsidized / totalSubsidized : 0; const prior = priorYearMap.get(row.productId); const priorSubsidized = prior ? (prior.payAmount - prior.refund) * 0.85 : 0; const hasPrior = Boolean(prior) && priorSubsidized > 0; return <tr className="pb-table-row pb-business-product-row" key={row.productId} style={{ "--pb-row-delay": `${300 + Math.min(index, 12) * 32}ms` } as CSSProperties}><td className="pb-row-label pb-product-label" title={row.productName}><ProductThumb alt={row.productName || shortName} size="md" src={product?.imageUrl} /><span>{shortName}</span></td><td>{number(row.visitors)}</td><td>{number(row.payBuyers)}</td><td>{percent(rate(row.payBuyers, row.visitors))}</td><td>{money(row.payAmount)}</td><td>{moneyPrecise(subsidized)}</td><td>{percent(amountShare)}</td><td>{hasPrior ? <Delta current={subsidized} previous={priorSubsidized} /> : <span className="pb-na">数据不足</span>}</td><td>{number(row.paidUnits)}</td><td>{money(row.refund)}</td><td>{percent(rate(row.refund, row.payAmount))}</td><td>{number(row.addToCart)}</td><td>{percent(rate(row.addToCart, row.visitors))}</td><td>{money(spend)}</td><td>{percent(rate(spend, subsidized))}</td><td>{`¥${rate(row.payAmount, row.paidUnits).toFixed(0)}`}</td></tr>; })}</tbody></table></div>
         <Pagination onPage={productPagination.setPage} page={productPagination.page} totalItems={productPagination.totalItems} totalPages={productPagination.totalPages} />
       </section>
+      {shopSummaryDaily.length > 0 && (
+        <section className="pb-shop-summary">
+          <div className="pb-panel-title">店铺日汇总（钉钉同源） <small>mds 库直读 · 与钉钉「全渠道目标进度表」同口径 · 按日降序 · 不依赖生意参谋导出文件</small></div>
+          <div className="pb-table-wrap pb-animated-table"><table className="pb-data-table" data-testid="shop-summary-mds-table"><thead><tr><th>日期</th><th>浏览量</th><th>店铺客户数</th><th>GMV</th><th>成功退款金额</th><th>加购人数</th><th>关键词推广</th><th>精准人群推广</th><th>全站推广</th><th>内容场景</th><th>淘客</th><th>店铺排名</th></tr></thead><tbody>{shopSummaryPagination.pagedItems.map((row: PowerBiShopSummaryDaily, index: number) => <tr className="pb-table-row" key={row.date} style={{ "--pb-row-delay": `${300 + Math.min(index, 12) * 32}ms` } as CSSProperties}><td>{row.date}</td><td>{countOrDash(row.pageViews)}</td><td>{countOrDash(row.shopCustomers)}</td><td>{wanOrDash(row.gmv)}</td><td>{wanOrDash(row.refundAmount)}</td><td>{countOrDash(row.addToCart)}</td><td>{wanOrDash(row.keywordSpend)}</td><td>{wanOrDash(row.audienceSpend)}</td><td>{wanOrDash(row.fullSiteSpend)}</td><td>{wanOrDash(row.contentSceneSpend)}</td><td>{wanOrDash(row.taokeCommission)}</td><td>{row.storeRank || "—"}</td></tr>)}</tbody></table></div>
+          <Pagination onPage={shopSummaryPagination.setPage} page={shopSummaryPagination.page} totalItems={shopSummaryPagination.totalItems} totalPages={shopSummaryPagination.totalPages} />
+        </section>
+      )}
     </div>
   );
 }
 
-function PromotionPage({ pages, start, end }: { pages: PowerBiPages; start: string; end: string }) {
+function PromotionPage({ pages, start, end, selectedDate, onSelectDate }: { pages: PowerBiPages; start: string; end: string; selectedDate: string | null; onSelectDate: (date: string | null) => void }) {
+  // 点选日行时，场景/商品聚合按所选日期过滤；每日推广费用表保持完整区间以便改选
+  const effectiveStart = selectedDate ?? start;
+  const effectiveEnd = selectedDate ?? end;
   const sceneDaily = inPeriod(pages.promotionSceneDaily, start, end);
-  const sceneRows = aggregatePromotion(sceneDaily, "scene");
-  const productRows = aggregatePromotion(inPeriod(pages.promotionProductDaily, start, end), "productId");
+  const sceneRows = aggregatePromotion(inPeriod(pages.promotionSceneDaily, effectiveStart, effectiveEnd), "scene");
+  const productRows = aggregatePromotion(inPeriod(pages.promotionProductDaily, effectiveStart, effectiveEnd), "productId");
   const products = new Map(pages.products.map((item) => [item.productId, item]));
   const labelledProducts = productRows.map((row) => {
     const product = products.get(row.productId || "");
     return { ...row, displayLabel: product?.merchantCode || row.productId, imageUrl: product?.imageUrl || null };
   });
-  return <div className="pb-detail-layout" data-search-anchor="analytics-tmall-promotion"><main><PromotionDailySpendTable end={end} rows={sceneDaily} start={start} /><section className="pb-panel-title">推广计划数据 <small>按场景聚合</small></section><PromotionTable labelKey="scene" rows={sceneRows} /><section className="pb-panel-title is-spaced">商品推广明细 <small>Top 60，按花费排序 · 图片链接</small></section><PromotionTable labelKey="productId" rows={labelledProducts} showProductImages variant="product-detail" /></main></div>;
+  return <div className="pb-detail-layout" data-search-anchor="analytics-tmall-promotion"><main><PromotionDailySpendTable end={end} onSelectDate={onSelectDate} rows={sceneDaily} selectedDate={selectedDate} start={start} /><section className="pb-panel-title">推广计划数据 <small>按场景聚合{selectedDate ? ` · 已选 ${selectedDate}` : ""}</small></section><PromotionTable labelKey="scene" rows={sceneRows} /><section className="pb-panel-title is-spaced">商品推广明细 <small>Top 60，按花费排序 · 图片链接</small></section><PromotionTable labelKey="productId" rows={labelledProducts} showProductImages variant="product-detail" /></main></div>;
 }
 
-function ProductPromotionPage({ pages, start, end }: { pages: PowerBiPages; start: string; end: string }) {
-  const availableRows = useMemo(() => inPeriod(pages.promotionProductDaily, start, end), [pages.promotionProductDaily, start, end]);
+function ProductPromotionPage({ pages, start, end, selectedDate, onSelectDate }: { pages: PowerBiPages; start: string; end: string; selectedDate: string | null; onSelectDate: (date: string | null) => void }) {
+  // 点选日行时，商品列表与场景聚合按所选日期过滤；商品每日推广数据表保持完整区间以便改选
+  const effectiveStart = selectedDate ?? start;
+  const effectiveEnd = selectedDate ?? end;
+  const availableRows = useMemo(() => inPeriod(pages.promotionProductDaily, effectiveStart, effectiveEnd), [pages.promotionProductDaily, effectiveStart, effectiveEnd]);
+  const fullRangeRows = useMemo(() => inPeriod(pages.promotionProductDaily, start, end), [pages.promotionProductDaily, start, end]);
   const ranked = useMemo(() => aggregatePromotion(availableRows, "productId"), [availableRows]);
   const [search, setSearch] = useState("");
   const [selectedProduct, setSelectedProduct] = useState(ranked[0]?.productId || "");
@@ -689,14 +720,14 @@ function ProductPromotionPage({ pages, start, end }: { pages: PowerBiPages; star
   const selectedRows = availableRows.filter((row) => row.productId === selectedProduct);
   const sceneRows = aggregatePromotion(selectedRows, "scene");
   const dailyRows = aggregatePromotion(
-    selectedRows.map((row) => ({ ...row, productId: row.date })),
+    fullRangeRows.filter((row) => row.productId === selectedProduct).map((row) => ({ ...row, productId: row.date })),
     "productId",
   ).sort((left, right) => String(right.productId).localeCompare(String(left.productId)));
   const filteredProducts = ranked.filter((row) => { const product = products.get(row.productId || ""); return `${product?.merchantCode || ""}${product?.productName || ""}${row.productId}`.toLowerCase().includes(search.toLowerCase()); });
   return (
     <div className="pb-product-promotion-layout" data-search-anchor="analytics-tmall-product">
       <aside className="pb-product-selector"><label><Search size={13} /><input onChange={(event) => setSearch(event.target.value)} placeholder="搜索商品编码" value={search} /></label><div>{filteredProducts.map((row, index) => { const product = products.get(row.productId || ""); const label = product?.merchantCode || row.productId || "未匹配商品"; return <button className={selectedProduct === row.productId ? "is-active" : ""} key={row.productId} onClick={() => setSelectedProduct(row.productId || "")} style={{ "--pb-row-delay": `${140 + Math.min(index, 12) * 30}ms` } as CSSProperties} type="button"><ProductThumb alt={product?.productName || label} src={product?.imageUrl} /><span>{label}</span><b>{money(row.spend)}</b><small>{product?.productName || "未匹配商品名称"}</small></button>; })}</div></aside>
-      <main><section className="pb-panel-title">商品推广场景 <small>{products.get(selectedProduct)?.merchantCode || selectedProduct || "请选择商品"}</small></section><PromotionTable labelKey="scene" rows={sceneRows} /><section className="pb-panel-title is-spaced">商品每日推广数据 <small>{start} 至 {end}</small></section><PromotionTable labelKey="productId" labelHeader="日期" rows={dailyRows.map((row) => ({ ...row, productId: shortDate(row.productId || "") }))} /></main>
+      <main><section className="pb-panel-title">商品推广场景 <small>{products.get(selectedProduct)?.merchantCode || selectedProduct || "请选择商品"}{selectedDate ? ` · 已选 ${selectedDate}` : ""}</small></section><PromotionTable labelKey="scene" rows={sceneRows} /><section className="pb-panel-title is-spaced">商品每日推广数据 <small>{start} 至 {end} · 点击行联动本页数据</small></section><PromotionTable labelKey="productId" labelHeader="日期" onSelectDate={onSelectDate} rows={dailyRows.map((row) => ({ ...row, date: row.productId || "", productId: shortDate(row.productId || "") }))} selectedDate={selectedDate} /></main>
     </div>
   );
 }
@@ -739,6 +770,7 @@ interface CompetitorBrandSummary {
   revenueWan: number;
   impressionsWan: number;
   clicksWan: number;
+  cpc: number | null;
   roi: number | null;
   ctr: number | null;
   visitCost: number | null;
@@ -766,6 +798,8 @@ function summarizeCompetitorByBrand(rows: PowerBiCompetitorDaily[]): CompetitorB
       revenueWan,
       impressionsWan,
       clicksWan,
+      // 万元 / 万点击 = 元/点击
+      cpc: clicksWan ? spendWan / clicksWan : null,
       roi: spendWan ? revenueWan / spendWan : null,
       ctr: impressionsWan ? clicksWan / impressionsWan : null,
       visitCost: competitorSum(list.map((row) => row.visitCost)),
@@ -979,6 +1013,7 @@ function CompetitorPage({ pages, refreshedAt }: { pages: PowerBiPages; refreshed
     roi: (row) => row.roi,
     impressionsWan: (row) => row.impressionsWan,
     clicksWan: (row) => row.clicksWan,
+    cpc: (row) => row.cpc,
     ctr: (row) => row.ctr,
     revenueWan: (row) => row.revenueWan,
     visitCost: (row) => row.visitCost,
@@ -1037,7 +1072,6 @@ function CompetitorPage({ pages, refreshedAt }: { pages: PowerBiPages; refreshed
         <img alt="竞品推广数据页标识" className="pb-competitor-logo" src={logoWeixin} />
         <div>
           <h3>竞品推广流量数据</h3>
-          <small>{brands.length} 品牌 × 4 渠道 × {periods.length} 个时间段 · 消耗/成交均为万元口径 · PBIX 年/月/日层级切片器为空控件，未复刻</small>
         </div>
         <div className="pb-competitor-slicers">
           <div className="pb-competitor-slicer">
@@ -1105,6 +1139,7 @@ function CompetitorPage({ pages, refreshedAt }: { pages: PowerBiPages; refreshed
                   <SortHeader columnKey="roi" label="ROI(公式)" sort={summarySort} />
                   <SortHeader columnKey="impressionsWan" label="展现量(万)" sort={summarySort} />
                   <SortHeader columnKey="clicksWan" label="点击量(万)" sort={summarySort} />
+                  <SortHeader columnKey="cpc" label="平均点击成本" sort={summarySort} />
                   <SortHeader columnKey="ctr" label="点击率(竞品)" sort={summarySort} />
                   <SortHeader columnKey="revenueWan" label="成交金额(万)" sort={summarySort} />
                   <th className="pb-competitor-cost-cell" scope="col">
@@ -1122,6 +1157,7 @@ function CompetitorPage({ pages, refreshedAt }: { pages: PowerBiPages; refreshed
                         <td>{pbixDecimal(row.roi)}</td>
                         <td>{competitorWan(row.impressionsWan)}</td>
                         <td>{competitorWan(row.clicksWan)}</td>
+                        <td>{pbixDecimal(row.cpc)}</td>
                         <td>{pbixPercent(row.ctr)}</td>
                         <td>{competitorWan(row.revenueWan)}</td>
                         <td className="pb-competitor-cost-cell">
@@ -1429,24 +1465,28 @@ function CustomerServiceTrendChart({ rows, leftSeries, rightSeries }: {
 interface ServiceKpiTile {
   label: string;
   key: string;
-  aggregate: "sum" | "avg" | "avgOrNull";
+  aggregate: "sum" | "avg" | "avgOrNull" | "weightedAverage";
   format: (value: number) => string;
   note?: string;
   /** 客服维度无此指标时显示「—」（如整体口径的当日询单/销售人数） */
   unavailable?: boolean;
+  /** 严格口径（metricsCaliber=strict）下比率的区间口径 = SUM(分子)/SUM(分母)，等价于按分母加权平均；预置口径回落普通平均。 */
+  weightKey?: string;
 }
 
-/** KPI 卡区：范围内聚合（数值 SUM、比率 AVG），环比「较上期」（previousRows 同口径聚合）。 */
-function ServiceKpiGrid({ rows, previousRows, tiles }: {
+/** KPI 卡区：范围内聚合（数值 SUM、比率 AVG；strict 时按分母加权 = SUM/SUM），环比「较上期」（previousRows 同口径聚合）。 */
+function ServiceKpiGrid({ rows, previousRows, tiles, strict }: {
   rows: Array<PowerBiCustomerServiceDaily | PowerBiCustomerServiceAgent>;
   previousRows: Array<PowerBiCustomerServiceDaily | PowerBiCustomerServiceAgent>;
   tiles: ServiceKpiTile[];
+  strict?: boolean;
 }) {
   const metricRows = rows as unknown as ServiceMetricRow[];
   const metricPrevRows = previousRows as unknown as ServiceMetricRow[];
   const aggregate = (list: ServiceMetricRow[], tile: ServiceKpiTile) =>
     tile.aggregate === "sum" ? sumRows(list, tile.key)
     : tile.aggregate === "avgOrNull" ? avgRowsOrNull(list, tile.key)
+    : tile.aggregate === "weightedAverage" || (tile.weightKey && strict) ? weightedAverageRows(list, tile.key, tile.weightKey ?? "")
     : avgRows(list, tile.key);
   return (
     <div className="pb-kpi-grid">
@@ -1478,20 +1518,38 @@ function TmallServicePage({ cs, range }: { cs: PowerBiCustomerService; range: { 
   const prevDaily = range && prevRange ? allDaily.filter((row) => row.date >= prevRange.start && row.date <= prevRange.end) : [];
   const [group, setGroup] = useState("全部");
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
+  const sort = useColumnSort("effectiveReceived");
   const detailRows = tmall.byAgent.filter((row) => inRange(row.date) && (group === "全部" || row.groupName === group));
   const selectedRows = selectedAgent ? detailRows.filter((row) => row.agent === selectedAgent) : [];
+  // 严格口径 = 范围内每一行都带原子分子分母（metricsCaliber=strict）：比率按分母加权(SUM/SUM)；
+  // 否则(旧结构/precomputed 混合)比率回落普通日平均，并提示「预置口径」。
+  const rangeStrict = detailRows.length > 0 && detailRows.every((row) => row.metricsCaliber === "strict");
+  const ratioAggregate = (key: string, weightKey: string): AggregateConfig =>
+    rangeStrict ? { key, aggregate: "weightedAverage", weightKey } : { key, aggregate: "avg" };
   // 表格恒为「范围内按客服聚合」（每客服一行，无日期列），点击行联动卡片与趋势
-  const tableRows = aggregateAgentRows(detailRows, [
+  const aggregatedRows = aggregateAgentRows(detailRows, [
     { key: "effectiveReceived", aggregate: "sum" },
-    { key: "salesAmountWan", aggregate: "sum" },
+    { key: "netSalesWan", aggregate: "sum" },
     { key: "firstResponse", aggregate: "avg" },
-    { key: "answerRatio", aggregate: "avg" },
+    ratioAggregate("answerRatio", "buyerMsgNum"),
     { key: "avgResponse", aggregate: "avg" },
     { key: "unitPrice", aggregate: "avg" },
-    { key: "inquiryConvRate", aggregate: "avg" },
-    { key: "satisfactionRate", aggregate: "weightedAverage", weightKey: "effectiveReceived" },
-  ]).sort((a, b) => (b.effectiveReceived ?? 0) - (a.effectiveReceived ?? 0));
-  const agentPagination = usePagination(tableRows, `${selectedAgent ?? "all"}-${group}-${range?.start}-${range?.end}`, 10);
+    ratioAggregate("inquiryConvRate", "consultNum"),
+    ratioAggregate("satisfactionRate", "evaluationNum"),
+  ]);
+  const tableRows = sortRows(aggregatedRows, sort.sortKey, sort.sortDir, {
+    agent: (row) => row.agent,
+    groupName: (row) => row.groupName ?? null,
+    effectiveReceived: (row) => row.effectiveReceived ?? null,
+    netSalesWan: (row) => row.netSalesWan ?? null,
+    firstResponse: (row) => row.firstResponse ?? null,
+    answerRatio: (row) => row.answerRatio ?? null,
+    avgResponse: (row) => row.avgResponse ?? null,
+    unitPrice: (row) => row.unitPrice ?? null,
+    inquiryConvRate: (row) => row.inquiryConvRate ?? null,
+    satisfactionRate: (row) => row.satisfactionRate ?? null,
+  });
+  const agentPagination = usePagination(tableRows, `${selectedAgent ?? "all"}-${group}-${range?.start}-${range?.end}-${sort.sortKey}-${sort.sortDir}`, 10);
   // 选中客服失效时自动清除（改分组/全局日期后该客服可能不在当前明细集内）
   useEffect(() => {
     if (selectedAgent && !detailRows.some((row) => row.agent === selectedAgent)) setSelectedAgent(null);
@@ -1507,25 +1565,25 @@ function TmallServicePage({ cs, range }: { cs: PowerBiCustomerService; range: { 
   const overallTiles: ServiceKpiTile[] = [
     { label: "有效接待人数", key: "effectiveReceived", aggregate: "sum", format: (value) => countFormat.format(value), note: "范围内合计" },
     { label: "询单人数", key: "todayInquiry", aggregate: "sum", format: (value) => countFormat.format(value), note: "范围内合计" },
-    { label: "销售人数", key: "salesPeople", aggregate: "sum", format: (value) => countFormat.format(value), note: "范围内合计" },
+    { label: "询单最终付款人数", key: "finalPayCusNum", aggregate: "sum", format: (value) => countFormat.format(value), note: "范围内合计" },
     { label: "净销售额", key: "netSales", aggregate: "sum", format: (value) => `${moneyPreciseFormat.format(value / 10000)} 万`, note: "万元" },
     { label: "客单价", key: "unitPrice", aggregate: "avg", format: (value) => `¥${moneyFormat.format(value)}`, note: "每日平均" },
-    { label: "询单转化率", key: "inquiryConversionRate", aggregate: "avg", format: (value) => percent(value), note: "每日平均" },
+    { label: "询单转化率", key: "inquiryConversionRate", aggregate: "avg", weightKey: "consultNum", format: (value) => percent(value), note: "每日平均" },
   ];
   const agentTiles: ServiceKpiTile[] = [
     { label: "有效接待人数", key: "effectiveReceived", aggregate: "sum", format: (value) => countFormat.format(value), note: "范围内合计" },
-    { label: "询单人数", key: "todayInquiry", aggregate: "sum", format: (value) => countFormat.format(value), unavailable: true },
-    { label: "销售人数", key: "salesPeople", aggregate: "sum", format: (value) => countFormat.format(value), unavailable: true },
-    { label: "销售额", key: "salesAmountWan", aggregate: "sum", format: (value) => `${moneyPreciseFormat.format(value)} 万`, note: "万元" },
+    { label: "询单人数", key: "consultNum", aggregate: "sum", format: (value) => countFormat.format(value), note: "范围内合计" },
+    { label: "询单最终付款人数", key: "finalPayCusNum", aggregate: "sum", format: (value) => countFormat.format(value), note: "范围内合计" },
+    { label: "净销售额", key: "netSalesWan", aggregate: "sum", format: (value) => `${moneyPreciseFormat.format(value)} 万`, note: "万元" },
     { label: "客单价", key: "unitPrice", aggregate: "avg", format: (value) => `¥${moneyFormat.format(value)}`, note: "每日平均" },
-    { label: "询单转化率", key: "inquiryConvRate", aggregate: "avg", format: (value) => percent(value), note: "每日平均" },
+    { label: "询单转化率", key: "inquiryConvRate", aggregate: "avg", weightKey: "consultNum", format: (value) => percent(value), note: "每日平均" },
   ];
   const serviceTiles: ServiceKpiTile[] = [
     { label: "首次响应时长", key: "firstResponse", aggregate: "avg", format: (value) => `${value.toFixed(1)}s`, note: "每日平均" },
     { label: "平均响应时长", key: "avgResponse", aggregate: "avg", format: (value) => `${value.toFixed(1)}s`, note: "每日平均" },
-    { label: "淘宝答问比", key: "answerRatio", aggregate: "avg", format: (value) => value.toFixed(2), note: "答 vs 问 · 每日平均" },
+    { label: "答问比", key: "answerRatio", aggregate: "avg", weightKey: "buyerMsgNum", format: (value) => value.toFixed(2), note: "答 vs 问 · 每日平均" },
   ];
-  const spend = selectedRows.reduce((sum, row) => sum + (row.salesAmountWan ?? 0), 0);
+  const spend = selectedRows.reduce((sum, row) => sum + (row.netSalesWan ?? 0), 0);
   const selectedName = selectedAgent ?? "";
   return (
     <div className="pb-detail-layout" data-search-anchor="analytics-tmall-service">
@@ -1535,16 +1593,26 @@ function TmallServicePage({ cs, range }: { cs: PowerBiCustomerService; range: { 
             <option value="全部">全部</option>
             {tmall.groups.map((value) => <option key={value} value={value}>{value}</option>)}
           </select></label>
-          <span className="pb-follow-global-date">全局日期 {range ? `${range.start} 至 ${range.end}` : "全部"} · {detailRows.length} 行明细</span>
+          <span className="pb-follow-global-date">全局日期 {range ? `${range.start} 至 ${range.end}` : "全部"} · {detailRows.length} 行明细{serviceCoverageNote(range, detailRows)}</span>
+          {!rangeStrict && <span className="pb-precomputed-badge" title="2026-06-29 前的旧结构无原子分子分母，三个比率展示平台预制口径">预置口径</span>}
           {selectedAgent && <button className="pb-selected-agent-chip" onClick={() => setSelectedAgent(null)} type="button">已筛选：{selectedName} ✕</button>}
         </div>
         <section className="pb-panel-title">整体客服数据 <small>{selectedAgent ? `已联动客服：${selectedName}` : "全局范围"} · 较上期环比</small></section>
-        <ServiceKpiGrid previousRows={kpiPrevRows} rows={kpiRows} tiles={selectedAgent ? agentTiles : overallTiles} />
+        <ServiceKpiGrid previousRows={kpiPrevRows} rows={kpiRows} strict={rangeStrict} tiles={selectedAgent ? agentTiles : overallTiles} />
         <section className="pb-panel-title is-spaced">客服明细数据 <small>{selectedAgent ? `仅显示 ${selectedName}` : "全局范围 × 客服"} · 点击行联动卡片与趋势</small></section>
         <div className="pb-table-wrap pb-animated-table">
           <table className="pb-data-table pb-service-table" data-testid="tmall-service-agent-table">
             <thead><tr>
-              <th>客服</th><th>分组</th><th>有效接待</th><th>销售额(万)</th><th>首次响应</th><th>答问比</th><th>平均响应</th><th>客单价</th><th>询单转化率</th><th>满意率</th>
+              <SortHeader columnKey="agent" label="客服" sort={sort} />
+              <SortHeader columnKey="groupName" label="分组" sort={sort} />
+              <SortHeader columnKey="effectiveReceived" label="有效接待" sort={sort} />
+              <SortHeader columnKey="netSalesWan" label="净销售额(万)" sort={sort} />
+              <SortHeader columnKey="firstResponse" label="首次响应" sort={sort} />
+              <SortHeader columnKey="answerRatio" label="答问比" sort={sort} />
+              <SortHeader columnKey="avgResponse" label="平均响应" sort={sort} />
+              <SortHeader columnKey="unitPrice" label="客单价" sort={sort} />
+              <SortHeader columnKey="inquiryConvRate" label="询单转化率" sort={sort} />
+              <SortHeader columnKey="satisfactionRate" label="满意率" sort={sort} />
             </tr></thead>
             <tbody>
               {agentPagination.pagedItems.map((row, index) => (
@@ -1552,7 +1620,7 @@ function TmallServicePage({ cs, range }: { cs: PowerBiCustomerService; range: { 
                   <td className="pb-row-label"><span title={row.agent}>{row.agent}</span></td>
                   <td>{row.groupName || "—"}</td>
                   <td>{countFormat.format(row.effectiveReceived ?? 0)}</td>
-                  <td>{moneyPreciseFormat.format(row.salesAmountWan ?? 0)}</td>
+                  <td>{moneyPreciseFormat.format(row.netSalesWan ?? 0)}</td>
                   <td>{(row.firstResponse ?? 0).toFixed(1)}s</td>
                   <td>{(row.answerRatio ?? 0).toFixed(2)}</td>
                   <td>{(row.avgResponse ?? 0).toFixed(1)}s</td>
@@ -1567,20 +1635,20 @@ function TmallServicePage({ cs, range }: { cs: PowerBiCustomerService; range: { 
         </div>
         <Pagination onPage={agentPagination.setPage} page={agentPagination.page} totalItems={agentPagination.totalItems} totalPages={agentPagination.totalPages} />
         <section className="pb-panel-title is-spaced">服务维度数据 <small>响应时效与问答质量 · 较上期环比</small></section>
-        <ServiceKpiGrid previousRows={kpiPrevRows} rows={kpiRows} tiles={serviceTiles} />
-        <section className="pb-panel-title is-spaced">每日趋势 <small>{selectedAgent ? `${selectedName} · 有效接待(左轴) · 销售额万与询单转化率(右轴)` : "有效接待(左轴) · 净销售额万与询单转化率(右轴)"}</small></section>
+        <ServiceKpiGrid previousRows={kpiPrevRows} rows={kpiRows} strict={rangeStrict} tiles={serviceTiles} />
+        <section className="pb-panel-title is-spaced">每日趋势 <small>{selectedAgent ? `${selectedName} · 有效接待(左轴) · 净销售额万与询单转化率(右轴)` : "有效接待(左轴) · 净销售额万与询单转化率(右轴)"}</small></section>
         <CustomerServiceTrendChart
           rows={trendRows as unknown as ServiceMetricRow[]}
           leftSeries={[{ key: "effectiveReceived", label: "有效接待人数", color: "rgba(76, 190, 182, 0.85)", tooltipFormat: (value) => countFormat.format(value) }]}
           rightSeries={selectedAgent ? [
-            { key: "salesAmountWan", label: "销售额(万)", color: "rgba(214, 69, 80, 0.85)", scaleValue: (value) => value, tooltipFormat: (value) => `${value.toFixed(1)}万` },
+            { key: "netSalesWan", label: "净销售额(万)", color: "rgba(214, 69, 80, 0.85)", scaleValue: (value) => value, tooltipFormat: (value) => `${value.toFixed(1)}万` },
             { key: "inquiryConvRate", label: "询单转化率", color: "rgba(222, 168, 92, 0.9)", scaleValue: (value) => value * 100, tooltipFormat: (value) => percent(value) },
           ] : [
             { key: "netSales", label: "净销售额(万)", color: "rgba(214, 69, 80, 0.85)", scaleValue: (value) => value / 10000, tooltipFormat: (value) => `${(value / 10000).toFixed(1)}万` },
             { key: "inquiryConversionRate", label: "询单转化率", color: "rgba(222, 168, 92, 0.9)", scaleValue: (value) => value * 100, tooltipFormat: (value) => percent(value) },
           ]}
         />
-        {spend > 0 && <p className="pb-source-bar">选中客服 {selectedName} 销售额合计约 {moneyPreciseFormat.format(spend)} 万</p>}
+        {spend > 0 && <p className="pb-source-bar">选中客服 {selectedName} 净销售额合计约 {moneyPreciseFormat.format(spend)} 万</p>}
       </main>
     </div>
   );
@@ -1606,10 +1674,11 @@ function JdServicePage({ cs, range }: { cs: PowerBiCustomerService; range: { sta
   const prevServiceDaily = range && prevRange ? allServiceDaily.filter((row) => row.date >= prevRange.start && row.date <= prevRange.end && dailyStoreMatch(row)) : [];
   const [group, setGroup] = useState("全部");
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
+  const sort = useColumnSort("received");
   const detailRows = jd.byAgent.filter((row) => inRange(row.date) && agentStoreMatch(row) && (group === "全部" || row.skillGroup === group));
   const selectedRows = selectedAgent ? detailRows.filter((row) => row.agent === selectedAgent) : [];
   // 表格恒为「范围内按客服聚合」（每客服一行，无日期列），点击行联动卡片与趋势
-  const tableRows = aggregateAgentRows(detailRows, [
+  const aggregatedRows = aggregateAgentRows(detailRows, [
     { key: "received", aggregate: "sum" },
     { key: "orderAmount", aggregate: "sum" },
     { key: "firstResponse", aggregate: "avgOrNull" },
@@ -1618,8 +1687,20 @@ function JdServicePage({ cs, range }: { cs: PowerBiCustomerService; range: { sta
     { key: "conversionRate", aggregate: "avg" },
     { key: "goodReviews", aggregate: "sum" },
     { key: "badReviews", aggregate: "sum" },
-  ]).sort((a, b) => (b.received ?? 0) - (a.received ?? 0));
-  const agentPagination = usePagination(tableRows, `${selectedAgent ?? "all"}-${store}-${group}-${range?.start}-${range?.end}`, 10);
+  ]);
+  const tableRows = sortRows(aggregatedRows, sort.sortKey, sort.sortDir, {
+    agent: (row) => row.agent,
+    skillGroup: (row) => row.skillGroup ?? null,
+    received: (row) => row.received ?? null,
+    orderAmount: (row) => row.orderAmount ?? null,
+    firstResponse: (row) => row.firstResponse ?? null,
+    avgResponse: (row) => row.avgResponse ?? null,
+    answerRatio: (row) => row.answerRatio ?? null,
+    conversionRate: (row) => row.conversionRate ?? null,
+    goodReviews: (row) => row.goodReviews ?? null,
+    badReviews: (row) => row.badReviews ?? null,
+  });
+  const agentPagination = usePagination(tableRows, `${selectedAgent ?? "all"}-${store}-${group}-${range?.start}-${range?.end}-${sort.sortKey}-${sort.sortDir}`, 10);
   // 选中客服失效时自动清除（改分组/全局日期后该客服可能不在当前明细集内）
   useEffect(() => {
     if (selectedAgent && !detailRows.some((row) => row.agent === selectedAgent)) setSelectedAgent(null);
@@ -1669,7 +1750,7 @@ function JdServicePage({ cs, range }: { cs: PowerBiCustomerService; range: { sta
             <option value="全部">全部</option>
             {jd.groups.map((value) => <option key={value} value={value}>{value}</option>)}
           </select></label>
-          <span className="pb-follow-global-date">全局日期 {range ? `${range.start} 至 ${range.end}` : "全部"} · {detailRows.length} 行明细</span>
+          <span className="pb-follow-global-date">全局日期 {range ? `${range.start} 至 ${range.end}` : "全部"} · {detailRows.length} 行明细{serviceCoverageNote(range, detailRows)}</span>
           {selectedAgent && <button className="pb-selected-agent-chip" onClick={() => setSelectedAgent(null)} type="button">已筛选：{selectedName} ✕</button>}
         </div>
         <section className="pb-panel-title">整体客服数据 <small>{selectedAgent ? `已联动客服：${selectedName}` : "全局范围"} · 较上期环比</small></section>
@@ -1678,7 +1759,16 @@ function JdServicePage({ cs, range }: { cs: PowerBiCustomerService; range: { sta
         <div className="pb-table-wrap pb-animated-table">
           <table className="pb-data-table pb-service-table" data-testid="jd-service-agent-table">
             <thead><tr>
-              <th>客服</th><th>技能组</th><th>接待量</th><th>促成金额(万)</th><th>首次响应</th><th>平均响应</th><th>答问比</th><th>转化率</th><th>好评量</th><th>差评量</th>
+              <SortHeader columnKey="agent" label="客服" sort={sort} />
+              <SortHeader columnKey="skillGroup" label="技能组" sort={sort} />
+              <SortHeader columnKey="received" label="接待量" sort={sort} />
+              <SortHeader columnKey="orderAmount" label="促成金额(万)" sort={sort} />
+              <SortHeader columnKey="firstResponse" label="首次响应" sort={sort} />
+              <SortHeader columnKey="avgResponse" label="平均响应" sort={sort} />
+              <SortHeader columnKey="answerRatio" label="答问比" sort={sort} />
+              <SortHeader columnKey="conversionRate" label="转化率" sort={sort} />
+              <SortHeader columnKey="goodReviews" label="好评量" sort={sort} />
+              <SortHeader columnKey="badReviews" label="差评量" sort={sort} />
             </tr></thead>
             <tbody>
               {agentPagination.pagedItems.map((row, index) => (
@@ -1714,6 +1804,21 @@ function JdServicePage({ cs, range }: { cs: PowerBiCustomerService; range: { sta
       </main>
     </div>
   );
+}
+
+// 全局筛选后如实标注客服明细的实际覆盖日期：三源最新数据日常不一致（如抖音 T-1 领先一天），
+// 筛选区间尾端可能无数据，只显示筛选区间会误导（2026-09-12 运营反馈）。
+function serviceCoverageNote(range: { start: string; end: string } | null, rows: Array<{ date?: string }>): string {
+  if (!range) return "";
+  let min: string | null = null;
+  let max: string | null = null;
+  for (const row of rows) {
+    if (!row.date) continue;
+    if (!min || row.date < min) min = row.date;
+    if (!max || row.date > max) max = row.date;
+  }
+  if (!min || !max) return "";
+  return min > range.start || max < range.end ? ` · 实际数据 ${min} 至 ${max}` : "";
 }
 
 function servicePeriodRange(csPeriod: { start: string; end: string } | null, globalPeriod?: DatePeriod | null): { start: string; end: string } | null {
@@ -1752,9 +1857,129 @@ function coverageSummary(coverage: PowerBiPages["coverage"], start: string, end:
   return notes.length ? `数仓缺口：${notes.join("；")}` : "数仓覆盖完整";
 }
 
-function CustomerServiceWorkspace({ pages, globalPeriod }: { pages: PowerBiPages; globalPeriod?: DatePeriod | null }) {
+function DouyinServicePage({ cs, range }: { cs: PowerBiCustomerService; range: { start: string; end: string } | null }) {
+  const douyin = cs.douyin ?? { daily: [], byAgent: [], groups: [] };
+  const inRange = (value: string) => !range || (value >= range.start && value <= range.end);
+  const allDaily = [...douyin.daily].sort((a, b) => a.date.localeCompare(b.date));
+  const daily = allDaily.filter((row) => inRange(row.date));
+  const prevRange = previousRangeFor(range);
+  const prevDaily = range && prevRange ? allDaily.filter((row) => row.date >= prevRange.start && row.date <= prevRange.end) : [];
+  const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
+  const sort = useColumnSort("received");
+  const detailRows = douyin.byAgent.filter((row) => inRange(row.date));
+  const selectedRows = selectedAgent ? detailRows.filter((row) => row.agent === selectedAgent) : [];
+  // 表格恒为「范围内按客服聚合」（每客服一行，无日期列），点击行联动卡片与趋势；
+  // 询单转化率按 SUM(支付人数)/SUM(询单人数) 重算，与后端 daily 口径一致
+  const aggregatedRows = aggregateAgentRows(detailRows, [
+    { key: "received", aggregate: "sum" },
+    { key: "onlineSeconds", aggregate: "sum" },
+    { key: "netSales", aggregate: "sum" },
+    { key: "netSalesWan", aggregate: "sum" },
+    { key: "inquiryCount", aggregate: "sum" },
+    { key: "payCount", aggregate: "sum" },
+    { key: "evalCount", aggregate: "sum" },
+    { key: "firstResponse", aggregate: "avg" },
+    { key: "avgResponse", aggregate: "avg" },
+    { key: "satisfactionRate", aggregate: "weightedAverage", weightKey: "evalCount" },
+  ])
+    .map((row) => ({ ...row, inquiryConvRate: row.inquiryCount ? (row.payCount ?? 0) / row.inquiryCount : null }));
+  const tableRows = sortRows(aggregatedRows, sort.sortKey, sort.sortDir, {
+    agent: (row) => row.agent,
+    onlineSeconds: (row) => row.onlineSeconds ?? null,
+    received: (row) => row.received ?? null,
+    avgResponse: (row) => row.avgResponse ?? null,
+    inquiryConvRate: (row) => row.inquiryConvRate ?? null,
+    netSalesWan: (row) => row.netSalesWan ?? null,
+    satisfactionRate: (row) => row.satisfactionRate ?? null,
+  });
+  const agentPagination = usePagination(tableRows, `${selectedAgent ?? "all"}-${range?.start}-${range?.end}-${sort.sortKey}-${sort.sortDir}`, 10);
+  // 选中客服失效时自动清除（改全局日期后该客服可能不在当前明细集内）
+  useEffect(() => {
+    if (selectedAgent && !detailRows.some((row) => row.agent === selectedAgent)) setSelectedAgent(null);
+  }, [selectedAgent, detailRows]);
+  const prevAgentRows = selectedAgent
+    ? douyin.byAgent.filter((row) => row.agent === selectedAgent && prevRange && row.date >= prevRange.start && row.date <= prevRange.end)
+    : [];
+  if (!cs.douyin) return null;
+  if (!daily.length) return <div className="pb-empty">当前日期范围内无抖音客服数据，请调整日期筛选。</div>;
+  const trendRows = selectedAgent ? [...selectedRows].sort((a, b) => a.date.localeCompare(b.date)) : daily;
+  const kpiRows = selectedAgent ? selectedRows : daily;
+  const kpiPrevRows = selectedAgent ? prevAgentRows : prevDaily;
+  const onlineHours = (seconds: number) => `${(seconds / 3600).toFixed(1)}h`;
+  const overallTiles: ServiceKpiTile[] = [
+    { label: "在线客服数", key: "agentCount", aggregate: "avg", format: (value) => countFormat.format(Math.round(value)), note: "日均在线" },
+    { label: "接待会话量", key: "received", aggregate: "sum", format: (value) => countFormat.format(value), note: "范围内合计" },
+    { label: "净销售额", key: "netSales", aggregate: "sum", format: (value) => `${moneyPreciseFormat.format(value / 10000)} 万`, note: "万元 · 已扣退款" },
+    { label: "询单转化率", key: "inquiryConvRate", aggregate: "avg", format: (value) => percent(value), note: "支付人数/询单人数 · 每日平均" },
+    { label: "全天满意率", key: "satisfactionRate", aggregate: "avgOrNull", format: (value) => percent(value), note: "按有效评价加权 · 每日平均" },
+    { label: "平均响应时长", key: "avgResponse", aggregate: "avg", format: (value) => `${value.toFixed(1)}s`, note: "工作时间平响 · 每日平均" },
+  ];
+  const agentTiles: ServiceKpiTile[] = [
+    { label: "接待会话量", key: "received", aggregate: "sum", format: (value) => countFormat.format(value), note: "范围内合计" },
+    { label: "在线时长", key: "onlineSeconds", aggregate: "sum", format: onlineHours, note: "范围内合计" },
+    { label: "净销售额", key: "netSalesWan", aggregate: "sum", format: (value) => `${moneyPreciseFormat.format(value)} 万`, note: "万元 · 已扣退款" },
+    { label: "询单转化率", key: "inquiryConvRate", aggregate: "avg", format: (value) => percent(value), note: "每日平均" },
+    { label: "全天满意率", key: "satisfactionRate", aggregate: "avgOrNull", format: (value) => percent(value), note: "每日平均" },
+    { label: "平均响应时长", key: "avgResponse", aggregate: "avg", format: (value) => `${value.toFixed(1)}s`, note: "工作时间平响 · 每日平均" },
+  ];
+  const selectedName = selectedAgent ?? "";
+  return (
+    <div className="pb-detail-layout" data-search-anchor="analytics-douyin-service">
+      <main>
+        <div className="pb-service-controls">
+          <span className="pb-follow-global-date">全局日期 {range ? `${range.start} 至 ${range.end}` : "全部"} · {detailRows.length} 行明细{serviceCoverageNote(range, detailRows)}</span>
+          {selectedAgent && <button className="pb-selected-agent-chip" onClick={() => setSelectedAgent(null)} type="button">已筛选：{selectedName} ✕</button>}
+        </div>
+        <section className="pb-panel-title">整体客服数据 <small>{selectedAgent ? `已联动客服：${selectedName}` : "全局范围"} · 较上期环比</small></section>
+        <ServiceKpiGrid previousRows={kpiPrevRows} rows={kpiRows} tiles={selectedAgent ? agentTiles : overallTiles} />
+        <section className="pb-panel-title is-spaced">客服明细数据 <small>{selectedAgent ? `仅显示 ${selectedName}` : "全局范围 × 客服"} · 点击行联动卡片与趋势</small></section>
+        <div className="pb-table-wrap pb-animated-table">
+          <table className="pb-data-table pb-service-table" data-testid="douyin-service-agent-table">
+            <thead><tr>
+              <SortHeader columnKey="agent" label="客服" sort={sort} />
+              <SortHeader columnKey="onlineSeconds" label="在线时长" sort={sort} />
+              <SortHeader columnKey="received" label="接待会话量" sort={sort} />
+              <SortHeader columnKey="avgResponse" label="平均响应" sort={sort} />
+              <SortHeader columnKey="inquiryConvRate" label="询单转化率" sort={sort} />
+              <SortHeader columnKey="netSalesWan" label="净销售额(万)" sort={sort} />
+              <SortHeader columnKey="satisfactionRate" label="全天满意率" sort={sort} />
+            </tr></thead>
+            <tbody>
+              {agentPagination.pagedItems.map((row, index) => (
+                <tr className={clsx("pb-table-row", row.agent === selectedAgent && "is-selected")} key={row.agent} onClick={() => setSelectedAgent(selectedAgent === row.agent ? null : row.agent)} style={{ "--pb-row-delay": `${180 + Math.min(index, 12) * 28}ms` } as CSSProperties}>
+                  <td className="pb-row-label"><span title={row.agent}>{row.agent}</span></td>
+                  <td>{onlineHours(row.onlineSeconds ?? 0)}</td>
+                  <td>{countFormat.format(row.received ?? 0)}</td>
+                  <td>{row.avgResponse == null ? "—" : `${row.avgResponse.toFixed(1)}s`}</td>
+                  <td>{row.inquiryConvRate == null ? "—" : percent(row.inquiryConvRate)}</td>
+                  <td>{moneyPreciseFormat.format(row.netSalesWan ?? 0)}</td>
+                  <td>{row.satisfactionRate == null ? "—" : percent(row.satisfactionRate)}</td>
+                </tr>
+              ))}
+              {!tableRows.length && <tr className="pb-table-row"><td colSpan={7}>当前范围内暂无客服明细</td></tr>}
+            </tbody>
+          </table>
+        </div>
+        <Pagination onPage={agentPagination.setPage} page={agentPagination.page} totalItems={agentPagination.totalItems} totalPages={agentPagination.totalPages} />
+        <section className="pb-panel-title is-spaced">每日趋势 <small>{selectedAgent ? `${selectedName} · 接待会话量(左轴) · 净销售额万(右轴)` : "接待会话量(左轴) · 净销售额万与询单转化率(右轴)"}</small></section>
+        <CustomerServiceTrendChart
+          rows={trendRows as unknown as ServiceMetricRow[]}
+          leftSeries={[{ key: "received", label: "接待会话量", color: "rgba(76, 190, 182, 0.85)", tooltipFormat: (value) => countFormat.format(value) }]}
+          rightSeries={selectedAgent ? [
+            { key: "netSalesWan", label: "净销售额(万)", color: "rgba(214, 69, 80, 0.85)", scaleValue: (value) => value, tooltipFormat: (value) => `${value.toFixed(1)}万` },
+          ] : [
+            { key: "netSales", label: "净销售额(万)", color: "rgba(214, 69, 80, 0.85)", scaleValue: (value) => value / 10000, tooltipFormat: (value) => `${(value / 10000).toFixed(1)}万` },
+            { key: "inquiryConvRate", label: "询单转化率", color: "rgba(222, 168, 92, 0.9)", scaleValue: (value) => value * 100, tooltipFormat: (value) => percent(value) },
+          ]}
+        />
+      </main>
+    </div>
+  );
+}
+
+export function CustomerServiceWorkspace({ pages, globalPeriod }: { pages: PowerBiPages; globalPeriod?: DatePeriod | null }) {
   const cs = pages.customerService;
-  const [tab, setTab] = useState<"tmall" | "jd">("tmall");
+  const [tab, setTab] = useState<"tmall" | "jd" | "douyin">("tmall");
   if (!cs?.period) return <div className="pb-empty">客服数据尚未生成，请先同步本地数仓。</div>;
   const range = servicePeriodRange(cs.period, globalPeriod);
   if (!range) return <div className="pb-empty">当前页面日期范围与客服数据范围没有交集，请调整日期筛选。</div>;
@@ -1764,10 +1989,13 @@ function CustomerServiceWorkspace({ pages, globalPeriod }: { pages: PowerBiPages
         <nav>
           <button className={tab === "tmall" ? "is-active" : ""} key="tmall" onClick={() => setTab("tmall")} type="button"><Headphones size={14} />天猫每日客服</button>
           <button className={tab === "jd" ? "is-active" : ""} key="jd" onClick={() => setTab("jd")} type="button"><Headphones size={14} />京东每日客服</button>
+          <button className={tab === "douyin" ? "is-active" : ""} key="douyin" onClick={() => setTab("douyin")} type="button"><Headphones size={14} />抖音每日客服</button>
         </nav>
         <span className="pb-follow-global-date">跟随页面日期：{range.start} 至 {range.end}</span>
       </div>
-      {tab === "tmall" ? (cs.tmall?.daily.length ? <TmallServicePage cs={cs} range={range} /> : <div className="pb-empty">天猫客服数据为空</div>) : (cs.jd?.daily.length ? <JdServicePage cs={cs} range={range} /> : <div className="pb-empty">京东客服数据为空</div>)}
+      {tab === "tmall" ? (cs.tmall?.daily.length ? <TmallServicePage cs={cs} range={range} /> : <div className="pb-empty">天猫客服数据为空</div>)
+        : tab === "jd" ? (cs.jd?.daily.length ? <JdServicePage cs={cs} range={range} /> : <div className="pb-empty">京东客服数据为空</div>)
+        : (cs.douyin?.daily.length ? <DouyinServicePage cs={cs} range={range} /> : <div className="pb-empty">抖音客服数据为空</div>)}
     </div>
   );
 }
@@ -1833,6 +2061,11 @@ function GrowthDiagnosis({ warehouse, globalPeriod, searchTarget }: { warehouse:
     const end = requested.end < pages.period.end ? requested.end : pages.period.end;
     return start <= end ? { start, end } : null;
   }, [demand, pages.period, requested, usingDemand]);
+  // 每天核心数据日行点选：在整个天猫明细页范围内叠加单日筛选，不改变全局日期控件
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  useEffect(() => {
+    setSelectedDate(null);
+  }, [period?.start, period?.end]);
   if (!pages.period) return <div className="pb-empty">本地 PowerBI 独有数据尚未生成，请先同步本地数仓。</div>;
   if (!period) return <div className="pb-empty">当前页面日期范围与 PowerBI 本地数据范围没有交集，请调整日期筛选。</div>;
   const followLabel = usingDemand
@@ -1846,9 +2079,10 @@ function GrowthDiagnosis({ warehouse, globalPeriod, searchTarget }: { warehouse:
     <div className={clsx("pb-replica-canvas", "pb-tmall-detail-scale", `is-page-${page}`)}>
       <div className="pb-replica-toolbar">
         <nav>{([{ id: "overall", label: "旗舰店整体", icon: BarChart3 }, { id: "promotion", label: "推广费用明细", icon: Table2 }, { id: "product", label: "商品推广费用", icon: Database }, { id: "competitor", label: "竞品推广数据", icon: TrendingUp }] as const).map((item) => <button className={page === item.id ? "is-active" : ""} key={item.id} onClick={() => setPage(item.id)} type="button"><item.icon size={14} />{item.label}</button>)}</nav>
-        <span className="pb-follow-global-date">{followLabel}</span>
+        {page !== "competitor" && <span className="pb-follow-global-date">{followLabel}</span>}
+        {selectedDate && <button className="pb-selected-agent-chip" onClick={() => setSelectedDate(null)} type="button">已选日期：{selectedDate} ✕</button>}
       </div>
-      {page === "overall" ? <OverallPage end={period.end} pages={activePages} start={period.start} /> : page === "promotion" ? <PromotionPage end={period.end} pages={activePages} start={period.start} /> : page === "product" ? <ProductPromotionPage end={period.end} pages={activePages} start={period.start} /> : <CompetitorPage pages={activePages} refreshedAt={warehouse.refreshedAt} />}
+      {page === "overall" ? <OverallPage end={period.end} onSelectDate={setSelectedDate} pages={activePages} selectedDate={selectedDate} start={period.start} /> : page === "promotion" ? <PromotionPage end={period.end} onSelectDate={setSelectedDate} pages={activePages} selectedDate={selectedDate} start={period.start} /> : page === "product" ? <ProductPromotionPage end={period.end} onSelectDate={setSelectedDate} pages={activePages} selectedDate={selectedDate} start={period.start} /> : <CompetitorPage pages={activePages} refreshedAt={warehouse.refreshedAt} />}
     </div>
   );
 }
@@ -1865,9 +2099,8 @@ export function PowerBiReplica({ overview, warehouse, period, searchTarget }: Po
       <div className="analytics-workspace-tabs" role="tablist" aria-label="运营数据视图">
         <button aria-selected={workspace === "overview"} className={workspace === "overview" ? "is-active" : ""} onClick={() => setWorkspace("overview")} role="tab" type="button">全渠道总览</button>
         <button aria-selected={workspace === "diagnosis"} className={workspace === "diagnosis" ? "is-active" : ""} onClick={() => setWorkspace("diagnosis")} role="tab" type="button">天猫明细</button>
-        <button aria-selected={workspace === "service"} className={workspace === "service" ? "is-active" : ""} onClick={() => setWorkspace("service")} role="tab" type="button">客服数据</button>
       </div>
-      {workspace === "overview" ? overview : workspace === "service" ? (warehouse?.powerbiPages ? <CustomerServiceWorkspace globalPeriod={period} pages={warehouse.powerbiPages} /> : <div className="pb-empty">正在等待 PowerBI 本地数仓快照…</div>) : warehouse?.powerbiPages ? <GrowthDiagnosis globalPeriod={period} searchTarget={searchTarget} warehouse={warehouse} /> : <div className="pb-empty">正在等待 PowerBI 本地数仓快照…</div>}
+      {workspace === "overview" ? overview : warehouse?.powerbiPages ? <GrowthDiagnosis globalPeriod={period} searchTarget={searchTarget} warehouse={warehouse} /> : <div className="pb-empty">正在等待 PowerBI 本地数仓快照…</div>}
     </section>
   );
 }

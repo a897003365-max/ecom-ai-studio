@@ -477,4 +477,20 @@ export function sourceXlsxInfo() {
   return { path: p, size: s.size, mtime: s.mtime.toISOString(), period: slug };
 }
 
+/**
+ * 导入外部完成的分析行（本机子代理视觉分析，不经第三方 LLM）。
+ * 写入本周期缓存后，analyze-source 会因全部行已缓存跳过视觉接口，直接 merge + build。
+ */
+export function importAnalysisRows(period, rows) {
+  const slug = periodSlug(period);
+  if (!slug) throw new Error("缺少 period 参数");
+  if (!Array.isArray(rows) || rows.length === 0) throw new Error("rows 必须是非空数组");
+  for (const r of rows) {
+    if (!r || typeof r.row !== "number") throw new Error("每行必须包含数值型 row 字段");
+  }
+  const dirs = periodDirs(slug);
+  const total = upsertRowsIntoCache(rows, dirs);
+  return { ok: true, slug, imported: rows.length, total };
+}
+
 export { visionProviderInfo };

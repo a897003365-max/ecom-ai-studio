@@ -5,14 +5,20 @@
 // 2. 最长匹配消耗式扫描（避免"骗人"同时命中"骗"的双重计数）
 // 3. 否定识别：命中词前 4 字窗口内含 不/没/无/毫无/并不/不太/没啥/从未/不用/不会/不再/不怕/无需/没有/不用担心 则不计分
 //    （"不用担心踩雷""不会变形"不算负面）
-// 4. 旧床垫主语排除：负面词前 8 字内出现 旧床垫/软床垫/家里床垫/这种床垫 等主语，视为对旧床垫的描述而非麻大师投诉
+// 4. 旧床垫主语排除：负面词前 16 字内出现 旧床垫/软床垫/家里床垫/这种床垫 等主语，视为对旧床垫的描述而非麻大师投诉
 // 5. 标题命中权重 ×2
+// 6. 转折点：种草文「买前痛点 → 入手本品牌 → 好评」结构的分界（findTurnIndex）。
+//    强标记（换上/入手/我这次选了…）直接认定；弱标记（我选的/买的是/试了一下…）在真投诉里同样常见，
+//    必须紧跟正向评价才认定，避免「先投诉后点品牌」被误当转折点而漏报。
+//    2026-09-19 线上案例「【关于床垫太软我有话说】」（乔乔爱宅家, 2026-08-29）被判负面：
+//    正文痛点铺垫用的是"试了一下现在的棕榈垫加硬，我选的是一家做黄麻的加硬神器"，弱标记缺失，
+//    导致旧床垫的 避雷/塌陷×2/不舒服/坑 全部计分（neg=5 > pos=4）——补弱标记后 neg=0（旧床垫痛点全部豁免）。
 
 const NEGATIVE_TERMS = [
   "避雷", "踩雷", "后悔", "差评", "退货", "退款", "拔草", "劝退", "别买", "不要买", "千万别买", "避坑",
   "坑", "韭菜", "智商税", "垃圾", "质量差", "太差", "很差", "差劲", "翻车", "破损", "瑕疵",
   "虚假宣传", "虚假", "夸大", "骗", "欺骗", "假货", "山寨", "货不对版", "货不对板", "偷工减料", "减配",
-  "异味", "酸臭", "臭味", "味道大", "有味道", "很臭", "刺鼻", "难闻", "甲醛", "超标", "有毒", "头晕", "头疼",
+  "异味", "酸臭", "臭味", "味道大", "有味道", "很臭", "刺鼻", "难闻", "熏人", "甲醛", "超标", "有毒", "头晕", "头疼",
   "塌陷", "凹陷", "塌边", "塌腰", "变形", "起拱", "发霉", "生虫", "虫子", "开线", "断裂", "掉渣",
   "味道重", "味道很重", "味很大", "闷热", "越睡越热", "不透气", "睡醒一身汗",
   "太厚", "偏厚", "尺寸不符", "中间高", "斜坡", "凸起", "滚下去",
@@ -30,6 +36,8 @@ const POSITIVE_TERMS = [
   "超预期", "惊喜", "值得", "性价比", "划算", "回购", "复购", "无限回购", "真香", "安利", "放心", "靠谱",
   "正品", "质量好", "很棒", "点赞", "五星", "好评", "天花板", "闭眼入", "支撑到位", "贴合", "睡得很香",
   "一觉到天亮", "睡得香", "秒睡", "深度睡眠", "强烈推荐", "值得买", "买对了", "选对了", "超值", "爱了", "绝了",
+  // 种草文收尾满意度（"加硬神器真的太香了"）
+  "太香了", "太香",
   // 反转句式：先被最长匹配消耗，避免正文里的"塌陷/腰疼/后悔"把好评误判成负面
   "拯救塌陷", "救了我的腰", "解放了腰", "yyds", "后悔没早", "相见恨晚", "早买早享受",
   // 种草文收尾满意度信号
@@ -56,7 +64,8 @@ const NEGATION_SUFFIXES = [
 ];
 
 // 强否定短语（命中词前 10 字窗口内出现即豁免）：覆盖长距离否定（"不会局部塌陷""也不像旧床垫那样"）
-const STRONG_NEGATION_PHRASES = ["不用担心", "不必担心", "再也不用", "再也不", "再也没", "很少", "不再", "没再", "再也没有", "没有明显", "无明显", "不会"];
+// "没有出现/没出现"：好评文防御性声明（"使用三十天没有出现塌陷、凹陷"），2026-09-08 全库审计 3 处命中均为好评
+const STRONG_NEGATION_PHRASES = ["不用担心", "不必担心", "再也不用", "再也不", "再也没", "很少", "不再", "没再", "再也没有", "没有明显", "无明显", "不会", "没有出现", "没出现", "不用猜"];
 
 // 后置否定/转好短语（命中词后 6 字窗口内出现即豁免）："一点异味都没有""腰酸也好了""后悔没有早入手""不满意可以退回"
 const POST_NEGATION_PHRASES = ["都没有", "也没有", "都没", "也没", "也好了", "好多了", "缓解了", "改善了", "找到了办法", "有救了", "得救了", "救星", "没有早", "没早", "可以退回", "可以退", "更少"];
@@ -66,6 +75,7 @@ const OLD_MATTRESS_SUBJECTS = [
   "旧床垫", "软床垫", "家里床垫", "家里的床垫", "现在的床垫", "之前的床垫", "原来的床垫", "原先的床垫",
   "这种床垫", "这种软床垫", "那张床垫", "旧床", "软床", "硬床板", "硬板床", "床板",
   "木板床", "硬木板", "木板", "盒子床垫", "网红床垫", "很多床垫",
+  "老式弹簧", "旧弹簧",
   "之前买的", "之前睡", "以前睡", "去年买", "图便宜",
   // 软化/塌陷的状态描述主语（"整个人陷进去，腰悬空"是旧床状态铺垫）
   "陷进去", "腰悬空", "腰部悬空", "睡醒浑身酸痛",
@@ -78,35 +88,44 @@ const OTHER_BRAND_SUBJECTS = ["林氏木业", "林氏", "喜临门", "慕思", "
 const SKIP_PHRASES = ["坑坑洼洼", "0甲醛", "0胶水", "零甲醛", "零胶水"];
 
 // 语境豁免：特定词前接特定主语时不计分（"包装垃圾顺手带走"是物流描述，"可以退款"是售后保障陈述）
+// "踩过"："换它之前我踩过不少坑"是买前踩坑叙事不是本次投诉（2026-09-08 全库审计 17 处命中无一是麻大师投诉）
 const CONTEXT_EXEMPTIONS: Record<string, string[]> = {
+  "坑": ["踩过", "好几次", "无数", "很多"],
   "垃圾": ["包装"],
   "退款": ["可以", "能", "支持", "100天"],
   "退货": ["可以", "能", "支持", "不好"],
+  // "处理换货用了刚好五周"：装修流水账里的售后流程叙述，主语是家具不是床垫（2026-09-19 全库审计案例）
+  "换货": ["处理"],
   "不好用": ["也有"],
   "头疼": ["挑", "选", "纠结"],
   "难受": ["看着", "心疼", "破防"],
   "甲醛": ["不确定", "不知道", "测试", "检测", "焦虑"],
-  "踩雷": ["零风险"],
+  "踩雷": ["零风险", "过"],
   "腰酸": ["久坐"],
   "腰疼": ["久坐"],
+  "塌腰": ["太软"],
+  "晃动": ["老式弹簧", "弹簧"],
 };
 
 // 后接身份词豁免：症状词后接身份/人群后缀时是人群自述而非投诉（"腰突宝妈""腰酸星人救星"）
 const SUFFIX_EXEMPTIONS: Record<string, string[]> = {
   "腰突": ["宝妈", "党", "患者", "人", "星"],
   "腰酸": ["星人"],
+  // "换货柜子氧化程度…"：退换货发生在家具上，不是床垫售后（2026-09-19 全库审计案例）
+  "换货": ["柜子", "家具"],
 };
 
 // 恐吓式标题 + 正文反转：标题钩子词命中且正文出现反转信号时,标题负面词清零
 // （"腰酸背痛警告😭" + 正文"闭眼冲";真投诉的正文不会出现这些词）
 const TITLE_FEAR_HOOKS = /警告|别乱买|千万别|劝退|踩雷无数|选不对|太软|太硬/;
-const BODY_REVERSAL_SIGNALS = /闭眼冲|闭眼入|救星|真香|还好|挖到|安排上|找到了办法|太适合|赚到|赚到了|不费劲|拿取|躺平|做功课|就是我.*选|直接换|零风险/;
+const BODY_REVERSAL_SIGNALS = /闭眼冲|闭眼入|救星|真香|还好|挖到|安排上|找到了办法|太适合|赚到|赚到了|不费劲|拿取|躺平|做功课|就是我.*选|直接换|零风险|总结出|选购经验|幸福感.*拉满|拉满/;
 
 // 行业测评/预告类标题（"全网床垫甲醛大揭秘"）：@多品牌且无结论,不判负面
-const NEUTRAL_TITLE_PATTERNS = /大揭秘|陆续公布|计划测试/;
+// 选购攻略/避坑总结类标题（"床垫别乱买！踩无数坑总结的选购攻略"）：坑/别乱买是钩子不是投诉
+const NEUTRAL_TITLE_PATTERNS = /大揭秘|陆续公布|计划测试|选购攻略|避坑攻略|避坑指南|选购指南|选购经验|总结的选购|选购心得/;
 
 // 疑问/求证/二选一类标题:提问帖不是投诉,判负降为中性
-const QUESTION_TITLE_PATTERNS = /靠不靠谱|靠不靠|值得买吗|值得入|怎么样|咋样|好不好|二选一|有没有用过的|选哪个|推荐吗|避雷吗|真的假的|是不是真的|是真假/;
+const QUESTION_TITLE_PATTERNS = /靠不靠谱|靠不靠|值得买吗|值得入|怎么样|咋样|好不好|二选一|有没有用过的|选哪个|推荐吗|避雷吗|真的假的|是不是真的|是真假|帮我选|求推荐/;
 
 // 平台投诉类标题:投诉对象是京东/淘宝/物流等平台,不是麻大师
 const PLATFORM_COMPLAINT_PATTERNS = /京东|淘宝|天猫|拼多多|物流|快递|plus会员|会员维权/;
@@ -116,23 +135,39 @@ const PLATFORM_COMPLAINT_PATTERNS = /京东|淘宝|天猫|拼多多|物流|快�
 // 真投诉的负面描述必然出现在入手之后,不受影响。
 // 有效性：标记后 12 字内必须出现麻大师产品词 —— 否则像"当初盲目跟风入手软床垫"
 // 买的是旧床垫,不是转折点。
-const TURN_MARKERS = ["换上", "入手", "入了", "安排上", "铺上", "换成", "挖到", "这次我选", "还好", "幸好", "被种草", "种草这个", "种草了"];
+const TURN_MARKERS = ["换上", "入手", "入了", "安排上", "铺上", "换成", "挖到", "这次我选", "这次选", "这次入手", "还好", "幸好", "被种草", "种草这个", "种草了"];
+// 弱转折标记：这些"我已经选定这款"的表述在真投诉里同样常见（"我买的是加硬款，结果尺寸差两公分"），
+// 只有紧跟正向评价（TURN_POSITIVE_SIGNALS）才认定为转折点 —— 否则"先投诉后点品牌"会被误当转折点，
+// 把前面的真实投诉全部豁免（漏报比误报更不可接受）。
+// 2026-09-19 案例「关于床垫太软我有话说」：转折点写作"试了一下现在的棕榈垫加硬，我选的是一家做黄麻的加硬神器"。
+const WEAK_TURN_MARKERS = ["我选的", "我选了", "选的是", "选择的是", "选了这个", "最后选了", "后来选了", "最终选了", "买的是", "试了这款", "试了一下", "选了这款"];
+// 弱转折点后 40 字内的正向/问题解决信号（"…加硬神器，确实还不错"）
+const TURN_POSITIVE_SIGNALS = /还不错|不错|很值|值了|太香|真香|舒服|舒适|满意|推荐|支撑到位|贴合|放心|惊艳|划算|省心|安心|好用|好睡|绝了|爱了|喜欢|缓解|改善|踏实|放松|解决|神器|有效/;
 const TURN_PRODUCT_PATTERN = /麻大师|护脊宝|加硬|神器|豆芽|豆7|豆苗|黄麻/;
 
 function findTurnIndex(body: string): number {
   let earliest = 0;
-  for (const marker of TURN_MARKERS) {
-    let from = 0;
-    while (true) {
-      const idx = body.indexOf(marker, from);
-      if (idx === -1) break;
-      if (TURN_PRODUCT_PATTERN.test(body.slice(idx + marker.length, idx + marker.length + 12))) {
-        if (earliest === 0 || idx < earliest) earliest = idx;
-        break;
+  const record = (idx: number) => {
+    if (earliest === 0 || idx < earliest) earliest = idx;
+  };
+  const scanMarkers = (markers: string[], requirePositiveSignal: boolean) => {
+    for (const marker of markers) {
+      let from = 0;
+      while (true) {
+        const idx = body.indexOf(marker, from);
+        if (idx === -1) break;
+        const after = body.slice(idx + marker.length, idx + marker.length + 12);
+        const signalWindow = body.slice(idx + marker.length, idx + marker.length + 40);
+        if (TURN_PRODUCT_PATTERN.test(after) && (!requirePositiveSignal || TURN_POSITIVE_SIGNALS.test(signalWindow))) {
+          record(idx);
+          break;
+        }
+        from = idx + marker.length;
       }
-      from = idx + marker.length;
     }
-  }
+  };
+  scanMarkers(TURN_MARKERS, false);
+  scanMarkers(WEAK_TURN_MARKERS, true);
   return earliest;
 }
 
@@ -284,6 +319,52 @@ function scanSentimentText(text: string, weight: number, negStartIndex = 0): { n
     i += 1;
   }
   return { neg, pos };
+}
+
+/** 调试/测试辅助：返回分类结果与逐词命中明细（含是否计分），供契约测试与人工排查使用 */
+export function debugScanSentiment(note: { title?: string; noteBody?: string; author?: string }): {
+  label: "negative" | "positive" | "neutral";
+  neg: number;
+  pos: number;
+  hits: Array<{ src: string; term: string; counted: boolean; ctx: string }>;
+} {
+  const title = (note.title ?? "").trim();
+  const { body, tags } = extractBodyAndTags(note.noteBody ?? "");
+  const negStartIndex = findTurnIndex(body);
+  const hits: Array<{ src: string; term: string; counted: boolean; ctx: string }> = [];
+  const scan = (text: string, src: string) => {
+    let i = 0;
+    while (i < text.length) {
+      const bucket = TERMS_BY_FIRST_CHAR.get(text[i]);
+      if (bucket) {
+        let matched = false;
+        for (const t of bucket) {
+          if (text.startsWith(t.term, i)) {
+            matched = true;
+            i += t.term.length;
+            let exempt = false;
+            if (t.negative) {
+              exempt = i - t.term.length < negStartIndex || isNegatedAt(text, i - t.term.length) || isExternalSubjectAt(text, i - t.term.length) ||
+                isGenericParagraphAt(text, i - t.term.length) || isContextExemptAt(text, i - t.term.length, t.term) || isPostNegatedAt(text, i - t.term.length, t.term.length) ||
+                isSuffixExemptAt(text, i - t.term.length, t.term);
+            } else {
+              exempt = isNegatedAt(text, i - t.term.length);
+            }
+            if (!t.skip) {
+              hits.push({ src, term: t.term, counted: !exempt, ctx: text.slice(Math.max(0, i - t.term.length - 8), i + 8) });
+            }
+            break;
+          }
+        }
+        if (matched) continue;
+      }
+      i += 1;
+    }
+  };
+  scan(title, "title");
+  scan(body, "body");
+  scan(tags, "tags");
+  return { ...classifyNoteSentiment(note), hits };
 }
 
 export function classifyNoteSentiment(note: { title?: string; noteBody?: string; author?: string }): NoteSentiment {

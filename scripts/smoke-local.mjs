@@ -73,7 +73,8 @@ assert(sources.sources.some((source) => source.id === "feishu" && source.status 
 assert(workflows.workflow.readyCount === workflows.workflow.expectedCount, "Claude Code Agent 配置不完整");
 assert(analytics.warehouse?.recordCount > 0, "本地数仓 PowerBI 独有数据目录为空");
 assert(analytics.warehouse?.scope === "powerbi_unique_only", "本地数仓未启用 PowerBI 独有数据边界");
-assert(analytics.warehouse?.quality?.queryCount === 25, "本地数仓独有查询数量异常");
+// 30 = 32 总查询 - 2 钉钉权威排除（2026-09-10 起含 16-抖音每日客服；2026-10-09 起含 4 个 mds 天猫 postgres 直读查询）
+assert(analytics.warehouse?.quality?.queryCount === 30, "本地数仓独有查询数量异常");
 assert(analytics.warehouse?.quality?.excludedQueryCount === 2, "本地数仓重叠排除数量异常");
 assert(
   analytics.warehouse?.overlapPolicy?.excludedQueries?.some((item) => item.query === "00-月表汇总"),

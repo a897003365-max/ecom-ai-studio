@@ -45,12 +45,21 @@ export function getPowerbiPagesOnDemand(filters: { start: string; end: string })
   );
 }
 
+// 商品页首屏默认日期用：只取产品数据可用周期，不加载完整商品快照。
+export function getProductPeriod() {
+  return request<{ period: { start: string; end: string } | null; refreshedAt: string | null }>("/api/products/period");
+}
+
 export function getProductData(filters?: {
   start?: string;
   end?: string;
   statuses?: string[];
   channels?: string[];
   storeShortNames?: string[];
+  productCodes?: string[];
+  excludeProductCodes?: string[];
+  productIds?: string[];
+  excludeProductIds?: string[];
 }) {
   if (!filters) return request<ProductsPayload>("/api/products");
   const params = new URLSearchParams();
@@ -59,6 +68,10 @@ export function getProductData(filters?: {
   for (const s of filters.statuses ?? []) params.append("status", s);
   for (const channel of filters.channels ?? []) params.append("channel", channel);
   for (const storeShortName of filters.storeShortNames ?? []) params.append("storeShortName", storeShortName);
+  for (const productCode of filters.productCodes ?? []) params.append("productCode", productCode);
+  for (const productCode of filters.excludeProductCodes ?? []) params.append("excludeProductCode", productCode);
+  for (const productId of filters.productIds ?? []) params.append("productId", productId);
+  for (const productId of filters.excludeProductIds ?? []) params.append("excludeProductId", productId);
   const query = params.toString();
   return request<ProductsPayload>(`/api/products${query ? `?${query}` : ""}`);
 }

@@ -1,5 +1,6 @@
 import {
   ChartNoAxesCombined,
+  Headphones,
   Images,
   LayoutDashboard,
   ListChecks,
@@ -19,6 +20,7 @@ const icons = {
   content: WandSparkles,
   images: Images,
   analytics: ChartNoAxesCombined,
+  "customer-service": Headphones,
   intelligence: Radar,
   sentiment: Megaphone,
   tasks: ListChecks,

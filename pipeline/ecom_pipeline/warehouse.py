@@ -22,6 +22,19 @@ from .product_structure_builders import (
     empty_size_structure,
     empty_spu_sales_trend,
 )
+from .mds_source import (
+    JST_WEB_QUERY,
+    TMALL_ITEM_PROMOTION_QUERY,
+    TMALL_PRODUCT_DAILY_QUERY,
+    TMALL_SCENE_DAILY_QUERY,
+    TMALL_SHOP_SUMMARY_QUERY,
+    MdsSourceError,
+    fetch_jst_order_item_web,
+    fetch_tmall_item_promotion_daily,
+    fetch_tmall_product_daily,
+    fetch_tmall_scene_daily,
+    fetch_tmall_shop_daily,
+)
 from .readers import QuarantinedSourceError, discover_files, read_source_file
 from .source_policy import (
     DINGTALK_COVERED_QUERIES,
@@ -29,7 +42,11 @@ from .source_policy import (
     select_sync_specs,
     unique_domain_catalog,
 )
-from .transforms import transform_source_file
+from .transforms import (
+    JUSHUITAN_ERP_MAPPING_RELATIVE_PATH,
+    JUSHUITAN_OFFLINE_RELATIVE_DIR,
+    transform_source_file,
+)
 
 ProgressCallback = Callable[[dict[str, Any]], None]
 POWERBI_PAGE_WINDOW_DAYS = 60
@@ -46,6 +63,16 @@ class SyncOptions:
 
 # 文件解析规则变更时递增对应查询的版本号，触发历史分区重建
 PARSE_VERSIONS = {"07-旗舰店商品销售数据": 2}
+
+# 辅助源依赖：不进入 manifest 的 sourcePaths，但转换结果会读取它们。
+# 相对路径以主源文件的上两级目录（天猫旗舰店根）为基准。
+# 签名必须覆盖这些文件，否则主源未变时会复用旧分区，辅助表更新永远不生效。
+AUXILIARY_DEPENDENCIES: dict[str, tuple[Path, ...]] = {
+    "15-聚水潭商品数据": (
+        JUSHUITAN_OFFLINE_RELATIVE_DIR,
+        JUSHUITAN_ERP_MAPPING_RELATIVE_PATH,
+    ),
+}
 
 
 def _read_state(path: Path) -> dict[str, Any]:
@@ -84,9 +111,45 @@ def _state_key(path: Path) -> str:
     return str(path.resolve()).lower()
 
 
+def _auxiliary_signature(path: Path, spec: QuerySpec | None) -> str:
+    """主源之外、但会影响转换结果的辅助文件签名。
+
+    只按「文件名 + 大小 + mtime」做摘要，和主源签名同一口径：辅助表重新导出、
+    追加行或更新单元格都会改变签名，触发对应分区重建。目录不存在时返回空串，
+    保持旧签名格式，不影响没有辅助依赖的查询。
+    """
+
+    if spec is None:
+        return ""
+    relatives = AUXILIARY_DEPENDENCIES.get(spec.name)
+    if not relatives:
+        return ""
+    root = path.parent.parent
+    entries: list[str] = []
+    for relative in relatives:
+        for item in discover_files((root / relative,)):
+            try:
+                metadata = item.stat()
+            except OSError:
+                # 辅助表可能正被 Excel/WPS 重写，跳过瞬时不可读文件；
+                # 下一轮同步签名会再次探测，不会永久漏掉。
+                continue
+            try:
+                relative_name = item.relative_to(root).as_posix()
+            except ValueError:
+                relative_name = item.name
+            entries.append(f"{relative_name}:{metadata.st_size}:{metadata.st_mtime_ns}")
+    if not entries:
+        return ""
+    return hashlib.sha1("|".join(entries).encode("utf-8")).hexdigest()[:16]
+
+
 def _file_signature(path: Path, spec: QuerySpec | None = None) -> str:
     metadata = path.stat()
     base = f"{metadata.st_size}:{metadata.st_mtime_ns}"
+    auxiliary = _auxiliary_signature(path, spec)
+    if auxiliary:
+        base = f"{base}:a{auxiliary}"
     # 解析规则变更后重建对应查询的历史分区；签名带版本避免脏分区被增量同步复用
     version = PARSE_VERSIONS.get(spec.name, 0) if spec else 0
     return f"{base}:v{version}" if version else base
@@ -218,6 +281,96 @@ def _sync_query(
         "durationSeconds": round(time.perf_counter() - started, 3),
         "status": "success" if failed == 0 else "partial" if active else "failed",
     }
+    _emit(progress, {"event": "query_finished", **{key: value for key, value in result.items() if key != "errors"}})
+    return result
+
+
+def _sync_postgres_query(
+    paths: WarehousePaths,
+    spec: QuerySpec,
+    state: dict[str, Any],
+    options: SyncOptions,
+    progress: ProgressCallback | None,
+) -> dict[str, Any]:
+    """数据库类源（source_kind=postgres）：整表全量刷新为单个 parquet 分区。
+
+    数据量为 1 行/天，不做增量签名，每次同步全量重写。故障隔离是硬要求：
+    远程库不可达/凭据缺失/查询异常只允许本查询失败并保留上次有效分区，
+    绝不让异常冒出到 sync_warehouse 主循环（那里对查询级异常没有兜底）。
+    """
+    started = time.perf_counter()
+    state_key = f"postgres://{spec.name}"
+    destination = paths.staging_root / spec.key / "snapshot.parquet"
+    _emit(progress, {"event": "query_started", "query": spec.name, "files": 1, "totalFiles": 1})
+    previous = state["files"].get(state_key)
+    try:
+        # 每次调用时现取，保证单测 mock.patch 模块属性即生效
+        fetchers = {
+            TMALL_SHOP_SUMMARY_QUERY: fetch_tmall_shop_daily,
+            TMALL_PRODUCT_DAILY_QUERY: fetch_tmall_product_daily,
+            TMALL_SCENE_DAILY_QUERY: fetch_tmall_scene_daily,
+            TMALL_ITEM_PROMOTION_QUERY: fetch_tmall_item_promotion_daily,
+            JST_WEB_QUERY: fetch_jst_order_item_web,
+        }
+        fetcher = fetchers.get(spec.name)
+        if fetcher is None:
+            raise MdsSourceError(f"未实现的 postgres 源查询：{spec.name}")
+        frame = fetcher()
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        # postgres 源是整表全量：清掉该查询目录下旧的文件链分区，避免
+        # read_parquet('*.parquet') 把旧 Excel 分区与 snapshot 叠加。
+        for stale in destination.parent.glob("*.parquet"):
+            if stale.resolve() != destination.resolve():
+                stale.unlink()
+        temporary = destination.with_suffix(".parquet.tmp")
+        frame.write_parquet(temporary, compression="zstd", statistics=True)
+        os.replace(temporary, destination)
+        state["files"][state_key] = {
+            "query": spec.name,
+            "signature": f"rows:{frame.height}:cols:{frame.width}",
+            "source": state_key,
+            "parquet": str(destination),
+            "rows": frame.height,
+            "columns": frame.width,
+            "updatedAt": datetime.now().astimezone().isoformat(),
+            "error": None,
+        }
+        result = {
+            "query": spec.name,
+            "key": spec.key,
+            "files": 1,
+            "activePartitions": 1,
+            "processed": 1,
+            "reused": 0,
+            "failed": 0,
+            "quarantined": [],
+            "rows": frame.height,
+            "columns": frame.width,
+            "errors": [],
+            "durationSeconds": round(time.perf_counter() - started, 3),
+            "status": "success",
+        }
+    except Exception as error:  # 含 MdsSourceError；任何意外都只降级本查询
+        message = str(error).replace("\r", " ").replace("\n", " ")[:500]
+        keep = bool(previous and previous.get("parquet") and Path(previous["parquet"]).exists())
+        if previous:
+            previous["error"] = message
+            previous["failedAt"] = datetime.now().astimezone().isoformat()
+        result = {
+            "query": spec.name,
+            "key": spec.key,
+            "files": 1,
+            "activePartitions": 1 if keep else 0,
+            "processed": 0,
+            "reused": 1 if keep else 0,
+            "failed": 1,
+            "quarantined": [],
+            "rows": int(previous.get("rows", 0)) if keep else 0,
+            "columns": int(previous.get("columns", 0)) if keep else 0,
+            "errors": [{"file": state_key, "error": message}],
+            "durationSeconds": round(time.perf_counter() - started, 3),
+            "status": "partial" if keep else "failed",
+        }
     _emit(progress, {"event": "query_finished", **{key: value for key, value in result.items() if key != "errors"}})
     return result
 
@@ -849,6 +1002,120 @@ def _source_coverage(
     }
 
 
+def _source_coverage_union(
+    connection: duckdb.DuckDBPyConnection,
+    parts: list[tuple[str | None, str]],
+    range_start: date,
+    range_end: date,
+) -> dict[str, Any]:
+    """多来源并集覆盖（文件链 + mds 补缺），与 builder 的缺口回填口径一致。
+
+    parts 中 view 为 None 的来源（mds 未登记/未同步）自动跳过，退化为纯文件链口径。
+    """
+    active = [(view, column) for view, column in parts if view]
+    selects = " UNION ALL ".join(
+        f'SELECT try_cast("{column}" AS DATE) AS day FROM {view} '
+        f'WHERE try_cast("{column}" AS DATE) BETWEEN ? AND ?'
+        for view, column in active
+    )
+    params = [value for _view, _column in active for value in (range_start, range_end)]
+    row = connection.execute(
+        f"SELECT min(day), max(day), count(DISTINCT day) FROM ({selects})", params
+    ).fetchone()
+    minimum, maximum, days = row[0], row[1], int(row[2] or 0)
+    total_days = (range_end - range_start).days + 1
+    return {
+        "min": minimum.isoformat() if minimum else None,
+        "max": maximum.isoformat() if maximum else None,
+        "days": days,
+        "missingDays": max(total_days - days, 0),
+    }
+
+
+def _gap_fill_view(connection: duckdb.DuckDBPyConnection, query_name: str, required_column: str) -> str | None:
+    """mds 补缺视图：未登记、未同步出分区（_empty 占位）或缺关键列时返回 None，
+    调用方退回纯文件链口径，不拖垮快照构建。"""
+    try:
+        view = _model_view(connection, query_name)
+    except ValueError:
+        return None
+    columns = {row[0] for row in connection.execute(f"DESCRIBE {view}").fetchall()}
+    return view if required_column in columns else None
+
+
+def _gap_union_cte(
+    alias: str,
+    dedup_name: str,
+    mds_view: str,
+    columns: list[tuple[str, str | None]],
+    dedup_date_column: str = "日期",
+) -> str:
+    """生成「文件链 dedup UNION ALL mds 补缺日」CTE 片段（自带两个区间占位符）。
+
+    columns 为 (输出列, mds 列) 对；mds 列为 None 时该列在 mds 侧置 NULL
+    （如 item 表无直接购物车数）。两源重叠日恒以文件链为准（反连接按日剔除）。
+    列类型由下游 try_cast 归一，混合类型在 UNION 中按 DuckDB 公共类型解析。
+    dedup_date_column 须显式给出 dedup 侧真实日期列（04 为「统计日期」）——若子查询
+    引用 dedup 不存在的列，DuckDB 会将其解析为外层 mds 行的相关列，反连接静默失效。
+    """
+    file_exprs = ", ".join(f'"{out}"' for out, _mds_col in columns)
+    mds_exprs = ", ".join(
+        ("NULL" if mds_col is None else f'"{mds_col}"') + f' AS "{out}"'
+        for out, mds_col in columns
+    )
+    return (
+        f", {alias} AS ("
+        f"SELECT {file_exprs} FROM {dedup_name} "
+        f"UNION ALL SELECT {mds_exprs} FROM {mds_view} "
+        f'WHERE try_cast("日期" AS DATE) BETWEEN ? AND ? '
+        f'AND try_cast("日期" AS DATE) NOT IN ('
+        f'SELECT try_cast("{dedup_date_column}" AS DATE) FROM {dedup_name} '
+        f'WHERE try_cast("{dedup_date_column}" AS DATE) IS NOT NULL'
+        f"))"
+    )
+
+
+def _build_shop_summary_daily(
+    connection: duckdb.DuckDBPyConnection,
+    period_start: date,
+    period_end: date,
+) -> list[dict[str, Any]]:
+    """mds 天猫店铺日汇总（与钉钉填表同一真值源）：店铺级日字段直读 mds 库。
+
+    独立于生意参谋导出文件链，文件漏跑（如 2026-10-05）时该卡仍有数据。
+    首次同步前/源故障时视图只有 _empty 占位列，列探测兜底返回 []，不拖垮快照构建。
+    """
+    try:
+        view = _model_view(connection, TMALL_SHOP_SUMMARY_QUERY)
+    except ValueError:
+        return []
+    columns = {row[0] for row in connection.execute(f"DESCRIBE {view}").fetchall()}
+    if not {"日期", "GMV"}.issubset(columns):
+        return []
+    return _records(
+        connection,
+        f"""
+        SELECT
+          try_cast("日期" AS DATE) AS date,
+          try_cast("浏览量" AS DOUBLE) AS pageViews,
+          try_cast("店铺客户数" AS DOUBLE) AS shopCustomers,
+          try_cast("GMV" AS DOUBLE) AS gmv,
+          try_cast("成功退款金额" AS DOUBLE) AS refundAmount,
+          try_cast("加购人数" AS DOUBLE) AS addToCart,
+          try_cast("关键词推广" AS DOUBLE) AS keywordSpend,
+          try_cast("精准人群推广" AS DOUBLE) AS audienceSpend,
+          try_cast("全站推广" AS DOUBLE) AS fullSiteSpend,
+          try_cast("淘客" AS DOUBLE) AS taokeCommission,
+          try_cast("内容场景" AS DOUBLE) AS contentSceneSpend,
+          cast("店铺排名" AS VARCHAR) AS storeRank
+        FROM {view}
+        WHERE try_cast("日期" AS DATE) BETWEEN ? AND ?
+        ORDER BY 1
+        """,
+        [period_start, period_end],
+    )
+
+
 def _build_powerbi_pages(
     connection: duckdb.DuckDBPyConnection,
     store_rank_daily: dict[str, str] | None = None,
@@ -869,6 +1136,13 @@ def _build_powerbi_pages(
     product_view = _model_view(connection, "07-旗舰店商品销售数据")
     promotion_view = _model_view(connection, "08-旗舰店推广花费")
     catalog_view = _model_view(connection, "05-旗舰店ID对照表")
+    # mds 补缺源（钉钉填表同库）：文件链漏跑的日子由 mds 补齐，重叠日恒以文件链为准；
+    # 未登记/未同步时为 None，自动退回纯文件链口径
+    mds_product_view = _gap_fill_view(connection, TMALL_PRODUCT_DAILY_QUERY, "商品ID")
+    mds_scene_view = _gap_fill_view(connection, TMALL_SCENE_DAILY_QUERY, "场景名字")
+    mds_item_promo_view = _gap_fill_view(connection, TMALL_ITEM_PROMOTION_QUERY, "商品ID")
+    # 04 基础数据补缺：要求扩列后的店铺汇总视图（含支付买家数）；旧 12 列分区自动不启用
+    mds_base_view = _gap_fill_view(connection, TMALL_SHOP_SUMMARY_QUERY, "支付买家数")
 
     latest_candidates = [
         connection.execute(
@@ -884,6 +1158,15 @@ def _build_powerbi_pages(
             'WHERE try_cast("日期" AS DATE) <= current_date'
         ).fetchone()[0],
     ]
+    # 文件链连续漏跑时 mds 可能更新到更晚日期；纳入窗口端点，避免补缺数据被窗口截掉
+    for mds_view in (mds_product_view, mds_scene_view, mds_item_promo_view, mds_base_view):
+        if mds_view:
+            latest_candidates.append(
+                connection.execute(
+                    f'SELECT max(try_cast("日期" AS DATE)) FROM {mds_view} '
+                    'WHERE try_cast("日期" AS DATE) <= current_date'
+                ).fetchone()[0]
+            )
     latest_dates = [value for value in latest_candidates if value]
     if not latest_dates:
         return {
@@ -892,6 +1175,7 @@ def _build_powerbi_pages(
             "coverage": None,
             "overallDaily": [],
             "dailyCore": [],
+            "shopSummaryDaily": [],
             "productDaily": [],
             "productDailyPriorYear": [],
             "promotionSceneDaily": [],
@@ -912,6 +1196,25 @@ def _build_powerbi_pages(
         period_end = max(latest_dates)
         period_start = period_end - timedelta(days=POWERBI_PAGE_WINDOW_DAYS - 1)
 
+    # 04 基础数据同样做 mds 补缺：店铺汇总扩列后 14 字段与 04 逐项对平（2026-10-03~05 验证），
+    # 重叠日恒以文件链为准
+    overall_gap = ""
+    overall_from = "dedup"
+    overall_params: list[Any] = [period_start, period_end]
+    if mds_base_view:
+        overall_gap = _gap_union_cte(
+            "unioned",
+            "dedup",
+            mds_base_view,
+            [("统计日期", "日期"), ("访客数", "店铺客户数"), ("商品访客数", "商品访客数"),
+             ("加购人数", "加购人数"), ("支付买家数", "支付买家数"), ("支付金额", "GMV"),
+             ("成功退款金额", "成功退款金额"), ("全站推广花费", "全站推广"), ("关键词推广花费", "关键词推广"),
+             ("精准人群推广花费", "精准人群推广"), ("淘宝客佣金", "淘客"), ("新访客数", "新访客数"),
+             ("老访客数", "老访客数"), ("平均停留时长", "平均停留时长"), ("跳失率", "跳失率")],
+            dedup_date_column="统计日期",
+        )
+        overall_from = "unioned"
+        overall_params += [period_start, period_end]
     overall_daily = _records(
         connection,
         f"""
@@ -924,7 +1227,7 @@ def _build_powerbi_pages(
             FROM {base_view}
             WHERE try_cast("统计日期" AS DATE) BETWEEN ? AND ?
           ) WHERE _snapshot_rank = 1
-        )
+        ){overall_gap}
         SELECT
           try_cast("统计日期" AS DATE) AS date,
           sum(coalesce(try_cast("访客数" AS DOUBLE), 0)) AS visitors,
@@ -941,14 +1244,41 @@ def _build_powerbi_pages(
           sum(coalesce(try_cast("老访客数" AS DOUBLE), 0)) AS returningVisitors,
           avg(try_cast("平均停留时长" AS DOUBLE)) AS avgStaySeconds,
           avg(try_cast("跳失率" AS DOUBLE)) AS bounceRate
-        FROM dedup
+        FROM {overall_from}
         GROUP BY 1 ORDER BY 1
         """,
-        [period_start, period_end],
+        overall_params,
     )
 
     # 对齐 PBIX「天猫旗舰店整体数据 -> 每天核心数据」矩阵。
     # 字段来源和 DAX 口径：07 商品表 + 08 推广表；店铺排名由 00 原始表仅字段补充。
+    # mds 缺口回填：与商品/场景明细同一对补缺视图，避免文件链漏跑日出现「推广有数、商品全 0」的半空行
+    daily_core_product_gap = ""
+    daily_core_product_from = "product_dedup"
+    daily_core_params: list[Any] = [period_start, period_end]
+    if mds_product_view:
+        daily_core_product_gap = _gap_union_cte(
+            "product_unioned",
+            "product_dedup",
+            mds_product_view,
+            [("日期", "日期"), ("商品ID", "商品ID"), ("商品名称", "商品名称"),
+             ("商品访客数", "商品访客数"), ("加购人数", "加购人数"), ("支付买家数", "支付买家数"),
+             ("支付金额", "支付金额"), ("退款金额", "退款金额"), ("商品支付件数", "商品支付件数")],
+        )
+        daily_core_product_from = "product_unioned"
+        daily_core_params += [period_start, period_end]
+    daily_core_params += [period_start, period_end]
+    daily_core_promotion_gap = ""
+    daily_core_promotion_from = "promotion_dedup"
+    if mds_scene_view:
+        daily_core_promotion_gap = _gap_union_cte(
+            "promotion_unioned",
+            "promotion_dedup",
+            mds_scene_view,
+            [("日期", "日期"), ("花费（未含达人）", None), ("花费", "花费"), ("总购物车数", "总购物车数")],
+        )
+        daily_core_promotion_from = "promotion_unioned"
+        daily_core_params += [period_start, period_end]
     daily_core = _records(
         connection,
         f"""
@@ -962,7 +1292,7 @@ def _build_powerbi_pages(
             FROM {product_view}
             WHERE try_cast("日期" AS DATE) BETWEEN ? AND ? AND "商品ID" IS NOT NULL
           ) WHERE _snapshot_rank = 1
-        ), product_by_date AS (
+        ){daily_core_product_gap}, product_by_date AS (
           SELECT
             try_cast("日期" AS DATE) AS date,
             sum(coalesce(try_cast("商品访客数" AS DOUBLE), 0)) AS productVisitors,
@@ -976,7 +1306,7 @@ def _build_powerbi_pages(
                 ELSE 0
               END
             ) AS paidUnits
-          FROM product_dedup
+          FROM {daily_core_product_from}
           GROUP BY 1
         ), promotion_dedup AS (
           SELECT * EXCLUDE (_snapshot_rank) FROM (
@@ -993,12 +1323,12 @@ def _build_powerbi_pages(
             FROM {promotion_view}
             WHERE try_cast("日期" AS DATE) BETWEEN ? AND ?
           ) WHERE _snapshot_rank = 1
-        ), promotion_by_date AS (
+        ){daily_core_promotion_gap}, promotion_by_date AS (
           SELECT
             try_cast("日期" AS DATE) AS date,
             sum(coalesce(try_cast("花费（未含达人）" AS DOUBLE), try_cast("花费" AS DOUBLE), 0)) AS spend,
             sum(coalesce(try_cast("总购物车数" AS DOUBLE), 0)) AS promotionCarts
-          FROM promotion_dedup
+          FROM {daily_core_promotion_from}
           GROUP BY 1
         ), available_dates AS (
           SELECT date FROM product_by_date
@@ -1033,16 +1363,37 @@ def _build_powerbi_pages(
         LEFT JOIN promotion_by_date AS promotion ON promotion.date = dates.date
         ORDER BY dates.date
         """,
-        [
-            period_start,
-            period_end,
-            period_start,
-            period_end,
-        ],
+        daily_core_params,
     )
     for row in daily_core:
         row["storeRank"] = (store_rank_daily or {}).get(str(row["date"]))
 
+    # mds 缺口回填：文件链整体缺失的日期由 mds（钉钉填表同库）补齐，重叠日恒以文件链为准；
+    # ranked 只统计文件链，展示商品集合（访客前 60）不随补缺变化
+    product_gap_cte = ""
+    product_source = "dedup"
+    product_params: list[Any] = [period_start, period_end]
+    if mds_product_view:
+        product_gap_cte = f""", unioned AS (
+          SELECT try_cast("日期" AS DATE) AS "日期", cast("商品ID" AS VARCHAR) AS "商品ID",
+                 cast("商品名称" AS VARCHAR) AS "商品名称",
+                 try_cast("商品访客数" AS DOUBLE) AS "商品访客数", try_cast("加购人数" AS DOUBLE) AS "加购人数",
+                 try_cast("支付买家数" AS DOUBLE) AS "支付买家数", try_cast("支付金额" AS DOUBLE) AS "支付金额",
+                 try_cast("退款金额" AS DOUBLE) AS "退款金额", try_cast("商品支付件数" AS DOUBLE) AS "商品支付件数"
+          FROM dedup
+          UNION ALL
+          SELECT try_cast("日期" AS DATE), cast("商品ID" AS VARCHAR), cast("商品名称" AS VARCHAR),
+                 try_cast("商品访客数" AS DOUBLE), try_cast("加购人数" AS DOUBLE),
+                 try_cast("支付买家数" AS DOUBLE), try_cast("支付金额" AS DOUBLE),
+                 try_cast("退款金额" AS DOUBLE), try_cast("商品支付件数" AS DOUBLE)
+          FROM {mds_product_view}
+          WHERE try_cast("日期" AS DATE) BETWEEN ? AND ?
+            AND try_cast("日期" AS DATE) NOT IN (
+              SELECT try_cast("日期" AS DATE) FROM dedup WHERE try_cast("日期" AS DATE) IS NOT NULL
+            )
+        )"""
+        product_source = "unioned"
+        product_params += [period_start, period_end]
     product_daily = _records(
         connection,
         f"""
@@ -1056,7 +1407,7 @@ def _build_powerbi_pages(
             FROM {product_view}
             WHERE try_cast("日期" AS DATE) BETWEEN ? AND ? AND "商品ID" IS NOT NULL
           ) WHERE _snapshot_rank = 1
-        ), ranked AS (
+        ){product_gap_cte}, ranked AS (
           SELECT cast("商品ID" AS VARCHAR) AS productId,
                  sum(coalesce(try_cast("商品访客数" AS DOUBLE), 0)) AS visitors
           FROM dedup
@@ -1072,16 +1423,29 @@ def _build_powerbi_pages(
           sum(coalesce(try_cast(data."支付金额" AS DOUBLE), 0)) AS payAmount,
           sum(coalesce(try_cast(data."退款金额" AS DOUBLE), 0)) AS refund,
           sum(coalesce(try_cast(data."商品支付件数" AS DOUBLE), 0)) AS paidUnits
-        FROM dedup AS data
+        FROM {product_source} AS data
         INNER JOIN ranked ON ranked.productId = cast(data."商品ID" AS VARCHAR)
         GROUP BY 1, 2 ORDER BY 1, visitors DESC
         """,
-        [period_start, period_end],
+        product_params,
     )
 
     # 去年同期商品级聚合，用于「国补后金额同比」（对齐 .pbix DATEADD(-365, DAY)）
+    # 文件链去年同期缺口同样由 mds 商品日明细补缺（同口径反连接）
     prior_year_start = period_start - timedelta(days=365)
     prior_year_end = period_end - timedelta(days=365)
+    prior_year_gap = ""
+    prior_year_from = "dedup"
+    prior_year_params: list[Any] = [prior_year_start, prior_year_end]
+    if mds_product_view:
+        prior_year_gap = _gap_union_cte(
+            "unioned",
+            "dedup",
+            mds_product_view,
+            [("日期", "日期"), ("商品ID", "商品ID"), ("支付金额", "支付金额"), ("退款金额", "退款金额")],
+        )
+        prior_year_from = "unioned"
+        prior_year_params += [prior_year_start, prior_year_end]
     product_daily_prior_year = _records(
         connection,
         f"""
@@ -1095,17 +1459,44 @@ def _build_powerbi_pages(
             FROM {product_view}
             WHERE try_cast("日期" AS DATE) BETWEEN ? AND ? AND "商品ID" IS NOT NULL
           ) WHERE _snapshot_rank = 1
-        )
+        ){prior_year_gap}
         SELECT
           cast("商品ID" AS VARCHAR) AS productId,
           sum(coalesce(try_cast("支付金额" AS DOUBLE), 0)) AS payAmount,
           sum(coalesce(try_cast("退款金额" AS DOUBLE), 0)) AS refund
-        FROM dedup
+        FROM {prior_year_from}
         GROUP BY 1
         """,
-        [prior_year_start, prior_year_end],
+        prior_year_params,
     )
 
+    # mds 缺口回填：与商品明细同规则（文件链优先，mds 只补缺日；花费列走
+    # coalesce(花费（未含达人）, 花费)，mds 侧只提供「花费」即 charge_amount）
+    scene_gap_cte = ""
+    scene_source = "dedup"
+    scene_params: list[Any] = [period_start, period_end]
+    if mds_scene_view:
+        scene_gap_cte = f""", unioned AS (
+          SELECT try_cast("日期" AS DATE) AS "日期", cast("场景名字" AS VARCHAR) AS "场景名字",
+                 try_cast("展现量" AS DOUBLE) AS "展现量", try_cast("点击量" AS DOUBLE) AS "点击量",
+                 try_cast("花费（未含达人）" AS DOUBLE) AS "花费（未含达人）", try_cast("花费" AS DOUBLE) AS "花费",
+                 try_cast("总成交金额" AS DOUBLE) AS "总成交金额", try_cast("总购物车数" AS DOUBLE) AS "总购物车数",
+                 try_cast("直接购物车数" AS DOUBLE) AS "直接购物车数", try_cast("旺旺咨询量" AS DOUBLE) AS "旺旺咨询量"
+          FROM dedup
+          UNION ALL
+          SELECT try_cast("日期" AS DATE), cast("场景名字" AS VARCHAR),
+                 try_cast("展现量" AS DOUBLE), try_cast("点击量" AS DOUBLE),
+                 NULL, try_cast("花费" AS DOUBLE),
+                 try_cast("总成交金额" AS DOUBLE), try_cast("总购物车数" AS DOUBLE),
+                 try_cast("直接购物车数" AS DOUBLE), try_cast("旺旺咨询量" AS DOUBLE)
+          FROM {mds_scene_view}
+          WHERE try_cast("日期" AS DATE) BETWEEN ? AND ?
+            AND try_cast("日期" AS DATE) NOT IN (
+              SELECT try_cast("日期" AS DATE) FROM dedup WHERE try_cast("日期" AS DATE) IS NOT NULL
+            )
+        )"""
+        scene_source = "unioned"
+        scene_params += [period_start, period_end]
     promotion_scene_daily = _records(
         connection,
         f"""
@@ -1124,7 +1515,7 @@ def _build_powerbi_pages(
             FROM {promotion_view}
             WHERE try_cast("日期" AS DATE) BETWEEN ? AND ?
           ) WHERE _snapshot_rank = 1
-        )
+        ){scene_gap_cte}
         SELECT
           try_cast("日期" AS DATE) AS date,
           coalesce(nullif(cast("场景名字" AS VARCHAR), ''), '未分类场景') AS scene,
@@ -1135,12 +1526,27 @@ def _build_powerbi_pages(
           sum(coalesce(try_cast("总购物车数" AS DOUBLE), 0)) AS carts,
           sum(coalesce(try_cast("直接购物车数" AS DOUBLE), 0)) AS directCarts,
           sum(coalesce(try_cast("旺旺咨询量" AS DOUBLE), 0)) AS consultations
-        FROM dedup
+        FROM {scene_source}
         GROUP BY 1, 2 ORDER BY 1, spend DESC
         """,
-        [period_start, period_end],
+        scene_params,
     )
 
+    # mds 商品×场景补缺（taobao_item_promotion_daily）：item 表无直接购物车数，回填日该列为 0
+    promo_product_gap = ""
+    promo_product_from = "dedup"
+    promo_product_params: list[Any] = [period_start, period_end]
+    if mds_item_promo_view:
+        promo_product_gap = _gap_union_cte(
+            "unioned",
+            "dedup",
+            mds_item_promo_view,
+            [("日期", "日期"), ("商品ID", "商品ID"), ("主体名称", "主体名称"), ("场景名字", "场景名字"),
+             ("展现量", "展现量"), ("点击量", "点击量"), ("花费（未含达人）", None), ("花费", "花费"),
+             ("总成交金额", "总成交金额"), ("总购物车数", "总购物车数"), ("直接购物车数", None), ("旺旺咨询量", "旺旺咨询量")],
+        )
+        promo_product_from = "unioned"
+        promo_product_params += [period_start, period_end]
     promotion_product_daily = _records(
         connection,
         f"""
@@ -1159,7 +1565,7 @@ def _build_powerbi_pages(
             FROM {promotion_view}
             WHERE try_cast("日期" AS DATE) BETWEEN ? AND ? AND "商品ID" IS NOT NULL
           ) WHERE _snapshot_rank = 1
-        ), ranked AS (
+        ){promo_product_gap}, ranked AS (
           SELECT cast("商品ID" AS VARCHAR) AS productId,
                  sum(coalesce(try_cast("花费（未含达人）" AS DOUBLE), try_cast("花费" AS DOUBLE), 0)) AS spend
           FROM dedup
@@ -1176,11 +1582,11 @@ def _build_powerbi_pages(
           sum(coalesce(try_cast(data."总购物车数" AS DOUBLE), 0)) AS carts,
           sum(coalesce(try_cast(data."直接购物车数" AS DOUBLE), 0)) AS directCarts,
           sum(coalesce(try_cast(data."旺旺咨询量" AS DOUBLE), 0)) AS consultations
-        FROM dedup AS data
+        FROM {promo_product_from} AS data
         INNER JOIN ranked ON ranked.productId = cast(data."商品ID" AS VARCHAR)
         GROUP BY 1, 2, 3 ORDER BY 1, spend DESC
         """,
-        [period_start, period_end],
+        promo_product_params,
     )
 
     product_ids = sorted(
@@ -1209,17 +1615,35 @@ def _build_powerbi_pages(
             for item in products
         ]
 
+    shop_summary_daily = _build_shop_summary_daily(connection, period_start, period_end)
+
     return {
         "source": "powerbi_local_logic",
         "period": {"start": period_start, "end": period_end},
         "coverage": {
             "range": {"start": period_start.isoformat(), "end": period_end.isoformat()},
-            "base": _source_coverage(connection, base_view, "统计日期", period_start, period_end),
-            "product": _source_coverage(connection, product_view, "日期", period_start, period_end),
-            "promotion": _source_coverage(connection, promotion_view, "日期", period_start, period_end),
+            "base": _source_coverage_union(
+                connection,
+                [(base_view, "统计日期"), (mds_base_view, "日期")],
+                period_start,
+                period_end,
+            ),
+            "product": _source_coverage_union(
+                connection,
+                [(product_view, "日期"), (mds_product_view, "日期")],
+                period_start,
+                period_end,
+            ),
+            "promotion": _source_coverage_union(
+                connection,
+                [(promotion_view, "日期"), (mds_scene_view, "日期")],
+                period_start,
+                period_end,
+            ),
         },
         "overallDaily": overall_daily,
         "dailyCore": daily_core,
+        "shopSummaryDaily": shop_summary_daily,
         "productDaily": product_daily,
         "productDailyPriorYear": product_daily_prior_year,
         "promotionSceneDaily": promotion_scene_daily,
@@ -1260,9 +1684,46 @@ def _build_customer_service(
     口径不同，属于有意取舍，前端以此为准。
     """
     start_iso, end_iso = period_start.isoformat(), period_end.isoformat()
-    tmall = _build_tmall_customer_service(connection, start_iso, end_iso)
-    jd = _build_jd_customer_service(connection, start_iso, end_iso)
-    return {"period": {"start": start_iso, "end": end_iso}, "tmall": tmall, "jd": jd}
+    # 客服三源(天猫/京东/抖音)快照均承载各自全量历史(合计仅数万行,体量小),
+    # 不受 POWERBI_PAGE_WINDOW_DAYS=60 滚动窗口限制:period.start 放宽到各源最早数据日,
+    # 前端全局筛选即可查到任意历史日(2026-09-10 起,应运营要求)。
+    source_queries = {
+        "tmall": ("10-1淘宝客服绩效明细",),
+        "jd": ("10-2京东客服营销明细", "10-3京东客服绩效数据", "10-4客服员工日报统计"),
+        "douyin": ("16-抖音每日客服",),
+    }
+    # start 取窗口与各源最早数据日的较小者;end 取窗口与各源最晚数据日的较大者——
+    # 客服(尤其抖音 T-1 早 8 点导出)可能领先其他来源一天,不能因为生意参谋还没更新
+    # 就把客服最新一天挡在快照外(2026-09-11 实测:飞鸽 09-10 已入库但全局 period_end=09-09)。
+    bounds: dict[str, tuple[str, str]] = {}
+    for key, names in source_queries.items():
+        spans = [_customer_source_date_span(connection, name) for name in names]
+        lows = [lo for lo, _ in spans if lo and lo < start_iso]
+        highs = [hi for _, hi in spans if hi and hi > end_iso]
+        bounds[key] = (min(lows) if lows else start_iso, max(highs) if highs else end_iso)
+    tmall = _build_tmall_customer_service(connection, *bounds["tmall"])
+    jd = _build_jd_customer_service(connection, *bounds["jd"])
+    douyin = _build_douyin_customer_service(connection, *bounds["douyin"])
+    return {
+        "period": {"start": min(b[0] for b in bounds.values()), "end": max(b[1] for b in bounds.values())},
+        "tmall": tmall,
+        "jd": jd,
+        "douyin": douyin,
+    }
+
+
+def _customer_source_date_span(connection: duckdb.DuckDBPyConnection, query_name: str) -> tuple[str | None, str | None]:
+    """客服来源表的实际(最早, 最晚)数据日(ISO);视图不存在或无数据返回 (None, None)。"""
+    try:
+        view = _model_view(connection, query_name)
+    except ValueError:
+        return None, None
+    row = connection.execute(
+        f'SELECT min(try_cast("日期" AS DATE)), max(try_cast("日期" AS DATE)) FROM {view}'
+    ).fetchone()
+    lo = row[0].isoformat() if row and row[0] else None
+    hi = row[1].isoformat() if row and row[1] else None
+    return lo, hi
 
 
 def _customer_dedup_sql(view: str, start: str, end: str, keys: tuple[str, ...]) -> str:
@@ -1281,6 +1742,9 @@ def _customer_dedup_sql(view: str, start: str, end: str, keys: tuple[str, ...]) 
     ) WHERE _snapshot_rank = 1) AS dedup"""
 
 
+_TMALL_STRICT_ATOMS = {"满意", "很满意", "收到评价数", "询单人数", "询单最终付款人数", "客服消息条数", "买家消息条数"}
+
+
 def _build_tmall_customer_service(
     connection: duckdb.DuckDBPyConnection,
     start: str,
@@ -1290,6 +1754,65 @@ def _build_tmall_customer_service(
         view = _model_view(connection, "10-1淘宝客服绩效明细")
     except ValueError:
         return {"daily": [], "byAgent": [], "groups": []}
+    columns = _view_columns(connection, view.strip(chr(34)))
+    # 新结构（2026-06-29 起）直接提供原子分子分母（询单最终付款人数/询单人数/满意/很满意/收到评价数/客服·买家消息条数），
+    # 可严格按列名计算用户口径；旧结构只提供平台预制比率。列齐才走「新=严格 / 旧=预制 按日分叉」，
+    # 否则整体回退预制口径并标记 metricsCaliber=precomputed（前端显示「预置口径」角标）。
+    use_strict = not _TMALL_STRICT_ATOMS - set(columns)
+
+    if use_strict:
+        inquiry_rate = (
+            'CASE WHEN max(try_cast("询单最终付款人数" AS DOUBLE)) IS NOT NULL\n'
+            "     THEN sum(coalesce(try_cast(\"询单最终付款人数\" AS DOUBLE), 0))\n"
+            "          / nullif(sum(coalesce(try_cast(\"询单人数\" AS DOUBLE), 0)), 0)\n"
+            '     ELSE 1 - sum(coalesce(try_cast("询单流失人数" AS DOUBLE), 0))\n'
+            "              / nullif(sum(coalesce(try_cast(\"当日询单人数\" AS DOUBLE), 0)), 0)\n"
+            "     END"
+        )
+        satisfaction_rate = (
+            'CASE WHEN max(try_cast("满意" AS DOUBLE)) IS NOT NULL\n'
+            "     THEN (sum(coalesce(try_cast(\"满意\" AS DOUBLE), 0)) + sum(coalesce(try_cast(\"很满意\" AS DOUBLE), 0)))\n"
+            "          / nullif(sum(coalesce(try_cast(\"收到评价数\" AS DOUBLE), 0)), 0)\n"
+            '     ELSE sum(coalesce(try_cast("客户满意率" AS DOUBLE), 0)\n'
+            '              * coalesce(try_cast("有效接待人数" AS DOUBLE), 0))\n'
+            '          / nullif(sum(coalesce(try_cast("有效接待人数" AS DOUBLE), 0)), 0)\n'
+            "     END"
+        )
+        answer_ratio = (
+            'CASE WHEN max(try_cast("客服消息条数" AS DOUBLE)) IS NOT NULL\n'
+            "     THEN sum(coalesce(try_cast(\"客服消息条数\" AS DOUBLE), 0))\n"
+            "          / nullif(sum(coalesce(try_cast(\"买家消息条数\" AS DOUBLE), 0)), 0)\n"
+            '     ELSE avg(try_cast("淘宝答问比" AS DOUBLE)) END'
+        )
+        caliber = (
+            'CASE WHEN max(try_cast("询单最终付款人数" AS DOUBLE)) IS NOT NULL '
+            "THEN 'strict' ELSE 'precomputed' END"
+        )
+        final_pay_expr = 'sum(coalesce(try_cast("询单最终付款人数" AS DOUBLE), 0)) AS finalPayCusNum'
+        consult_expr = 'sum(coalesce(try_cast("询单人数" AS DOUBLE), 0)) AS consultNum'
+        evaluation_expr = 'sum(coalesce(try_cast("收到评价数" AS DOUBLE), 0)) AS evaluationNum'
+        satisfied_expr = 'sum(coalesce(try_cast("满意" AS DOUBLE), 0)) AS satisfiedNum'
+        very_satisfied_expr = 'sum(coalesce(try_cast("很满意" AS DOUBLE), 0)) AS verySatisfiedNum'
+        agent_msg_expr = 'sum(coalesce(try_cast("客服消息条数" AS DOUBLE), 0)) AS agentMsgNum'
+        buyer_msg_expr = 'sum(coalesce(try_cast("买家消息条数" AS DOUBLE), 0)) AS buyerMsgNum'
+    else:
+        # 旧结构：保留既有聚合口径（1−流失/询单、接待量加权满意率、平均答问比），仅补齐 metricsCaliber 标记。
+        inquiry_rate = "1 - sum(coalesce(try_cast(\"询单流失人数\" AS DOUBLE), 0)) / nullif(sum(coalesce(try_cast(\"当日询单人数\" AS DOUBLE), 0)), 0)"
+        satisfaction_rate = (
+            'sum(coalesce(try_cast("客户满意率" AS DOUBLE), 0)\n'
+            '    * coalesce(try_cast("有效接待人数" AS DOUBLE), 0))\n'
+            '  / nullif(sum(coalesce(try_cast("有效接待人数" AS DOUBLE), 0)), 0)'
+        )
+        answer_ratio = 'avg(try_cast("淘宝答问比" AS DOUBLE))'
+        caliber = "'precomputed'"
+        final_pay_expr = 'cast(NULL AS DOUBLE) AS finalPayCusNum'
+        consult_expr = 'cast(NULL AS DOUBLE) AS consultNum'
+        evaluation_expr = 'cast(NULL AS DOUBLE) AS evaluationNum'
+        satisfied_expr = 'cast(NULL AS DOUBLE) AS satisfiedNum'
+        very_satisfied_expr = 'cast(NULL AS DOUBLE) AS verySatisfiedNum'
+        agent_msg_expr = 'cast(NULL AS DOUBLE) AS agentMsgNum'
+        buyer_msg_expr = 'cast(NULL AS DOUBLE) AS buyerMsgNum'
+
     dedup = _customer_dedup_sql(view, start, end, ("旺旺昵称",))
     daily = _records(
         connection,
@@ -1300,18 +1823,21 @@ def _build_tmall_customer_service(
           sum(coalesce(try_cast("有效接待人数" AS DOUBLE), 0)) AS effectiveReceived,
           sum(coalesce(try_cast("当日询单人数" AS DOUBLE), 0)) AS todayInquiry,
           sum(coalesce(try_cast("销售人数" AS DOUBLE), 0)) AS salesPeople,
+          {final_pay_expr},
+          {consult_expr},
+          {evaluation_expr},
+          {satisfied_expr},
+          {very_satisfied_expr},
+          {agent_msg_expr},
+          {buyer_msg_expr},
           sum(coalesce(try_cast("净销售额" AS DOUBLE), 0)) AS netSales,
           avg(try_cast("客单价" AS DOUBLE)) AS unitPrice,
-          1 - sum(coalesce(try_cast("询单流失人数" AS DOUBLE), 0))
-              / nullif(sum(coalesce(try_cast("当日询单人数" AS DOUBLE), 0)), 0)
-            AS inquiryConversionRate,
+          {inquiry_rate} AS inquiryConversionRate,
           avg(try_cast("首次响应时长（秒)" AS DOUBLE)) AS firstResponse,
           avg(try_cast("平均响应时长（秒)" AS DOUBLE)) AS avgResponse,
-          avg(try_cast("淘宝答问比" AS DOUBLE)) AS answerRatio,
-          sum(coalesce(try_cast("客户满意率" AS DOUBLE), 0)
-              * coalesce(try_cast("有效接待人数" AS DOUBLE), 0))
-            / nullif(sum(coalesce(try_cast("有效接待人数" AS DOUBLE), 0)), 0)
-            AS satisfactionRate
+          {answer_ratio} AS answerRatio,
+          {satisfaction_rate} AS satisfactionRate,
+          {caliber} AS metricsCaliber
         FROM {dedup}
         GROUP BY 1 ORDER BY 1
         """,
@@ -1324,13 +1850,23 @@ def _build_tmall_customer_service(
           cast("旺旺昵称" AS VARCHAR) AS agent,
           max(cast("旺旺分组" AS VARCHAR)) AS groupName,
           sum(coalesce(try_cast("有效接待人数" AS DOUBLE), 0)) AS effectiveReceived,
-          sum(coalesce(try_cast("销售额" AS DOUBLE), 0)) / 10000 AS salesAmountWan,
+          -- 与 daily.netSales 同源：统一用「净销售额」（已扣成功退款），不用毛额「销售额」，
+          -- 否则 KPI 卡（净额）与明细表（毛额）在同一页出现两个口径的销售额合计。
+          sum(coalesce(try_cast("净销售额" AS DOUBLE), 0)) / 10000 AS netSalesWan,
+          {final_pay_expr},
+          {consult_expr},
+          {evaluation_expr},
+          {satisfied_expr},
+          {very_satisfied_expr},
+          {agent_msg_expr},
+          {buyer_msg_expr},
           sum(coalesce(try_cast("首次响应时长（秒)" AS DOUBLE), 0)) AS firstResponse,
-          sum(coalesce(try_cast("淘宝答问比" AS DOUBLE), 0)) AS answerRatio,
+          {answer_ratio} AS answerRatio,
           sum(coalesce(try_cast("平均响应时长（秒)" AS DOUBLE), 0)) AS avgResponse,
           sum(coalesce(try_cast("客单价" AS DOUBLE), 0)) AS unitPrice,
-          sum(coalesce(try_cast("询单最终付款转化率" AS DOUBLE), 0)) AS inquiryConvRate,
-          sum(coalesce(try_cast("客户满意率" AS DOUBLE), 0)) AS satisfactionRate
+          {inquiry_rate} AS inquiryConvRate,
+          {satisfaction_rate} AS satisfactionRate,
+          {caliber} AS metricsCaliber
         FROM {dedup}
         GROUP BY 1, 2 ORDER BY 1, 2
         """,
@@ -1350,6 +1886,68 @@ def _build_tmall_customer_service(
         "byAgent": by_agent,
         "groups": [row["value"] for row in groups],
     }
+
+
+def _build_douyin_customer_service(
+    connection: duckdb.DuckDBPyConnection,
+    start: str,
+    end: str,
+) -> dict[str, Any]:
+    """飞鸽「客服数据」导出(16-抖音每日客服):每文件一天,汇总行已在 transforms 剔除。
+
+    时长列在 transforms 解析为秒(在线时长秒/平响秒[工作时间平响]/首响秒),百分比列已转 0-1 小数。
+    询单转化率按 SUM(支付人数)/SUM(询单人数) 重算(不用导出列,与天猫口径一致);
+    满意率按有效评价数加权;净销售额=退款后销售额(已扣退款),单位元。
+    """
+    try:
+        view = _model_view(connection, "16-抖音每日客服")
+    except ValueError:
+        return {"daily": [], "byAgent": [], "groups": []}
+    dedup = _customer_dedup_sql(view, start, end, ("客服昵称",))
+    daily = _records(
+        connection,
+        f"""
+        SELECT
+          try_cast("日期" AS DATE) AS date,
+          count(DISTINCT CASE WHEN coalesce("在线时长秒", 0) > 0
+                THEN cast("客服昵称" AS VARCHAR) END) AS agentCount,
+          sum(coalesce("接待会话量", 0)) AS received,
+          sum(coalesce("在线时长秒", 0)) AS onlineSeconds,
+          sum(coalesce("退款后销售额", 0)) AS netSales,
+          sum(coalesce("支付人数", 0)) / nullif(sum(coalesce("询单人数", 0)), 0)
+            AS inquiryConvRate,
+          sum("全天满意率" * "有效评价数") FILTER (WHERE "全天满意率" IS NOT NULL)
+            / nullif(sum("有效评价数") FILTER (WHERE "全天满意率" IS NOT NULL), 0)
+            AS satisfactionRate,
+          avg("首响秒") AS firstResponse,
+          avg("平响秒") AS avgResponse
+        FROM {dedup}
+        GROUP BY 1 ORDER BY 1
+        """,
+    )
+    by_agent = _records(
+        connection,
+        f"""
+        SELECT
+          try_cast("日期" AS DATE) AS date,
+          cast("客服昵称" AS VARCHAR) AS agent,
+          sum(coalesce("接待会话量", 0)) AS received,
+          sum(coalesce("在线时长秒", 0)) AS onlineSeconds,
+          sum(coalesce("退款后销售额", 0)) AS netSales,
+          sum(coalesce("退款后销售额", 0)) / 10000 AS netSalesWan,
+          sum(coalesce("询单人数", 0)) AS inquiryCount,
+          sum(coalesce("支付人数", 0)) AS payCount,
+          sum(coalesce("有效评价数", 0)) AS evalCount,
+          sum(coalesce("支付人数", 0)) / nullif(sum(coalesce("询单人数", 0)), 0)
+            AS inquiryConvRate,
+          avg("全天满意率") AS satisfactionRate,
+          avg("首响秒") AS firstResponse,
+          avg("平响秒") AS avgResponse
+        FROM {dedup}
+        GROUP BY 1, 2 ORDER BY 1, 2
+        """,
+    )
+    return {"daily": daily, "byAgent": by_agent, "groups": []}
 
 
 def _build_jd_customer_service(
@@ -1582,13 +2180,19 @@ def _build_product_management_pages(
     statuses: list[str] | None = None,
     channels: list[str] | None = None,
     store_short_names: list[str] | None = None,
+    product_codes: list[str] | None = None,
+    exclude_product_codes: list[str] | None = None,
+    product_ids: list[str] | None = None,
+    exclude_product_ids: list[str] | None = None,
 ) -> dict[str, Any]:
     """聚水潭商品数据看板聚合：商品级销量/毛利/退货 + 床垫类别/渠道交叉矩阵 + 趋势 + 月环比。
 
     用复刻 PBIX ``Table.Distinct`` 的 model 视图聚合。转换层保留订单唯一键，模型层再移除
     快照元数据后去重，既与 PBIX 的最终订单行集合一致，也不会折叠不同订单。
     start/end（YYYY-MM-DD）为切片器日期范围；statuses、channels、store_short_names 为
-    订单状态、渠道平台、店铺简称的多选切片器值（IN 过滤）。传入任一后创建临时过滤视图，
+    订单状态、渠道平台、店铺简称的多选切片器值（IN 过滤）。product_codes / product_ids
+    为商品编码、商品ID 的「仅保留」列表，exclude_* 为排除列表；商品ID 经产品主数据
+    （商品编码 ↔ 商品ID）映射后按商品编码过滤。传入任一后创建临时过滤视图，
     所有聚合自动联动；可选项始终取自未过滤 base_view。
     """
     try:
@@ -1674,14 +2278,46 @@ def _build_product_management_pages(
     available_channels = _available_dimension_values("渠道平台" if "渠道平台" in source_columns else None)
     available_store_short_names = _available_dimension_values(store_short_column)
 
-    # 切片器过滤：日期范围 + 订单状态 + 渠道平台 + 店铺简称，创建临时视图替换 base_view。
-    # 上期数据可能落在日期范围之外（如仅选本月时上月为上期），因此单独保留一份
-    # 不带日期过滤、但保留其他维度过滤的视图 _jt_filtered_other，供上期查询使用。
+    # 产品主表（提供产品名称、成本、床垫类别），join 聚水潭计算毛利率与各产品分析。
+    # 提前到切片器过滤视图创建之前：商品ID 筛选需要先经产品主数据映射成商品编码。
+    try:
+        pm_view = _model_view(connection, "product-master")
+        has_master = True
+    except ValueError:
+        pm_view = None
+        has_master = False
+
+    master_columns = (
+        {row[0] for row in connection.execute(f"DESCRIBE {pm_view}").fetchall()}
+        if has_master and pm_view
+        else set()
+    )
+    # 商品ID 映射必须用未去重的 source 视图：model 视图按商品编码只保留最新源文件的一行，
+    # 同一编码在不同平台文件里的其它 商品ID 会被丢弃，导致按 ID 保留返回空、按 ID 排除静默失效。
+    pm_source_view = None
+    pm_source_columns: set[str] = set()
+    if has_master:
+        try:
+            pm_source_view = _source_view(connection, "product-master")
+            pm_source_columns = {
+                row[0] for row in connection.execute(f"DESCRIBE {pm_source_view}").fetchall()
+            }
+        except ValueError:
+            pm_source_view = pm_view
+            pm_source_columns = master_columns
+
+    # 日期筛选/聚合维度统一为「付款日期」，与聚水潭导出表 15-聚水潭商品数据 的付款日期口径一致。
+    # 履约时效仍按「订单日期」计算（见下方 order_date_expr），发货量图表仍按「发货日期」口径。
+    analysis_date = "付款日期" if "付款日期" in source_columns else "订单日期"
+
+    # 切片器过滤：日期范围 + 订单状态 + 渠道平台 + 店铺简称 + 商品范围，
+    # 创建临时视图替换 base_view。上期数据可能落在日期范围之外（如仅选本月时上月为上期），
+    # 因此单独保留一份不带日期过滤、但保留其他维度过滤的视图 _jt_filtered_other，供上期查询使用。
     date_filter = None
     date_conds: list[str] = []
     other_conds: list[str] = []
     if start and end and _re.fullmatch(r"\d{4}-\d{2}-\d{2}", start) and _re.fullmatch(r"\d{4}-\d{2}-\d{2}", end):
-        date_conds.append(f'"订单日期" >= DATE \'{start}\' AND "订单日期" <= DATE \'{end}\'')
+        date_conds.append(f'"{analysis_date}" >= DATE \'{start}\' AND "{analysis_date}" <= DATE \'{end}\'')
         date_filter = (start, end)
     if statuses:
         escaped = ",".join("'" + s.replace("'", "''") + "'" for s in statuses if s)
@@ -1695,6 +2331,59 @@ def _build_product_management_pages(
         store_filter = _in_filter(store_short_column, store_short_names)
         if store_filter:
             other_conds.append(store_filter)
+
+    # 商品范围筛选：商品编码直接过滤订单行；商品ID 先经产品主数据映射成商品编码。
+    # 未匹配产品主数据的订单：会被「仅保留ID」筛掉（无法证明属于保留集），
+    # 但不会被「排除ID」误删（无法证明属于排除集）。
+    def _clean_filter_values(values: list[str] | None) -> list[str]:
+        cleaned: list[str] = []
+        seen: set[str] = set()
+        for value in values or []:
+            text = str(value).strip()
+            if text and text not in seen:
+                seen.add(text)
+                cleaned.append(text)
+        return cleaned
+
+    def _codes_for_product_ids(values: list[str]) -> list[str] | None:
+        """把商品ID 映射成商品编码；产品主数据不可用时返回 None。"""
+        if not values:
+            return []
+        if not pm_source_view or not {"商品编码", "商品ID"}.issubset(pm_source_columns):
+            return None
+        escaped = ",".join("'" + value.replace("'", "''") + "'" for value in values)
+        rows = connection.execute(
+            f'SELECT DISTINCT cast("商品编码" AS VARCHAR) FROM {pm_source_view} '
+            f"WHERE regexp_replace(trim(cast(\"商品ID\" AS VARCHAR)), '\\.0+$', '') IN ({escaped})"
+        ).fetchall()
+        return [str(row[0]).strip() for row in rows if row[0] is not None and str(row[0]).strip()]
+
+    def _normalize_product_ids(values: list[str]) -> list[str]:
+        # Excel 数值单元格可能把 1001 读成 1001.0；与主数据侧同样去掉末尾 .0。
+        return [_re.sub(r"\.0+$", "", value) for value in values]
+
+    scope_include_codes = _clean_filter_values(product_codes)
+    scope_exclude_codes = _clean_filter_values(exclude_product_codes)
+    scope_include_ids = _normalize_product_ids(_clean_filter_values(product_ids))
+    scope_exclude_ids = _normalize_product_ids(_clean_filter_values(exclude_product_ids))
+
+    if scope_include_codes:
+        code_filter = _in_filter("商品编码", scope_include_codes) if "商品编码" in source_columns else None
+        other_conds.append(code_filter or "FALSE")
+    if scope_exclude_codes and "商品编码" in source_columns:
+        code_filter = _in_filter("商品编码", scope_exclude_codes)
+        if code_filter:
+            other_conds.append(f"NOT ({code_filter})")
+    if scope_include_ids:
+        mapped_codes = _codes_for_product_ids(scope_include_ids)
+        id_filter = _in_filter("商品编码", mapped_codes) if mapped_codes and "商品编码" in source_columns else None
+        other_conds.append(id_filter or "FALSE")
+    if scope_exclude_ids:
+        mapped_codes = _codes_for_product_ids(scope_exclude_ids)
+        if mapped_codes and "商品编码" in source_columns:
+            id_filter = _in_filter("商品编码", mapped_codes)
+            if id_filter:
+                other_conds.append(f"NOT ({id_filter})")
 
     all_conds = date_conds + other_conds
     if all_conds:
@@ -1717,8 +2406,13 @@ def _build_product_management_pages(
         period = (start, end)
     else:
         period = connection.execute(
-            f'SELECT min("订单日期"), max("订单日期") FROM {view} WHERE "订单日期" IS NOT NULL'
+            f'SELECT min("{analysis_date}"), max("{analysis_date}") FROM {view} WHERE "{analysis_date}" IS NOT NULL'
         ).fetchone()
+        # 商品范围过滤后可能没有任何订单：展示周期回退到未过滤数据，避免页面误报“尚未同步”。
+        if not period or period[0] is None:
+            period = connection.execute(
+                f'SELECT min("{analysis_date}"), max("{analysis_date}") FROM {base_view} WHERE "{analysis_date}" IS NOT NULL'
+            ).fetchone()
 
     # 期间对比窗口：当期 = 所选日期范围（x 天），上期 = 所选范围前一段等长窗口（x 天）。
     # 例：选 2026-07-01~07-31（31 天），上期 = 2026-05-31~06-30（31 天）。
@@ -1743,14 +2437,14 @@ def _build_product_management_pages(
             cur_range = None
     if cur_range is None:
         months = connection.execute(
-            f"""SELECT strftime('%Y-%m', "订单日期") AS month FROM {view}
-               WHERE "订单日期" IS NOT NULL GROUP BY 1 ORDER BY 1 DESC LIMIT 3"""
+            f"""SELECT strftime('%Y-%m', "{analysis_date}") AS month FROM {view}
+               WHERE "{analysis_date}" IS NOT NULL GROUP BY 1 ORDER BY 1 DESC LIMIT 3"""
         ).fetchall()
         if months:
             # 校验最新月份是否完整：若该月最大日期 < 月末，回退到上一个完整月
             cur_m = months[0][0]
             max_date_row = connection.execute(
-                f'SELECT max("订单日期") FROM {view} WHERE strftime(\'%Y-%m\', "订单日期") = ?',
+                f'SELECT max("{analysis_date}") FROM {view} WHERE strftime(\'%Y-%m\', "{analysis_date}") = ?',
                 [cur_m],
             ).fetchone()
             max_date = max_date_row[0] if max_date_row else None
@@ -1774,19 +2468,6 @@ def _build_product_management_pages(
                 prev_range = _month_to_range(prev_m)
                 prev_label = prev_m
 
-    # 产品主表（提供产品名称、成本、床垫类别），join 聚水潭计算毛利率与各产品分析。
-    try:
-        pm_view = _model_view(connection, "product-master")
-        has_master = True
-    except ValueError:
-        pm_view = None
-        has_master = False
-
-    master_columns = (
-        {row[0] for row in connection.execute(f"DESCRIBE {pm_view}").fetchall()}
-        if has_master and pm_view
-        else set()
-    )
     # 辅4-床垫编码（q18）提供 SPU/尺寸/厚度/是否折叠等富维度，仅作 supplemental join。
     try:
         q18_view = _model_view(connection, "辅4-床垫编码")
@@ -1794,12 +2475,8 @@ def _build_product_management_pages(
     except ValueError:
         q18_view = None
         q18_columns = set()
-    jd_master_view = _source_view(connection, "product-master") if has_master else None
-    jd_master_columns = (
-        {row[0] for row in connection.execute(f"DESCRIBE {jd_master_view}").fetchall()}
-        if jd_master_view
-        else set()
-    )
+    jd_master_view = pm_source_view
+    jd_master_columns = pm_source_columns
     pm_join = f"LEFT JOIN {pm_view} pm ON s.\"商品编码\" = pm.\"商品编码\"" if has_master else ""
     # PBIX 对京东自营先以“店铺商品编码 → 商品ID”找回商家规编，再关联产品主数据。
     # 用未按商品编码去重的自营源映射保留全部 商品ID，直接补一条唯一产品名称映射，避免订单行放大。
@@ -1939,7 +2616,7 @@ def _build_product_management_pages(
         or 0
     )
     # 商品管理统一使用商家实收作为金额口径；回款率 = 商家实收 / 销售金额。
-    # 0.01 链接、礼品袋等已在转换层按 PBIX M 规则置零并过滤，销售数量可安全用于销量口径。
+    # 礼品袋、链接等垃圾单已在转换层按 PBIX M 规则置零并过滤；0.01 过滤已于 2026-10-06 取消，0.01 链接订单计入销量口径。
     kpis = {
         "productCount": int(product_count),
         "orderLines": int(order_lines),
@@ -2009,7 +2686,7 @@ def _build_product_management_pages(
     daily_trend = _records(
         connection,
         f"""
-        SELECT s."订单日期" AS date,
+        SELECT s."{analysis_date}" AS date,
                sum(coalesce(try_cast(s."商家实收" AS DOUBLE),0)) AS receivedAmount,
                sum(coalesce(try_cast(s."销售数量" AS DOUBLE),0)) AS salesUnits,
                sum(coalesce(try_cast(s."销售金额" AS DOUBLE),0)) AS salesAmount,
@@ -2017,8 +2694,8 @@ def _build_product_management_pages(
                {margin_select}
                count(*) AS orderLines
         FROM {view} s {pm_join}
-        WHERE s."订单日期" IS NOT NULL
-          AND s."订单日期" >= (SELECT max("订单日期") - INTERVAL 400 DAY FROM {view})
+        WHERE s."{analysis_date}" IS NOT NULL
+          AND s."{analysis_date}" >= (SELECT max("{analysis_date}") - INTERVAL 400 DAY FROM {view})
         GROUP BY 1 ORDER BY 1
         """,
     )
@@ -2035,7 +2712,7 @@ def _build_product_management_pages(
         previous_daily_trend = _records(
             connection,
             f"""
-            SELECT s."订单日期" AS date,
+            SELECT s."{analysis_date}" AS date,
                    sum(coalesce(try_cast(s."商家实收" AS DOUBLE),0)) AS receivedAmount,
                    sum(coalesce(try_cast(s."销售数量" AS DOUBLE),0)) AS salesUnits,
                    sum(coalesce(try_cast(s."销售金额" AS DOUBLE),0)) AS salesAmount,
@@ -2043,8 +2720,8 @@ def _build_product_management_pages(
                    {margin_select}
                    count(*) AS orderLines
             FROM {prev_view} s {pm_join}
-            WHERE s."订单日期" IS NOT NULL
-              AND s."订单日期" >= CAST(? AS DATE) AND s."订单日期" <= CAST(? AS DATE)
+            WHERE s."{analysis_date}" IS NOT NULL
+              AND s."{analysis_date}" >= CAST(? AS DATE) AND s."{analysis_date}" <= CAST(? AS DATE)
             GROUP BY 1 ORDER BY 1
             """,
             [prev_range[0], prev_range[1]],
@@ -2490,7 +3167,7 @@ def _build_product_management_pages(
     monthly_trend = _records(
         connection,
         f"""
-        SELECT strftime('%Y-%m', s."订单日期") AS month,
+        SELECT strftime('%Y-%m', s."{analysis_date}") AS month,
                sum(coalesce(try_cast(s."商家实收" AS DOUBLE),0)) AS receivedAmount,
                sum(coalesce(try_cast(s."销售数量" AS DOUBLE),0)) AS salesUnits,
                sum(coalesce(try_cast(s."销售金额" AS DOUBLE),0)) AS salesAmount,
@@ -2498,7 +3175,7 @@ def _build_product_management_pages(
                {margin_select}
                count(*) AS orderLines
         FROM {view} s {pm_join}
-        WHERE s."订单日期" IS NOT NULL
+        WHERE s."{analysis_date}" IS NOT NULL
         GROUP BY 1 ORDER BY 1
         """,
     )
@@ -2567,7 +3244,7 @@ def _build_product_management_pages(
                   {margin_select}
                   {custom_sales_col}
                 FROM {query_view} s {pm_join}
-                WHERE s."订单日期" >= CAST(? AS DATE) AND s."订单日期" <= CAST(? AS DATE)
+                WHERE s."{analysis_date}" >= CAST(? AS DATE) AND s."{analysis_date}" <= CAST(? AS DATE)
                 """,
                 [rng[0], rng[1]],
             ).fetchone()
@@ -2613,7 +3290,7 @@ def _build_product_management_pages(
             f"""SELECT sum(coalesce(try_cast(s."销售数量" AS DOUBLE), 0)) AS pendingUnits
                 FROM {prev_view} s
                 WHERE cast(s."订单状态明细" AS VARCHAR) LIKE '%待发货%'
-                  AND s."订单日期" >= CAST(? AS DATE) AND s."订单日期" <= CAST(? AS DATE)""",
+                  AND s."{analysis_date}" >= CAST(? AS DATE) AND s."{analysis_date}" <= CAST(? AS DATE)""",
             [prev_range[0], prev_range[1]],
         ).fetchone()
         prev_pending_val = float(prev_pending_row[0] or 0) if prev_pending_row else 0.0
@@ -2626,7 +3303,7 @@ def _build_product_management_pages(
                        sum(coalesce(try_cast(s."商家实收" AS DOUBLE), 0)) AS prevReceivedAmount
                 FROM {prev_view} s
                 WHERE s."商品编码" IS NOT NULL
-                  AND s."订单日期" >= CAST(? AS DATE) AND s."订单日期" <= CAST(? AS DATE)
+                  AND s."{analysis_date}" >= CAST(? AS DATE) AND s."{analysis_date}" <= CAST(? AS DATE)
                 GROUP BY 1""",
                 [prev_range[0], prev_range[1]],
             )
@@ -2644,7 +3321,7 @@ def _build_product_management_pages(
                        sum(coalesce(try_cast(s."商家实收" AS DOUBLE), 0)) AS prevReceivedAmount
                 FROM {prev_view} s {pm_join}
                 WHERE pm."床垫类别" IS NOT NULL AND trim(cast(pm."床垫类别" AS VARCHAR)) <> ''
-                  AND s."订单日期" >= CAST(? AS DATE) AND s."订单日期" <= CAST(? AS DATE)
+                  AND s."{analysis_date}" >= CAST(? AS DATE) AND s."{analysis_date}" <= CAST(? AS DATE)
                 GROUP BY 1""",
                 [prev_range[0], prev_range[1]],
             )
@@ -2659,7 +3336,7 @@ def _build_product_management_pages(
                        sum(coalesce(try_cast(s."商家实收" AS DOUBLE), 0)) AS prevReceivedAmount
                 FROM {prev_view} s {pm_join}
                 WHERE {product_name_expr} <> '(未命名)'
-                  AND s."订单日期" >= CAST(? AS DATE) AND s."订单日期" <= CAST(? AS DATE)
+                  AND s."{analysis_date}" >= CAST(? AS DATE) AND s."{analysis_date}" <= CAST(? AS DATE)
                 GROUP BY 1""",
                 [prev_range[0], prev_range[1]],
             )
@@ -2698,15 +3375,15 @@ def _build_product_management_pages(
         "row",
     )
 
-    daily_window = "" if date_filter else f"AND s.\"订单日期\" >= (SELECT max(\"订单日期\") - INTERVAL 30 DAY FROM {view})"
+    daily_window = "" if date_filter else f"AND s.\"{analysis_date}\" >= (SELECT max(\"{analysis_date}\") - INTERVAL 30 DAY FROM {view})"
     daily_channel_matrix = _matrix(
         connection,
         f"""
         PIVOT (
-          SELECT cast(s."订单日期" AS VARCHAR) AS row, {channel_expr} AS channel,
+          SELECT cast(s."{analysis_date}" AS VARCHAR) AS row, {channel_expr} AS channel,
                  coalesce(try_cast(s."销售数量" AS DOUBLE),0) AS units
           FROM {view} s
-          WHERE s."订单日期" IS NOT NULL
+          WHERE s."{analysis_date}" IS NOT NULL
             {daily_window}
         ) ON channel USING sum(units) ORDER BY row
         """,
@@ -2718,11 +3395,11 @@ def _build_product_management_pages(
         connection,
         f"""
         PIVOT (
-          SELECT cast(s."订单日期" AS VARCHAR) AS row,
+          SELECT cast(s."{analysis_date}" AS VARCHAR) AS row,
                  coalesce(cast(s."订单状态明细" AS VARCHAR), '(未知)') AS status,
                  coalesce(try_cast(s."销售数量" AS DOUBLE),0) AS units
           FROM {view} s
-          WHERE s."订单日期" IS NOT NULL
+          WHERE s."{analysis_date}" IS NOT NULL
             {daily_window}
         ) ON status USING sum(units) ORDER BY row
         """,
@@ -2735,11 +3412,11 @@ def _build_product_management_pages(
             connection,
             f"""
             PIVOT (
-              SELECT cast(s."订单日期" AS VARCHAR) AS row,
+              SELECT cast(s."{analysis_date}" AS VARCHAR) AS row,
                       coalesce(cast(s."发货仓" AS VARCHAR), '(未设定)') AS warehouse,
                       coalesce(try_cast(s."销售数量" AS DOUBLE),0) AS units
               FROM {view} s
-              WHERE s."订单日期" IS NOT NULL
+              WHERE s."{analysis_date}" IS NOT NULL
                 {daily_window}
             ) ON warehouse USING sum(units) ORDER BY row
             """,
@@ -2787,11 +3464,11 @@ def _build_product_management_pages(
             connection,
             f"""
             PIVOT (
-              SELECT cast(s."订单日期" AS VARCHAR) AS row,
+              SELECT cast(s."{analysis_date}" AS VARCHAR) AS row,
                       coalesce(nullif(trim(cast(q18."床垫类别" AS VARCHAR)), ''), '其他') AS category,
                       coalesce(try_cast(s."销售数量" AS DOUBLE),0) AS units
               FROM {view} s LEFT JOIN {q18_view} q18 ON s."商品编码" = q18."商家规编（后台）"
-              WHERE s."订单日期" IS NOT NULL
+              WHERE s."{analysis_date}" IS NOT NULL
                 {daily_window}
             ) ON category USING sum(units) ORDER BY row
             """,
@@ -2806,11 +3483,11 @@ def _build_product_management_pages(
             connection,
             f"""
             PIVOT (
-              SELECT cast(s."订单日期" AS VARCHAR) AS row, {channel_expr} AS channel,
+              SELECT cast(s."{analysis_date}" AS VARCHAR) AS row, {channel_expr} AS channel,
                      CASE WHEN pm."成本" IS NOT NULL THEN coalesce(try_cast(s."商家实收" AS DOUBLE),0)
                           - coalesce(try_cast(pm."成本" AS DOUBLE),0)*coalesce(try_cast(s."销售数量" AS DOUBLE),0) ELSE 0 END AS v
               FROM {view} s {pm_join}
-              WHERE s."订单日期" IS NOT NULL {daily_window}
+              WHERE s."{analysis_date}" IS NOT NULL {daily_window}
             ) ON channel USING sum(v) ORDER BY row
             """,
             "row",
@@ -2819,10 +3496,10 @@ def _build_product_management_pages(
             connection,
             f"""
             PIVOT (
-              SELECT cast(s."订单日期" AS VARCHAR) AS row, {channel_expr} AS channel,
+              SELECT cast(s."{analysis_date}" AS VARCHAR) AS row, {channel_expr} AS channel,
                      CASE WHEN pm."成本" IS NOT NULL THEN coalesce(try_cast(s."商家实收" AS DOUBLE),0) ELSE 0 END AS v
               FROM {view} s {pm_join}
-              WHERE s."订单日期" IS NOT NULL {daily_window}
+              WHERE s."{analysis_date}" IS NOT NULL {daily_window}
             ) ON channel USING sum(v) ORDER BY row
             """,
             "row",
@@ -3222,7 +3899,10 @@ def sync_warehouse(
     results = []
     started = time.perf_counter()
     for spec in selected_specs:
-        results.append(_sync_query(paths, spec, state, options, progress))
+        if spec.source_kind == "postgres":
+            results.append(_sync_postgres_query(paths, spec, state, options, progress))
+        else:
+            results.append(_sync_query(paths, spec, state, options, progress))
         state["updatedAt"] = datetime.now().astimezone().isoformat()
         _write_json_atomic(paths.state_file, state)
 

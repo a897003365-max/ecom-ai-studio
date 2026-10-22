@@ -92,7 +92,8 @@ function buildChannelMonthlyOverview(
 /**
  * 把全渠道 DingTalk 快照切成单渠道视图：totals 取该渠道的 platform 行，
  * platforms/stores 过滤到该渠道，daily 由 reporting.dailyPlatforms 按日期重聚合，
- * monthlyOverview 按渠道重算目标进度带（去年同期逐日回款 + 渠道月度目标）。
+ * monthlyOverview 按渠道重算目标进度带（去年同期逐日回款 + 渠道月度目标），
+ * metricTrends 取服务端预聚合的渠道级同比/环比，latestComparison 过滤到该渠道。
  * channel 为 "all" 或空时原样返回。金额口径沿用 filterDingTalkSnapshot 的 daily 聚合，
  * 不引入新权威源。
  */
@@ -114,10 +115,24 @@ export function selectChannelSnapshot(dingtalk: DingTalkSnapshot, channel: strin
   const platform = dingtalk.platforms.find((item) => item.platform === channel);
   const totals: DingTalkMetricTotals = platform ? { ...platform } : emptyMetrics();
   const overview = dingtalk.reporting?.monthlyOverview;
-  const reporting = dingtalk.reporting && overview
+  const comparison = dingtalk.reporting?.latestComparison
+    ? {
+        ...dingtalk.reporting.latestComparison,
+        channels: dingtalk.reporting.latestComparison.channels.filter((item) => item.platform === channel),
+        stores: dingtalk.reporting.latestComparison.stores.filter((item) => item.platform === channel),
+      }
+    : undefined;
+  const trendsByPlatform = dingtalk.reporting?.metricTrendsByPlatform;
+  const reporting = dingtalk.reporting
     ? {
         ...dingtalk.reporting,
-        monthlyOverview: buildChannelMonthlyOverview(overview, dingtalk.reporting.monthlyTargetsByPlatform, channel),
+        monthlyOverview: overview
+          ? buildChannelMonthlyOverview(overview, dingtalk.reporting.monthlyTargetsByPlatform, channel)
+          : overview,
+        // 渠道级 trends 缺失（渠道无历史数据）时显示“同比 —”，不回退全渠道值；
+        // 仅当服务端未提供渠道级数据（旧快照）时沿用全渠道 trends。
+        metricTrends: trendsByPlatform ? trendsByPlatform[channel] : dingtalk.reporting.metricTrends,
+        latestComparison: comparison,
       }
     : dingtalk.reporting;
   return {

@@ -379,6 +379,9 @@
 .product-command .radar-wrap { display: grid; gap: 10px; padding: 14px; }
 .product-command .radar-svg { width: min(100%, 360px); margin: 0 auto; }
 .product-command .radar-grid { fill: none; stroke: rgba(175, 203, 190, 0.12); }
+/* 白天模式：底线网格在浅色底上用深色描边，否则几乎不可见 */
+:root[data-theme="light"] .product-command .radar-grid { stroke: var(--color-border-strong); }
+:root[data-theme="light"] .product-command .radar-current { fill: var(--color-accent-soft); }
 .product-command .radar-current { fill: rgba(166, 229, 54, 0.22); stroke: var(--brand); stroke-width: 2; }
 .product-command .radar-label { fill: var(--muted); font-size: 10px; }
 .product-command .radar-note { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }

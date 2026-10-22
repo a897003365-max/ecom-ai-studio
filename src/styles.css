@@ -662,12 +662,20 @@ select option:disabled {
     @apply grid gap-1.5 text-[11px] font-semibold text-[var(--muted)];
   }
 
-  .date-field input {
+  .date-field input,
+  .date-field textarea {
     @apply min-h-9 w-full rounded-md border border-[var(--border)] bg-white/[0.04] px-2.5 text-[12px] text-[var(--text)] outline-none;
     color-scheme: dark;
   }
 
-  .date-field input:focus {
+  .date-field textarea {
+    min-height: 56px;
+    padding-block: 6px;
+    resize: vertical;
+  }
+
+  .date-field input:focus,
+  .date-field textarea:focus {
     border-color: var(--brand);
   }
 
@@ -677,10 +685,6 @@ select option:disabled {
 
   .insight-row {
     @apply flex items-center justify-between gap-4 border-b border-[var(--border)] pb-3 text-xs;
-  }
-
-  .insight-grid {
-    @apply grid gap-3 lg:grid-cols-4;
   }
 
   .insight-note {
@@ -953,6 +957,14 @@ select option:disabled {
     border-color: rgba(243, 182, 63, 0.55);
     color: var(--orange);
     background: var(--orange-bg);
+  }
+
+  /* 缺失态：只保留一个橙色圆点，无边框/背景/文字，悬浮才展示明细 */
+  .dashboard-data-status.is-dot-only {
+    min-height: 0;
+    border: 0;
+    padding: 0;
+    background: transparent;
   }
 
   .comparison-ticker:hover .comparison-ticker-track {
@@ -1903,6 +1915,19 @@ html {
   white-space: nowrap;
 }
 
+.pb-precomputed-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border: 1px solid color-mix(in srgb, var(--amber) 55%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--amber) 14%, transparent);
+  color: var(--amber);
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
 .pb-page-heading {
   position: relative;
   justify-content: space-between;
@@ -1953,8 +1978,9 @@ html {
   grid-template-columns: minmax(390px, 0.85fr) minmax(520px, 1.15fr);
   grid-template-areas:
     "main daily"
-    "products products";
-  grid-template-rows: 1fr auto;
+    "products products"
+    "summary summary";
+  grid-template-rows: 1fr auto auto;
   gap: 1px;
   min-width: 1060px;
   background: var(--border);
@@ -2000,6 +2026,7 @@ html {
 .pb-overall-main,
 .pb-daily-matrix,
 .pb-product-table,
+.pb-shop-summary,
 .pb-detail-layout main,
 .pb-product-promotion-layout main {
   min-width: 0;
@@ -2022,6 +2049,12 @@ html {
   grid-area: products;
   padding: 14px;
   animation: pb-surface-in 600ms 350ms var(--ease-out-expo) both;
+}
+
+.pb-shop-summary {
+  grid-area: summary;
+  padding: 14px;
+  animation: pb-surface-in 600ms 400ms var(--ease-out-expo) both;
 }
 
 .pb-panel-title {
@@ -3116,6 +3149,7 @@ html {
   .pb-overall-main,
   .pb-daily-matrix,
   .pb-product-table,
+  .pb-shop-summary,
   .pb-kpi,
   .pb-animated-table,
   .pb-table-row,
@@ -4004,7 +4038,7 @@ html {
 .exec-mid-grid {
   display: grid;
   min-width: 0;
-  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1.25fr) minmax(0, 1fr);
   grid-template-rows: 360px;
   gap: 10px;
 }
@@ -4035,7 +4069,6 @@ html {
   min-width: 620px;
 }
 
-.exec-mid-grid .exec-category-panel .exec-category-list,
 .exec-mid-grid .exec-funnel-panel .exec-funnel-list {
   flex: 1 1 auto;
   min-height: 0;
@@ -4461,69 +4494,35 @@ html {
   z-index: 1;
 }
 
-.exec-category-panel .exec-panel-head,
 .exec-spend-panel .exec-panel-head {
   min-height: 70px;
-}
-
-.exec-category-list {
-  display: grid;
-  gap: 13px;
-  padding: 14px;
-}
-
-.exec-category-row {
-  display: grid;
-  grid-template-columns: minmax(110px, 1.1fr) minmax(90px, 1fr) auto;
-  align-items: center;
-  gap: 9px;
-}
-
-.exec-category-row > span {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: 7px;
-  overflow: hidden;
-  color: var(--text);
-  font-size: 9.5px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.exec-category-row em {
-  color: var(--muted-2);
-  font-family: var(--font-display);
-  font-size: 8px;
-  font-style: normal;
-}
-
-.exec-category-row > div {
-  height: 7px;
-  overflow: hidden;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--text) 8%, transparent);
-}
-
-.exec-category-row > div i {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: linear-gradient(90deg, #48c97b, var(--brand));
-  box-shadow: 0 0 10px rgba(166, 229, 54, 0.15);
-  transform-origin: left;
-  animation: exec-width-grow 760ms 300ms var(--ease-out-expo) both;
-}
-
-.exec-category-row > b {
-  color: var(--text);
-  font-size: 9px;
 }
 
 .exec-funnel-panel .exec-panel-unit b {
   margin-left: 6px;
   color: var(--brand);
   font-size: 16px;
+}
+
+.exec-insight-panel .exec-insight-list {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  overflow-y: auto;
+}
+
+.exec-insight-panel .insight-row > b {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.exec-insight-panel .insight-note {
+  margin-top: auto;
 }
 
 .exec-funnel-list {
@@ -4698,6 +4697,21 @@ html {
   .exec-bottom-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+  .exec-mid-grid {
+    grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  }
+  .exec-insight-panel {
+    grid-column: 1 / -1;
+  }
+  .exec-insight-panel .exec-insight-list {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(0, 1.2fr);
+    align-items: start;
+    gap: 12px;
+  }
+  .exec-insight-panel .insight-note {
+    margin-top: 0;
+  }
 }
 
 @media (max-width: 1150px) {
@@ -4708,6 +4722,12 @@ html {
   }
   .exec-mid-grid {
     grid-template-rows: auto;
+  }
+  .exec-insight-panel .exec-insight-list {
+    display: flex;
+  }
+  .exec-insight-panel .insight-note {
+    margin-top: auto;
   }
   .exec-mid-grid .channel-chart-canvas svg {
     height: auto;
@@ -4743,7 +4763,6 @@ html {
   .exec-target-band,
   .exec-bridge-step rect,
   .exec-table-bar i,
-  .exec-category-row > div i,
   .exec-spend-bars i {
     animation: none;
   }
@@ -5529,4 +5548,22 @@ html {
   justify-content: flex-end;
   gap: 0.75rem;
   margin-top: 1.5rem;
+}
+/* === 嵌入模式（iframe 中运行时隐藏导航栏和用户栏） === */
+.app-embedded {
+  min-height: 0;
+  height: 100%;
+}
+.app-embedded .content-shell {
+  padding-top: 12px;
+  padding-bottom: 12px;
+  height: 100%;
+  overflow-y: auto;
+}
+.app-embedded .top-progress-bar {
+  display: none;
+}
+
+.pb-data-table tr.is-day-selectable {
+  cursor: pointer;
 }

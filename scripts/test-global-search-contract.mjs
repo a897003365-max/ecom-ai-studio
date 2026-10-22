@@ -70,7 +70,7 @@ assert.match(searchTypes, /dataState:/, "SearchAnswer 缺少数据状态");
 // --- 锚点存在 ---
 const anchors = [
   "analytics-top", "analytics-daily-trend", "analytics-revenue-quality",
-  "analytics-channel-quality", "analytics-store-quality", "analytics-category-performance",
+  "analytics-channel-quality", "analytics-store-quality",
   "analytics-channel-spend", "analytics-funnel", "analytics-tmall-overall",
   "analytics-tmall-promotion", "analytics-tmall-product",
   "products-overview", "products-priority", "products-gallery", "products-channel",

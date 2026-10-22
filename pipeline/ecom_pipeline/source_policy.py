@@ -85,6 +85,7 @@ POWERBI_UNIQUE_DOMAINS: tuple[dict[str, Any], ...] = (
             "淘宝客服排班表",
             "营销数据",
             "营销数据改版",
+            "16-抖音每日客服",
         ),
     },
     {

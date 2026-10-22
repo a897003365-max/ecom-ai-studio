@@ -46,11 +46,6 @@ export async function handleArkCall(req, res) {
     sendJson(res, 405, { error: "POST only" });
     return;
   }
-  const apiKey = process.env.ARK_API_KEY?.trim();
-  if (!apiKey) {
-    sendJson(res, 503, { error: "服务端未配置 ARK_API_KEY，请在 .env 中填入后重启服务" });
-    return;
-  }
   let payload;
   try {
     payload = await readJson(req);
@@ -63,61 +58,79 @@ export async function handleArkCall(req, res) {
     return;
   }
 
-  const upstream = await new Promise((resolve, reject) => {
-    const url = new URL(ARK_ENDPOINT);
-    // 前端走 Anthropic 风格的 {system, messages}；chat/completions 需要把 system 并成首条 system 消息
-    const body = JSON.stringify({
-      model: payload.model ?? ARK_MODEL,
-      max_tokens: payload.maxTokens ?? 2048,
-      temperature: payload.temperature ?? 0.7,
-      messages: [
-        ...(payload.system ? [{ role: "system", content: payload.system }] : []),
-        ...payload.messages,
-      ],
-    });
-    const proxyReq = https.request(
-      {
-        hostname: url.hostname,
+  // 候选 key：主 ARK_API_KEY → 备用 ARK_API_KEY_BACKUP（主 key 鉴权失败 401/403 时自动切换）
+  const keys = [process.env.ARK_API_KEY, process.env.ARK_API_KEY_BACKUP]
+    .map((k) => k?.trim())
+    .filter(Boolean);
+  if (keys.length === 0) {
+    sendJson(res, 503, { error: "服务端未配置 ARK_API_KEY / ARK_API_KEY_BACKUP，请在 .env 中填入后重启服务" });
+    return;
+  }
 
-        path: url.pathname,
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          "content-length": Buffer.byteLength(body),
-          authorization: `Bearer ${apiKey}`,
-        },
-        timeout: ARK_TIMEOUT_MS,
-      },
-      (proxyRes) => {
-        const chunks = [];
-        proxyRes.on("data", (chunk) => chunks.push(chunk));
-        proxyRes.on("end", () => resolve({ status: proxyRes.statusCode ?? 0, body: Buffer.concat(chunks).toString("utf8") }));
-        proxyRes.on("error", reject);
-      },
-    );
-    proxyReq.on("timeout", () => proxyReq.destroy(new Error("upstream timeout")));
-    proxyReq.on("error", reject);
-    proxyReq.write(body);
-    proxyReq.end();
+  const body = JSON.stringify({
+    model: payload.model ?? ARK_MODEL,
+    max_tokens: payload.maxTokens ?? 2048,
+    temperature: payload.temperature ?? 0.7,
+    messages: [
+      ...(payload.system ? [{ role: "system", content: payload.system }] : []),
+      ...payload.messages,
+    ],
   });
 
-  if (upstream.status === 401 || upstream.status === 403) {
-    sendJson(res, 502, { error: "火山 Ark 鉴权失败，请检查服务端 ARK_API_KEY 是否有效" });
+  for (let i = 0; i < keys.length; i++) {
+    const apiKey = keys[i];
+    const isLast = i === keys.length - 1;
+    const upstream = await new Promise((resolve, reject) => {
+      const url = new URL(ARK_ENDPOINT);
+      // 前端走 Anthropic 风格的 {system, messages}；chat/completions 需要把 system 并成首条 system 消息
+      const proxyReq = https.request(
+        {
+          hostname: url.hostname,
+          path: url.pathname,
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "content-length": Buffer.byteLength(body),
+            authorization: `Bearer ${apiKey}`,
+          },
+          timeout: ARK_TIMEOUT_MS,
+        },
+        (proxyRes) => {
+          const chunks = [];
+          proxyRes.on("data", (chunk) => chunks.push(chunk));
+          proxyRes.on("end", () => resolve({ status: proxyRes.statusCode ?? 0, body: Buffer.concat(chunks).toString("utf8") }));
+          proxyRes.on("error", reject);
+        },
+      );
+      proxyReq.on("timeout", () => proxyReq.destroy(new Error("upstream timeout")));
+      proxyReq.on("error", reject);
+      proxyReq.write(body);
+      proxyReq.end();
+    });
+
+    if (upstream.status === 401 || upstream.status === 403) {
+      if (!isLast) {
+        console.warn(`[arkProxy] 第 ${i + 1} 个 ARK key 鉴权失败（${upstream.status}），自动切换备用 key 重试`);
+        continue; // 试下一个候选 key
+      }
+      sendJson(res, 502, { error: "火山 Ark 鉴权失败，请检查服务端 ARK_API_KEY / ARK_API_KEY_BACKUP 是否有效" });
+      return;
+    }
+    if (upstream.status !== 200) {
+      // 安全：上游 body 仅写入服务端日志，不透传给客户端
+      console.error(`[arkProxy] upstream ${upstream.status}: ${upstream.body.slice(0, 500)}`);
+      sendJson(res, 502, { error: `Ark 上游服务返回错误（状态 ${upstream.status}），请稍后重试` });
+      return;
+    }
+    let parsed;
+    try {
+      parsed = JSON.parse(upstream.body);
+    } catch {
+      sendJson(res, 502, { error: "上游响应非 JSON" });
+      return;
+    }
+    const text = parsed.choices?.[0]?.message?.content ?? "";
+    sendJson(res, 200, { text, usage: parsed.usage });
     return;
   }
-  if (upstream.status !== 200) {
-    // 安全：上游 body 仅写入服务端日志，不透传给客户端
-    console.error(`[arkProxy] upstream ${upstream.status}: ${upstream.body.slice(0, 500)}`);
-    sendJson(res, 502, { error: `Ark 上游服务返回错误（状态 ${upstream.status}），请稍后重试` });
-    return;
-  }
-  let parsed;
-  try {
-    parsed = JSON.parse(upstream.body);
-  } catch {
-    sendJson(res, 502, { error: "上游响应非 JSON" });
-    return;
-  }
-  const text = parsed.choices?.[0]?.message?.content ?? "";
-  sendJson(res, 200, { text, usage: parsed.usage });
 }

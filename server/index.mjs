@@ -18,7 +18,7 @@ import { buildDashboardDataStatus } from "./dashboard-status.mjs";
 import { checkWarehouse, prewarmPowerbiPagesOnDemand, queryPowerbiPagesOnDemand, queryProductsOnDemand, readWarehouseSnapshot, syncWarehouse, warehouseSnapshotMtime } from "./warehouse.mjs";
 import { searchSite } from "./search-service.mjs";
 import { fetchCompetitorPrices, fetchProducts } from "./yudao-client.mjs";
-import { getPipelineState, hasSourceXlsx, saveSourceFile, sourceXlsxInfo, startAnalysisPipeline, requestCancel, visionProviderInfo } from "./intelligence-pipeline.mjs";
+import { getPipelineState, hasSourceXlsx, importAnalysisRows, saveSourceFile, sourceXlsxInfo, startAnalysisPipeline, requestCancel, visionProviderInfo } from "./intelligence-pipeline.mjs";
 import { generateIntelligenceReport, reportArtifactPath } from "./intelligence-report.mjs";
 import { hasVisionKey } from "./vision-client.mjs";
 import {
@@ -286,7 +286,7 @@ function requiredPermissionForApi(method, path) {
   if (path === "/api/analytics/powerbi-pages") return "analytics.view";
   if (path === "/api/search") return ["analytics.view", "products.view"];
   if (path === "/api/sync/analytics") return "analytics.manage";
-  if (path === "/api/products") return "products.view";
+  if (path === "/api/products" || path === "/api/products/period") return "products.view";
   if (path === "/api/masterdata/competitor-prices") return "intelligence.view";
   if (path === "/api/masterdata/products") return "products.view";
   if (path.startsWith("/api/workflows")) return method === "GET" ? "content.view" : "content.manage";
@@ -738,23 +738,45 @@ async function handleApi(request, response, url) {
     const result = await searchSite({ query, mode, limit, user: currentUser, permissions: currentUser.permissions }, context);
     return sendJson(response, 200, result);
   }
+  // 产品页首屏只需要数据可用周期来设置默认日期（最新日期近 7 天），
+  // 不读取整个 productManagement 快照，避免多传约 5MB。
+  if (request.method === "GET" && path === "/api/products/period") {
+    const snapshot = await readWarehouseSnapshot();
+    return sendJsonCached(response, {
+      period: snapshot?.productManagement?.period ?? null,
+      refreshedAt: snapshot?.refreshedAt ?? null,
+    });
+  }
   if (request.method === "GET" && path === "/api/products") {
     const start = url.searchParams.get("start") || undefined;
     const end = url.searchParams.get("end") || undefined;
     const statuses = url.searchParams.getAll("status");
     const channels = url.searchParams.getAll("channel");
     const storeShortNames = url.searchParams.getAll("storeShortName");
+    const productCodes = url.searchParams.getAll("productCode");
+    const excludeProductCodes = url.searchParams.getAll("excludeProductCode");
+    const productIds = url.searchParams.getAll("productId");
+    const excludeProductIds = url.searchParams.getAll("excludeProductId");
     // 用快照 refreshedAt（随 sync 变化）而非 new Date()，保证相同数据响应体一致，ETag 可命中 304
     const snapshot = await readWarehouseSnapshot();
     const refreshedAt = snapshot?.refreshedAt ?? null;
-    if (start || end || statuses.length || channels.length || storeShortNames.length) {
+    if (
+      start || end || statuses.length || channels.length || storeShortNames.length
+      || productCodes.length || excludeProductCodes.length || productIds.length || excludeProductIds.length
+    ) {
       try {
-        const onDemand = await queryProductsOnDemand({ start, end, statuses, channels, storeShortNames });
+        const onDemand = await queryProductsOnDemand({
+          start, end, statuses, channels, storeShortNames,
+          productCodes, excludeProductCodes, productIds, excludeProductIds,
+        });
         return sendJsonCached(response, {
           productManagement: onDemand.productManagement,
           refreshedAt,
           status: "ok",
-          filtered: { start: start ?? null, end: end ?? null, statuses, channels, storeShortNames },
+          filtered: {
+            start: start ?? null, end: end ?? null, statuses, channels, storeShortNames,
+            productCodes, excludeProductCodes, productIds, excludeProductIds,
+          },
         });
       } catch (error) {
         return sendJson(response, 200, {
@@ -905,7 +927,7 @@ async function handleApi(request, response, url) {
     return sendJson(response, 200, { syncRuns: listSyncRuns(), uploads: listUploads(), tasks: listTasks(30) });
   }
   if (request.method === "GET" && path === "/api/intelligence/periods") {
-    return sendJson(response, 200, { periods: listIntelligencePeriods() });
+    return sendJson(response, 200, { periods: listIntelligencePeriods(url.searchParams.get("category")) });
   }
   // 竞品价格趋势：聚合 price-snapshots/<period>.json 中同一商品的多期快照。
   // 快照文件由抓取流程按周期落盘（scripts/export-price-snapshots.mjs 负责首期导出）。
@@ -913,9 +935,16 @@ async function handleApi(request, response, url) {
     const id = String(url.searchParams.get("id") || "").trim();
     if (!id) return sendJson(response, 400, { error: "缺少 id 参数" });
     const snapshotsDir = join(intelligenceDir, "price-snapshots");
+    // 按类目过滤快照：儿童床垫为 <period>_儿童床垫.json；默认类目排除一切类目后缀文件
+    const trendSuffix = intelligenceCategorySuffix(url.searchParams.get("category"));
+    const allCatSuffixes = Object.values(INTELLIGENCE_CATEGORIES);
     let files = [];
     try {
-      files = readdirSync(snapshotsDir).filter((f) => f.endsWith(".json")).sort();
+      files = readdirSync(snapshotsDir).filter((f) => {
+        if (!f.endsWith(".json")) return false;
+        const stem = f.slice(0, -".json".length);
+        return trendSuffix ? stem.endsWith(trendSuffix) : !allCatSuffixes.some((s) => stem.endsWith(s));
+      }).sort();
     } catch {
       files = [];
     }
@@ -954,13 +983,13 @@ async function handleApi(request, response, url) {
     return sendJson(response, 200, { id, productName, points, snapshots: files.length });
   }
   if (request.method === "GET" && path === "/api/intelligence/top100") {
-    return serveIntelligenceJson(response, "top100.json", url.searchParams.get("period"));
+    return serveIntelligenceJson(response, "top100.json", url.searchParams.get("period"), url.searchParams.get("category"));
   }
   if (request.method === "GET" && path === "/api/intelligence/brand-ranking") {
-    return serveIntelligenceJson(response, "brand-ranking.json", url.searchParams.get("period"));
+    return serveIntelligenceJson(response, "brand-ranking.json", url.searchParams.get("period"), url.searchParams.get("category"));
   }
   if (request.method === "GET" && path === "/api/intelligence/insights") {
-    return serveIntelligenceJson(response, "insights.json", url.searchParams.get("period"));
+    return serveIntelligenceJson(response, "insights.json", url.searchParams.get("period"), url.searchParams.get("category"));
   }
   if (request.method === "GET" && path === "/api/intelligence/analyze-status") {
     return sendJson(response, 200, {
@@ -973,7 +1002,7 @@ async function handleApi(request, response, url) {
   }
   // 解析失败清单（含 LLM 原始返回片段），诊断哪些图片的输出无法解析为结构化字段
   if (request.method === "GET" && path === "/api/intelligence/parse-failures") {
-    const safePeriod = String(url.searchParams.get("period") || "").replace(/[^0-9A-Za-z~_|-]/g, "");
+    const safePeriod = String(url.searchParams.get("period") || "").replace(/[\\/:*?"<>|\s]+/g, "_");
     if (!safePeriod) return sendJson(response, 400, { error: "缺少 period 参数" });
     const fp = join(intelligenceDir, "analysis-cache", safePeriod, "pipeline-parse-failures.json");
     if (!existsSync(fp)) return sendJson(response, 200, { period: safePeriod, failures: [] });
@@ -1120,6 +1149,17 @@ async function handleApi(request, response, url) {
       return sendJson(response, 400, { error: errorMessage(error) });
     }
   }
+  // 导入外部完成的分析结果（本机子代理视觉分析，不经第三方 LLM）：
+  // 写入周期缓存后 analyze-source 会因全部行已缓存跳过视觉接口，直接 merge + build
+  if (request.method === "POST" && path === "/api/intelligence/import-analysis") {
+    try {
+      const body = await readJson(request);
+      const result = importAnalysisRows(body?.period, body?.rows);
+      return sendJson(response, 200, result);
+    } catch (error) {
+      return sendJson(response, 400, { error: errorMessage(error) });
+    }
+  }
   if (request.method === "POST" && path === "/api/intelligence/analyze-source") {
     try {
       const body = await readJson(request).catch(() => ({}));
@@ -1260,16 +1300,32 @@ function serveCompetitorImage(response, fileName) {
   createReadStream(filePath).pipe(response);
 }
 
-function serveIntelligenceJson(response, name, period) {
-  // 周期快照：?period=2026-08-25 读 top100-<period>.json；不带 period 读最新
+// 竞品情报类目：category 参数值 → 数据文件名后缀（床垫类为默认，无后缀）
+const INTELLIGENCE_CATEGORIES = { kids: "_儿童床垫" };
+
+function intelligenceCategorySuffix(category) {
+  return INTELLIGENCE_CATEGORIES[String(category ?? "")] ?? "";
+}
+
+function serveIntelligenceJson(response, name, period, category) {
+  const suffix = intelligenceCategorySuffix(category);
+  // 周期快照：?period=2026-08-25 读 top100-<period>[_类目].json；不带 period 读最新
   let filePath = join(intelligenceDir, name);
   if (period) {
-    const safePeriod = String(period).replace(/[^0-9A-Za-z~_|-]/g, "");
-    const snapshotPath = join(intelligenceDir, name.replace(/\.json$/, `-${safePeriod}.json`));
+    const safePeriod = String(period).replace(/[\\/:*?"<>|\s]+/g, "_");
+    const snapshotPath = join(intelligenceDir, name.replace(/\.json$/, `-${safePeriod}${suffix}.json`));
     if (existsSync(snapshotPath)) {
       filePath = snapshotPath;
     } else {
-      return sendJson(response, 404, { error: `周期 ${safePeriod} 的 ${name} 不存在`, availablePeriods: listIntelligencePeriods() });
+      return sendJson(response, 404, { error: `周期 ${safePeriod} 的 ${name} 不存在`, availablePeriods: listIntelligencePeriods(category) });
+    }
+  } else {
+    // "最新"统一走该类目最新周期快照：静态 <name>.json 会被任意类目的分析管线覆盖（类目归属不可靠），
+    // 仅在该类目无任何周期快照时才回退静态文件
+    const latest = listIntelligencePeriods(category)[0];
+    if (latest) {
+      const candidate = join(intelligenceDir, name.replace(/\.json$/, `-${latest}${suffix}.json`));
+      if (existsSync(candidate)) filePath = candidate;
     }
   }
   if (!existsSync(filePath)) {
@@ -1283,14 +1339,22 @@ function serveIntelligenceJson(response, name, period) {
   }
 }
 
-// 扫描 intelligence 目录里的周期快照文件（top100-<period>.json），返回可用周期列表
-function listIntelligencePeriods() {
+// 扫描 intelligence 目录里的周期快照文件（top100-<period>[_类目].json），按类目返回可用周期列表；
+// 默认类目须排除带类目后缀的文件（避免把 top100-2026-09-16_儿童床垫.json 误列为周期）
+function listIntelligencePeriods(category) {
+  const suffix = intelligenceCategorySuffix(category);
+  const allSuffixes = Object.values(INTELLIGENCE_CATEGORIES);
   try {
     const files = readdirSync(intelligenceDir);
     const periods = new Set();
     for (const f of files) {
       const m = f.match(/^top100-(.+)\.json$/);
-      if (m) periods.add(m[1]);
+      if (!m) continue;
+      if (suffix) {
+        if (m[1].endsWith(suffix)) periods.add(m[1].slice(0, -suffix.length));
+      } else if (!allSuffixes.some((s) => m[1].endsWith(s))) {
+        periods.add(m[1]);
+      }
     }
     return [...periods].sort().reverse();
   } catch {
@@ -1302,8 +1366,31 @@ function serveProduction(response, pathname) {
   const requested = pathname === "/" ? "index.html" : pathname.replace(/^\/+/, "");
   const normalizedPath = normalize(join(distDir, requested));
   const filePath = normalizedPath.startsWith(distDir) && existsSync(normalizedPath) ? normalizedPath : join(distDir, "index.html");
-  response.writeHead(200, { "Content-Type": mimeTypes[extname(filePath)] ?? "application/octet-stream" });
-  createReadStream(filePath).pipe(response);
+  const ext = extname(filePath).toLowerCase();
+  const headers = { "Content-Type": mimeTypes[ext] ?? "application/octet-stream" };
+  // 构建产物带内容 hash，可强缓存一年；index.html 必须实时校验
+  headers["Cache-Control"] = ext === ".html" ? "no-cache" : "public, max-age=31536000, immutable";
+  const body = readFileSync(filePath);
+  // 静态资源按 Accept-Encoding 协商压缩，降低 SSH 隧道传输量（803KB js -> ~200KB）
+  const acceptEncoding = String(response.req?.headers?.["accept-encoding"] || "").toLowerCase();
+  const compressible = [".js", ".css", ".html", ".json", ".svg", ".txt", ".map", ".woff2"].includes(ext) && body.length > 1024;
+  if (compressible && acceptEncoding.includes("br")) {
+    headers["Content-Encoding"] = "br";
+    headers["Vary"] = "Accept-Encoding";
+    const compressed = brotliCompressSync(body, { params: { [zlibConstants.BROTLI_PARAM_QUALITY]: 9 } });
+    response.writeHead(200, headers);
+    response.end(compressed);
+    return;
+  }
+  if (compressible && acceptEncoding.includes("gzip")) {
+    headers["Content-Encoding"] = "gzip";
+    headers["Vary"] = "Accept-Encoding";
+    response.writeHead(200, headers);
+    response.end(gzipSync(body, { level: 9 }));
+    return;
+  }
+  response.writeHead(200, headers);
+  response.end(body);
 }
 
 const vite = production ? null : await createViteServer({
@@ -1392,6 +1479,6 @@ async function prewarmPowerbiPages() {
 setTimeout(prewarmPowerbiPages, 15_000).unref?.();
 setInterval(prewarmPowerbiPages, 5 * 60_000).unref?.();
 
-// restart-trigger: 1787733992
+// restart-trigger: 1829000000
 // Wed Aug 26 21:34:07     2026 touch
 // touch 1787751473
