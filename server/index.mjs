@@ -358,7 +358,8 @@ function hasCurrentProductManagementMetrics(productManagement) {
     && !Object.hasOwn(kpis, "totalShippedUnits")
     && Array.isArray(productManagement?.fulfillmentByProduct)
     && productManagement?.monthlyComparison?.currentPeriod
-    && Array.isArray(productManagement?.previousDailyTrend),
+    && Array.isArray(productManagement?.previousDailyTrend)
+    && Array.isArray(productManagement?.warehouseStatusDaily?.rows),
   );
 }
 

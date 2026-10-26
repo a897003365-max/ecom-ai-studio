@@ -43,3 +43,6 @@
 
 .product-management-page .product-trend-tooltip-heading { position: sticky; top: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; background: var(--panel-solid); }
 .product-management-page .product-trend-tooltip-close { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; min-width: 44px; min-height: 44px; padding: 8px; border: 1px solid var(--border-2); border-radius: 5px; background: var(--panel-solid); color: var(--text); cursor: pointer; }
+.matrix-daily-note { display: flex; flex-direction: column; gap: 4px; padding: 12px; color: var(--muted); font-size: 12px; }
+.matrix-daily-date { display: inline-block; padding-inline-start: 28px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.matrix-expand-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }

@@ -445,7 +445,7 @@ export function ProductManagementPage({ onAction, searchTarget, onSearchConsumed
               <MatrixTable matrix={pm.channelStatusMatrix ?? { columns: [], rows: [] }} rowHeader="渠道平台" minWidth={860} />
             </Card>
             <Card title="发货仓 × 订单状态 销售数量" className="mt-4">
-              <MatrixTable matrix={pm.warehouseStatusMatrix} rowHeader="发货仓" minWidth={860} />
+              <MatrixTable matrix={pm.warehouseStatusMatrix} dailyDetails={pm.warehouseStatusDaily} rowHeader="发货仓" minWidth={860} />
             </Card>
             <Card title="每日发货量趋势 · 发货日期 × 发货仓销售数量" className="mt-4">
               <div className="mb-3 text-[12px] text-[var(--muted)]">

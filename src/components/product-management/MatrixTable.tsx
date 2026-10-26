@@ -2,10 +2,10 @@ import { Pagination } from "../SortableTable";
 import { useViewState } from "../../hooks/useViewState";
 // 通用矩阵表组件 · 渲染 ProductMatrix 结构
 // 支持排序、分页、进度条、百分比/数量格式
-import { useEffect, type ReactNode } from "react";
-import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
+import { Fragment, useEffect, type ReactNode } from "react";
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, ChevronRight } from "lucide-react";
 import { TableShell } from "../TableShell";
-import type { ProductMatrix } from "../../types/integration";
+import type { ProductMatrix, WarehouseStatusDaily } from "../../types/integration";
 
 const compactNumber = new Intl.NumberFormat("zh-CN", { notation: "compact", maximumFractionDigits: 1 });
 
@@ -34,12 +34,14 @@ interface MatrixTableProps {
   minWidth: number;
   pageSize?: number;
   valueFormat?: "count" | "percent";
+  dailyDetails?: WarehouseStatusDaily;
 }
 
-export function MatrixTable({ matrix, rowHeader, minWidth, pageSize = 0, valueFormat = "count" }: MatrixTableProps) {
+export function MatrixTable({ matrix, rowHeader, minWidth, pageSize = 0, valueFormat = "count", dailyDetails }: MatrixTableProps) {
   const [sortKey, setSortKey] = useViewState<string | null>("MatrixTable.sortKey", null);
   const [dir, setDir] = useViewState<"asc" | "desc">("MatrixTable.dir", "asc");
   const [page, setPage] = useViewState("MatrixTable.page", 0, { resetOnFilterChange: true });
+  const [expanded, setExpanded] = useViewState<string[]>("MatrixTable.expanded", [], { resetOnFilterChange: true });
 
   const currentPage = Math.min(page, Math.max(0, pageSize > 0 ? Math.ceil(matrix.rows.length / pageSize) - 1 : 0));
   useEffect(() => { if (page !== currentPage) setPage(currentPage); }, [page, currentPage, setPage]);
@@ -103,6 +105,13 @@ export function MatrixTable({ matrix, rowHeader, minWidth, pageSize = 0, valueFo
 
   return (
     <div className="matrix-table-wrap">
+      {dailyDetails && (
+        <div className="matrix-daily-note">
+          <span>展开查看近 7 天付款明细{dailyDetails.start && dailyDetails.end ? ` · ${dailyDetails.start} 至 ${dailyDetails.end}` : ""}</span>
+          <span>父行汇总整个筛选期间；明细按付款日期统计销售件数，状态取当前数据。</span>
+          {dailyDetails.message && <span role="status">{dailyDetails.message}</span>}
+        </div>
+      )}
       <div className="matrix-scale-note" data-testid="matrix-shared-scale">
         <span>统一量尺</span>
         <span>进度条按全表最大单元格 {count(sharedMax)} 相对显示</span>
@@ -117,8 +126,23 @@ export function MatrixTable({ matrix, rowHeader, minWidth, pageSize = 0, valueFo
         </thead>
         <tbody>
           {visible.map((row) => (
+            <Fragment key={row.rowKey}>
             <tr className="matrix-row" key={row.rowKey}>
-              <td className="font-semibold">{row.rowKey}</td>
+              <td className="font-semibold">
+                {dailyDetails?.rows.some((day) => day.warehouse === row.rowKey) && (
+                  <button
+                    type="button"
+                    className="matrix-expand-btn"
+                    aria-label={`${expanded.includes(row.rowKey) ? "收起" : "展开"}${row.rowKey}近7天付款明细`}
+                    aria-expanded={expanded.includes(row.rowKey)}
+                    onClick={() => setExpanded((previous) => previous.includes(row.rowKey)
+                      ? previous.filter((key) => key !== row.rowKey) : [...previous, row.rowKey])}
+                  >
+                    {expanded.includes(row.rowKey) ? <ChevronDown size={14} aria-hidden="true" /> : <ChevronRight size={14} aria-hidden="true" />}
+                  </button>
+                )}
+                {row.rowKey}
+              </td>
               {matrix.columns.map((col) => {
                 const val = row.values[col] || 0;
                 return (
@@ -130,6 +154,24 @@ export function MatrixTable({ matrix, rowHeader, minWidth, pageSize = 0, valueFo
               })}
               <td className="matrix-total-cell">{row.total != null ? (valueFormat === "percent" ? percent(row.total) : count(row.total)) : "-"}</td>
             </tr>
+            {expanded.includes(row.rowKey) && dailyDetails?.rows.filter((day) => day.warehouse === row.rowKey).map((day) => (
+              <tr className="matrix-row matrix-row-child matrix-daily-row" key={day.date}>
+                <td><span className="matrix-daily-date">{day.date}</span></td>
+                {matrix.columns.map((col) => {
+                  const value = day.values[col];
+                  return (
+                    <td className="matrix-value-cell" key={col}>
+                      <span className={value ? "matrix-value" : "text-[var(--muted-2)]"}>
+                        {value == null ? "未覆盖" : count(value)}
+                      </span>
+                      {value != null && value > 0 && <MatrixProgress value={value} max={sharedMax} />}
+                    </td>
+                  );
+                })}
+                <td className="matrix-total-cell">{day.total == null ? "未覆盖" : count(day.total)}</td>
+              </tr>
+            ))}
+            </Fragment>
           ))}
         </tbody>
       </TableShell>

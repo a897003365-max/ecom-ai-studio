@@ -2173,6 +2173,61 @@ def _month_to_range(month: str) -> tuple[str, str]:
     return (first.isoformat(), last.isoformat())
 
 
+def _warehouse_status_daily(
+    connection: duckdb.DuckDBPyConnection,
+    view: str,
+    base_view: str,
+    source_columns: set[str],
+    matrix: dict[str, Any],
+    date_filter: tuple[str, str] | None,
+) -> dict[str, Any]:
+    result: dict[str, Any] = {
+        "start": None, "end": None, "coverageStart": None, "coverageEnd": None,
+        "message": None, "rows": [],
+    }
+    if "付款日期" not in source_columns:
+        result["message"] = "源数据缺少付款日期，无法展示每日付款明细。"
+        return result
+    first, latest = connection.execute(
+        f'SELECT min(try_cast("付款日期" AS DATE)), max(try_cast("付款日期" AS DATE)) FROM {base_view}'
+    ).fetchone()
+    if latest is None:
+        result["message"] = "源数据暂无有效付款日期。"
+        return result
+    end_day = date.fromisoformat(date_filter[1]) if date_filter else latest
+    start_day = end_day - timedelta(days=6)
+    if date_filter:
+        start_day = max(start_day, date.fromisoformat(date_filter[0]))
+    result.update(start=start_day.isoformat(), end=end_day.isoformat(),
+                  coverageStart=first.isoformat(), coverageEnd=latest.isoformat())
+    if start_day < first or end_day > latest:
+        result["message"] = f"付款数据日期范围为 {first} 至 {latest}；范围外日期显示未覆盖。"
+    grouped = connection.execute(
+        f'''SELECT coalesce(cast("发货仓" AS VARCHAR), '(未设定)'),
+                   try_cast("付款日期" AS DATE),
+                   coalesce(cast("订单状态明细" AS VARCHAR), '(未知)'),
+                   sum(coalesce(try_cast("销售数量" AS DOUBLE), 0))
+            FROM {view}
+            WHERE try_cast("付款日期" AS DATE) BETWEEN ? AND ?
+              AND ("发货仓" IS NOT NULL OR "订单状态" IS NOT NULL)
+            GROUP BY 1, 2, 3''', [start_day, end_day]
+    ).fetchall()
+    values_by_day: dict[tuple[str, date], dict[str, float]] = {}
+    for warehouse, day, status, units in grouped:
+        values_by_day.setdefault((warehouse, day), {})[status] = float(units)
+    for parent in matrix["rows"]:
+        for offset in range((end_day - start_day).days + 1):
+            day = end_day - timedelta(days=offset)
+            covered = first <= day <= latest
+            actual = values_by_day.get((parent["rowKey"], day), {})
+            values = {status: actual.get(status, 0.0) if covered else None for status in matrix["columns"]}
+            result["rows"].append({
+                "warehouse": parent["rowKey"], "date": day.isoformat(), "values": values,
+                "total": sum(values.values()) if covered else None,
+            })
+    return result
+
+
 def _build_product_management_pages(
     connection: duckdb.DuckDBPyConnection,
     start: str | None = None,
@@ -2221,6 +2276,8 @@ def _build_product_management_pages(
             "monthlyComparison": None,
             "categoryChannelMatrix": {"columns": [], "rows": []},
             "warehouseStatusMatrix": {"columns": [], "rows": []},
+            "warehouseStatusDaily": {"start": None, "end": None, "coverageStart": None, "coverageEnd": None,
+                                     "message": "商品数据尚未同步。", "rows": []},
             "dailyChannelMatrix": {"columns": [], "rows": []},
             "dailyWarehouseMatrix": {"columns": [], "rows": []},
             "dailyShipWarehouseMatrix": {"columns": [], "rows": []},
@@ -3376,6 +3433,10 @@ def _build_product_management_pages(
         "row",
     )
 
+    warehouse_status_daily = _warehouse_status_daily(
+        connection, view, base_view, source_columns, warehouse_status_matrix, date_filter,
+    )
+
     daily_window = "" if date_filter else f"AND s.\"{analysis_date}\" >= (SELECT max(\"{analysis_date}\") - INTERVAL 30 DAY FROM {view})"
     daily_channel_matrix = _matrix(
         connection,
@@ -3638,6 +3699,7 @@ def _build_product_management_pages(
         "monthlyComparison": monthly_comparison,
         "categoryChannelMatrix": category_channel_matrix,
         "warehouseStatusMatrix": warehouse_status_matrix,
+        "warehouseStatusDaily": warehouse_status_daily,
         "dailyChannelMatrix": daily_channel_matrix,
         "dailyWarehouseMatrix": daily_warehouse_matrix,
         "dailyShipWarehouseMatrix": daily_ship_warehouse_matrix,

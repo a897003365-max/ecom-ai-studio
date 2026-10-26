@@ -611,6 +611,7 @@ export interface ProductManagementPages {
   monthlyComparison: ProductMonthlyComparison | null;
   categoryChannelMatrix: ProductMatrix;
   warehouseStatusMatrix: ProductMatrix;
+  warehouseStatusDaily: WarehouseStatusDaily;
   dailyChannelMatrix: ProductMatrix;
   dailyWarehouseMatrix: ProductMatrix;
   dailyShipWarehouseMatrix: ProductMatrix;
@@ -648,6 +649,15 @@ export interface ProductMonthlyComparison {
 export interface ProductMatrix {
   columns: string[];
   rows: Array<{ rowKey: string; values: Record<string, number | null>; total: number | null }>;
+}
+
+export interface WarehouseStatusDaily {
+  start: string | null;
+  end: string | null;
+  coverageStart: string | null;
+  coverageEnd: string | null;
+  message: string | null;
+  rows: Array<{ warehouse: string; date: string; values: Record<string, number | null>; total: number | null }>;
 }
 
 // 产品名称 × 子名称 × 订单状态（销售数量）层级矩阵：父=产品名称，子=子名称
